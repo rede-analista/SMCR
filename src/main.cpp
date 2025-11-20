@@ -1,0 +1,57 @@
+// Conteúdo de main.cpp
+
+#include "globals.h" // Inclui tudo o que precisamos
+
+
+// Inicialização de Variáveis globais
+bool vB_wifiIsConnected = false;
+
+// Definição do objeto Preferences.
+Preferences preferences;
+
+// Definição da instância global da sua configuração em memória
+MainConfig_t vSt_mainConfig;
+AsyncWebServer* SERVIDOR_WEB_ASYNC = nullptr;
+
+void setup() {
+  // 1. Carregar a MainConfig_t (sua startup-config) da Flash para a RAM (running-config)
+  fV_carregarMainConfig();
+
+  // 2. Condicionalmente inicializa a Serial e define as flags de log
+  // Agora, usa os valores da struct vSt_mainConfig
+  if (vSt_mainConfig.vB_serialDebugEnabled) {
+    Serial.begin(115200);
+    delay(1000); // Dar tempo para o monitor serial conectar
+    // fV_printSerialDebug agora usa diretamente vSt_mainConfig.vU32_activeLogFlags
+    fV_printSerialDebug(LOG_INIT, "--- Inicializando SMCR ---");
+    fV_printSerialDebug(LOG_INIT, "Flags de log ativas: %u", vSt_mainConfig.vU32_activeLogFlags);
+
+  } else {
+    // Se o debug serial estiver desabilitado, garante que as flags de log estão desativadas
+    // A função fV_printSerialDebug já vai verificar vSt_mainConfig.vU32_activeLogFlags == LOG_NONE
+    // Se não houver Serial.begin(), nada será impresso.
+    // **Importante:** Se você precisa de Serial.begin() por outros motivos (ex: OTA, que precisa da Serial para mensagens de upload),
+    // apenas mantenha Serial.begin(115200) fora deste 'if' e confie que fV_printSerialDebug
+    // não imprimirá se vSt_mainConfig.vU32_activeLogFlags for LOG_NONE.
+  }
+
+  fV_printSerialDebug(LOG_INIT, "Configuração inicial concluida.");
+  
+  // 3. INICIA A REDE: Tenta conectar ao Wi-Fi ou ativa o AP de Fallback
+  fV_setupWifi();
+
+  // 4. INICIA O SERVIDOR WEB: Configura as rotas e inicia o servidor assíncrono
+  fV_setupWebServer();  
+
+  fV_printSerialDebug(LOG_INIT, "Hostname: %s", vSt_mainConfig.vS_hostname.c_str());
+  fV_printSerialDebug(LOG_INIT, "--- Fim da inicializacao SMCR ---");
+  // Use vSt_mainConfig.vS_hostname aqui se precisar
+}
+
+void loop() {
+  // Seu código principal
+  delay(5000);
+  //fV_printSerialDebug(LOG_NETWORK, "Loop principal executando. Checando conexão...");
+  //fV_printSerialDebug(LOG_PINS, "Loop: Verificando estado dos pinos...");
+  //fV_printSerialDebug(LOG_SENSOR, "Loop: Coletando nova leitura de sensor...");
+}
