@@ -51,53 +51,100 @@ bool fB_lerBool(const char* vC_key, bool vB_defaultValue) {
 
 
 // --- Implementação das funções para Carregar/Salvar a MainConfig_t ---
-// Chaves para as configurações da MainConfig_t
-const char* NVS_NAMESPACE_MAIN_CONFIG = "smcrconf"; // Novo namespace para a struct principal
-const char* KEY_SERIAL_DEBUG_ENABLED = "s_dbg_en"; // Chave curta para dentro do NVS
-const char* KEY_LOG_FLAGS = "log_flag";
+// Namespace e chaves para a MainConfig_t
+const char* NVS_NAMESPACE_MAIN_CONFIG = "smcrconf";
+const char* NVS_NAMESPACE_GENERIC = "smcrgenc"; 
+const char* KEY_SERIAL_DEBUG_ENABLED = "sdbgen";
+const char* KEY_LOG_FLAGS = "logflags";
+
+// Chaves da rede
 const char* KEY_HOSTNAME = "hostname";
-const char* KEY_AP_FALLBACK = "ap_fallb";
+const char* KEY_WIFI_SSID = "w_ssid";
+const char* KEY_WIFI_PASS = "w_pass";
+const char* KEY_WIFI_ATTEMPTS = "w_attmp";
+const char* KEY_AP_SSID = "a_ssid";
+const char* KEY_AP_PASS = "a_pass";
+const char* KEY_AP_FALLBACK = "a_fallb";
+const char* KEY_WIFI_CHECK_INTERVAL = "w_chkint";
 
 
 void fV_carregarMainConfig(void) {
+
     preferences.begin(NVS_NAMESPACE_MAIN_CONFIG, true); // Abre para leitura
 
-    // Carrega cada membro da struct com um valor padrão para o primeiro boot
+    // 1. Configurações de Debug/Log
     vSt_mainConfig.vB_serialDebugEnabled = preferences.getBool(KEY_SERIAL_DEBUG_ENABLED, true);
-    vSt_mainConfig.vU32_activeLogFlags = preferences.getUInt(KEY_LOG_FLAGS, LOG_INIT | LOG_NETWORK | LOG_PINS); // Usar getUInt para uint32_t
+    vSt_mainConfig.vU32_activeLogFlags = preferences.getUInt(KEY_LOG_FLAGS, LOG_FULL); 
+
+    // 2. Configurações de Rede (WIFI STA)
     vSt_mainConfig.vS_hostname = preferences.getString(KEY_HOSTNAME, "");
-    vSt_mainConfig.vB_apFallbackEnabled = preferences.getBool(KEY_AP_FALLBACK, true);
+    vSt_mainConfig.vS_wifiSsid = preferences.getString(KEY_WIFI_SSID, ""); 
+    vSt_mainConfig.vS_wifiPass = preferences.getString(KEY_WIFI_PASS, ""); 
+    vSt_mainConfig.vU16_wifiConnectAttempts = preferences.getUInt(KEY_WIFI_ATTEMPTS, 15);
+
+    // 3. Configurações de Acesso (AP Fallback)
+    vSt_mainConfig.vS_apSsid = preferences.getString(KEY_AP_SSID, "SMCR_AP_SETUP"); 
+    vSt_mainConfig.vS_apPass = preferences.getString(KEY_AP_PASS, "senha1234");
+    vSt_mainConfig.vB_apFallbackEnabled = preferences.getBool(KEY_AP_FALLBACK, true); // Padrão é TRUE
+    
+    // 4. Configurações de Checagem de Rede
+    vSt_mainConfig.vU32_wifiCheckInterval = preferences.getULong(KEY_WIFI_CHECK_INTERVAL, 15000); // 15 segundos
 
     preferences.end();
 
     if (vSt_mainConfig.vS_hostname.length() == 0) {
-        vSt_mainConfig.vS_hostname = fS_idModulo();
-        fV_printSerialDebug(LOG_FLASH, "Primeira execucao detectada. Gerando um hostname.");
-
-        // Se o SSID principal estiver vazio,
-        // garantimos que o AP Fallback esteja forçadamente ativado
-        // para evitar o loop de reinicialização.
+        // se for a primeira execução, atribui um hostname padrão baseado no ID do módulo
+        vSt_mainConfig.vS_hostname = preferences.getString(KEY_HOSTNAME, fS_idModulo());
         if (vSt_mainConfig.vS_wifiSsid.length() == 0) {
-            vSt_mainConfig.vB_apFallbackEnabled = true;
-            fV_printSerialDebug(LOG_FLASH, "Primeira execucao detectada. Fallback AP forcado como ATIVADO.");
-        }        
+          vSt_mainConfig.vB_apFallbackEnabled = true;
+        }
     }
 
-    // Neste ponto, vSt_mainConfig está preenchida com os valores da flash ou padrões.
 }
 
 void fV_salvarMainConfig(void) {
+
     preferences.begin(NVS_NAMESPACE_MAIN_CONFIG, false); // Abre para escrita
 
-    // Salva cada membro da struct
+    // 1. Configurações de Debug/Log
     preferences.putBool(KEY_SERIAL_DEBUG_ENABLED, vSt_mainConfig.vB_serialDebugEnabled);
-    preferences.putUInt(KEY_LOG_FLAGS, vSt_mainConfig.vU32_activeLogFlags); // Usar putUInt para uint32_t
+    preferences.putUInt(KEY_LOG_FLAGS, vSt_mainConfig.vU32_activeLogFlags);
+
+    // 2. Configurações de Rede (WIFI STA)
     preferences.putString(KEY_HOSTNAME, vSt_mainConfig.vS_hostname);
+    preferences.putString(KEY_WIFI_SSID, vSt_mainConfig.vS_wifiSsid);
+    preferences.putString(KEY_WIFI_PASS, vSt_mainConfig.vS_wifiPass);
+    preferences.putUInt(KEY_WIFI_ATTEMPTS, vSt_mainConfig.vU16_wifiConnectAttempts);
+
+    // 3. Configurações de Acesso (AP Fallback)
+    preferences.putString(KEY_AP_SSID, vSt_mainConfig.vS_apSsid);
+    preferences.putString(KEY_AP_PASS, vSt_mainConfig.vS_apPass);
     preferences.putBool(KEY_AP_FALLBACK, vSt_mainConfig.vB_apFallbackEnabled);
 
+    // 4. Configurações de Checagem de Rede
+    preferences.putULong(KEY_WIFI_CHECK_INTERVAL, vSt_mainConfig.vU32_wifiCheckInterval);
+
     preferences.end();
-    // Opcional: Adicionar um log para confirmar que as configurações foram salvas
-    // fV_printSerialDebug(LOG_FLASH, "MainConfig_t salva na flash."); // Não pode usar aqui diretamente, pois LOG_FLASH pode estar desativado
+
+    fV_printSerialDebug(LOG_FLASH, "MainConfig_t salva na flash.");
 }
 
-// A implementação de fV_printSerialDebug foi movida para utils.cpp
+//=======================================
+// Limpa todos os namespaces (Reset de Fábrica)
+//=======================================
+void fV_clearPreferences(void) {
+
+    fV_printSerialDebug(LOG_FLASH, "Abrindo Preferences para LIMPEZA GERAL (Reset de Fabrica)...");
+
+    // 1. Limpa o namespace principal (MainConfig_t)
+    preferences.begin(NVS_NAMESPACE_MAIN_CONFIG, false);
+    preferences.clear();
+    preferences.end();
+    
+    // 2. Limpa o namespace genérico (chaves avulsas)
+    preferences.begin(NVS_NAMESPACE_GENERIC, false);
+    preferences.clear();
+    preferences.end();
+
+    fV_printSerialDebug(LOG_FLASH, "Limpeza de fabrica concluida. Configs de rede e sistema apagadas.");
+}

@@ -14,6 +14,9 @@ MainConfig_t vSt_mainConfig;
 AsyncWebServer* SERVIDOR_WEB_ASYNC = nullptr;
 
 void setup() {
+
+  //fV_clearPreferences(); // Limpa todas as preferências (Reset de Fábrica) --- IGNORE ---
+
   // 1. Carregar a MainConfig_t (sua startup-config) da Flash para a RAM (running-config)
   fV_carregarMainConfig();
 
@@ -49,9 +52,7 @@ void setup() {
 }
 
 void loop() {
-  // Seu código principal
-  delay(5000);
-  //fV_printSerialDebug(LOG_NETWORK, "Loop principal executando. Checando conexão...");
-  //fV_printSerialDebug(LOG_PINS, "Loop: Verificando estado dos pinos...");
-  //fV_printSerialDebug(LOG_SENSOR, "Loop: Coletando nova leitura de sensor...");
+  // 1. CHECAGEM E RECONEXAO: Mantém a conexao Wi-Fi ativa (checa a cada 15s)
+  fV_checkWifiConnection();
+  
 }

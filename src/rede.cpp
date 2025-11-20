@@ -48,17 +48,24 @@ void fV_connectWifiSta() {
     }
     
     WiFi.setHostname(vSt_mainConfig.vS_hostname.c_str());
-    
-    // A função begin já é não-bloqueante no ESP32, mas o loop a seguir bloqueia o SETUP
+    //fV_printSerialDebug(LOG_NETWORK, "Usando SSID %s...", vSt_mainConfig.vS_wifiSsid.c_str());
+    //fV_printSerialDebug(LOG_NETWORK, "Usando SENHA %s...", vSt_mainConfig.vS_wifiPass.c_str());
+    // Inicia a conexao de forma nao-bloqueante
     WiFi.begin(vSt_mainConfig.vS_wifiSsid.c_str(), vSt_mainConfig.vS_wifiPass.c_str());
     fV_printSerialDebug(LOG_NETWORK, "Tentando conectar em modo STA a %s...", vSt_mainConfig.vS_wifiSsid.c_str());
     
-    // Lógica de reconexão inicial (limita o bloqueio no setup para vU16_wifiConnectAttempts segundos)
+    // ***************************************************************
+    // CORREÇÃO: Aumenta o tempo de espera entre as tentativas e adiciona um log
+    // ***************************************************************
     uint16_t vL_attempts = 0;
     while (WiFi.status() != WL_CONNECTED && vL_attempts < vSt_mainConfig.vU16_wifiConnectAttempts) {
-        delay(1000);
+        delay(2000); // Espera 2 segundos (mais tempo para varredura)
+        fV_printSerialDebug(LOG_NETWORK, "Conectando... (Tentativa %u de %u)", vL_attempts + 1, vSt_mainConfig.vU16_wifiConnectAttempts);
         vL_attempts++;
     }
+    // ***************************************************************
+    // Se a conexao falhou apos o loop, o log NETWORK mostrara a falha.
+    // ***************************************************************
 }
 
 //=======================================
@@ -76,6 +83,7 @@ void fV_startWifiAp() {
         WiFi.softAP(vC_apSsid, vC_apPass);
         fV_printSerialDebug(LOG_NETWORK, "AP iniciado. SSID: %s | Senha: %s", vC_apSsid, vC_apPass);
     } else {
+        // Isso nao deve ocorrer se o default for 12345678, mas e um bom fallback.
         WiFi.softAP(vC_apSsid);
         fV_printSerialDebug(LOG_NETWORK, "AP iniciado. SSID: %s (SEM SENHA, inseguro!)", vC_apSsid);
     }
@@ -116,4 +124,7 @@ void fV_checkWifiConnection(void) {
         // A função WiFi.reconnect() é não-bloqueante
         WiFi.reconnect();
     }
+    
+    // Chama yield() para garantir que o scheduler do ESP32 processe as requisições HTTP do servidor assíncrono.
+    yield();
 }

@@ -73,6 +73,7 @@ extern MainConfig_t vSt_mainConfig; // vSt_ para variável do tipo Struct
 // Estas serão as funções de interface para a sua "startup-config"
 void fV_carregarMainConfig(void); // Carrega da Flash para vSt_mainConfig
 void fV_salvarMainConfig(void);   // Salva de vSt_mainConfig para a Flash
+void fV_clearPreferences(void) ; // Limpa todas as preferências (Reset de Fábrica)
 
 
 //Gera um ID para o módulo com base nas informações do chip ESP32
