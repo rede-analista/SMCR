@@ -25,9 +25,9 @@ A nova interface apresenta:
 - Validação de campos em tempo real
 - Interface intuitiva e profissional
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_geral_novo_t1.png) 
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_geral_novo_t1.png) 
 <br>
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_geral_novo_t2.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_geral_novo_t2.png)
 
 
 ## Seções de Configuração

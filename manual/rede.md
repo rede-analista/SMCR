@@ -9,11 +9,11 @@ Se a configuração default não foi alterada o nome da rede própria do módulo
   - Conecte-se na rede wifi.<br>
   - Abra o browser e digite o endereço "http://192.168.4.1:8080/wifiinicio".<br>
   - Ao abrir a página informe o nome e senha da sua rede wifi e salve as informações.<br>
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_wifi_inicial_t1.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_wifi_inicial_t1.png)
 
 
   - Depois de salvar as informações o módulo irá reiniciar e conectar na sua rede wifi.<br>
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_wifi_inicial_t2.png)  
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_wifi_inicial_t2.png)  
 
   NOTA 1:
   - Após configurar o wifi o módulo irá reiniciar e conectar na rede wifi que você acabou de informar, a partir deste ponto você deve acessar o módulo pelo IP que foi atribuído pelo seu roteador.<br>
@@ -26,11 +26,11 @@ Se a configuração default não foi alterada o nome da rede própria do módulo
 
 - Depois que já estiver realizado a configuração inicial do wifi e já puder acessar o módulo pelo navegador, voce pode acessar mais configurações de rede. Para isto na tela inicial acesse o menu de "Configurações Gerais" e depois "Configuração de Rede".<br>
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_geral_t1.png) 
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_geral_t1.png) 
 <br>
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_rede_t2.png) 
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_rede_t2.png) 
 <br>
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_wifi_t1.png) 
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_wifi_t1.png) 
 
 - Habilita Modo AP
   - Se estiver marcado o módulo irá gerar uma rede wifi própria caso não consiga se conectar no wifi que está configurada.
@@ -83,8 +83,8 @@ Se a configuração default não foi alterada o nome da rede própria do módulo
 - Se quiser salvar as informações na memória flash do módulo, Vá para tela inicial clique em "Gerenciar Arquivos", despois clique em "Salvar Configurações".<br>
   Responda "Sim" à pergunta e clique em "Confirmar".<br>
   
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/t_salvar_t1.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t1.png)
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/t_salvar_t2.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t2.png)
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/t_salvar_t3.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t3.png)

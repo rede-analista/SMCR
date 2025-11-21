@@ -10,7 +10,7 @@ Algumas das características são proporcionar comunicação com outros módulos
 
 A interface web pode disponibilizar até 254(uint8_t) posições de configurações de pinos, ou seja, você poderá configurar até 254 pinos como entrada ou saída. também pela interface poderá configurar até 4 ações para cada pino, estas ações serão executadas quando por exemplo um sensor for acionado. Na configuração de ações é possível realizar uma configuração em cascata por exemplo quando o pino 2 aciona o pino 4, o pino 4 aciona o pino 5 e assim por diante, há várias formas de realizar as configurações de ações, depende um pouco da imaginação, espero que as quantidades sejam suficientes para atender uma boa parte das necessidades.
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/t_top_0.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_top_0.png)
 
 **NOTA 1: Não sou programador e nem técnico em eletrônica, somente me interesso por programação, sendo assim, não garanto uma programação "bonita" e/ou dentro das melhores práticas, mas fique a vontade para trocar informações ou sugerir alguma melhoria.**
 
@@ -70,10 +70,10 @@ Desta forma, uma configuração incorreta pode causar travamentos, falhas ou ain
 # Primeiro Acesso
 [Consulte Configuração de Rede](manual/rede.md)
 <br>Após realizar a gravação do programa no ESP32 e rebootar o módulo ele irá gerar uma rede wifi (modo AP) com o nome padrão default do módulo "esp32modularx Ponto de Acesso" a senha padrão é "senha12345678".<br>
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_wifi_inicial_t1.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_wifi_inicial_t1.png)
 
 Conecte-se na rede e pelo navegador você deve acessar o endereço "http://192.168.4.1:8080/wifiinicio". ao abrir a página informe o nome e senha da sua rede wifi e salve as informações.<br>
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_wifi_inicial_t2.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_wifi_inicial_t2.png)
 
 
   - Após configurar o wifi o módulo irá reiniciar e conectar na rede wifi que você acabou de informar, a partir deste ponto você deve acessar o módulo pelo IP que foi atribuído ao módulo pelo seu roteador (ou servidor DHCP).<br>

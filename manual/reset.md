@@ -7,7 +7,7 @@ O sistema SMCR possui um menu de reset abrangente com múltiplas opções para r
 - Na página inicial, clique em "Gerenciar Arquivos" e depois em "Menu de Reset"
 - O menu apresenta opções organizadas com descrições claras e recursos de segurança
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/menu_reset_t1.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/menu_reset_t1.png)
 
 ## Opções de Reset Disponíveis
 
@@ -142,7 +142,7 @@ O sistema SMCR possui um menu de reset abrangente com múltiplas opções para r
 - **Reset via hardware**: Botão de reset físico do ESP32
 - **Reflash de firmware**: Última opção via USB/Serial
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/menu_reset_countdown.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/menu_reset_countdown.png)
 
 ## Logs e Depuração
 

@@ -6,14 +6,14 @@
 
 - Uma ação é algo que o ESP32 irá executar quando um evento ocorrer. Um evento ocorre quando a leitura de um pino cadastrado como entrada atingir ou ultrapassar o valor informado no cadastro de pinos. 
 - Existe uma task no ESP32 que fica lendo as informação dos pinos de entrada, e este valor é comparado com o nível de acionamento.
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_acoes_t4.png)<br>
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_acoes_t4.png)<br>
 Quando o valor de um pino ṕe igual ou maior que o valor cadastrado no campo "Nível Acionamento:" o módulo entende que houve um alerta.
 
 <br><br><br><br>
 
 - Para configurar ações, clique na opção "Configurar Ações"na página inicial.<br>
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_acoes_t0.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_acoes_t0.png)
 
 
 - Será aberta a página com todas as informações de ações mas para cadastrar uma ação é necessário que já tenha pelo menos um pino cadastrado. O cadastro das ações pode ser realizada considerando a informação do "Pino Origem".<br>
@@ -26,15 +26,15 @@ Pino que irá sofrer uma ação.<br>
 <br>
 <br>
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_acoes_t1.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_acoes_t1.png)
 
 NOTA 2: <strong>Se o módulo for reiniciado antes de salvar as informações na flash todas as configurações serão perdidas</strong>.  
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_acoes_t2.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_acoes_t2.png)
 
   NOTA 1: Após configurar e clicar no botão "Aplicar (sem salvar)" as configurações já estarão sendo usadas pelo módulo mas não estarão salvas na flash. Isto pode ser usado para testar uma configuração sem alterar a configuração que está salva na flash.
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_acoes_t3.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_acoes_t3.png)
   
 - Parâmetro PINO ORIGEM
   - É o pino que irá iniciar a execução da ação com base no seu status.
@@ -106,8 +106,8 @@ NOTA 2: <strong>Se o módulo for reiniciado antes de salvar as informações na 
 - Se quiser salvar as informações na memória flash do ESP32, Vá para tela inicial clique em "Gerenciar Arquivos", despois clique em "Salvar Configurações".<br>
   Responda "Sim" à pergunta e clique em "Confirmar".<br>
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_acoes_t5.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_acoes_t5.png)
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/t_salvar_t2.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t2.png)
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/t_salvar_t3.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t3.png)

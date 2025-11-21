@@ -2,22 +2,22 @@
 
 - Você deve configurar os pinos do módulo como entrada ou saída, para isto, na página inicial clique na opção "Configurar Pinos".<br>
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_pinos_t0.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_pinos_t0.png)
 
 
 - Será aberta a página com as informações de todos os pinos. Nesta página pode chegar a 254(uint8_t) posições para configurações dos pinos, o cadastro de um pino pode ser realizado em qualquer posição.<br>
 Por padrão o módulo vem configurado com 15 pinos.<br>
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_pinos_tm.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_pinos_tm.png)
 
 - Escolha uma posição e clique para realizar o cadastro.<br>
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_pinos_t1.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_pinos_t1.png)
 
 
 - Após inserir as informações clique em "Aplicar (sem salvar)".
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_pinos_t2.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_pinos_t2.png)
 
 O total de pinos pode ser ajustado no cadastro geral. Em testes realizados o valor máximo atingido com boa performance foi de 48 pinos, porém, o sistema aceita o valor até 254.<br>
 
@@ -61,7 +61,7 @@ NOTA 3: Se o módulo for reiniciado antes de salvar as informações na flash to
 
 - Considere um ambiente em que tem vários módulos com várias funções, neste tipo de ambiente facilmente você pode se impedido de usar pinos iguais entre módulos devido a conflito de identificação de pinos, ou ainda ter poucos pinos disponíveis para realizar suas configurações.<br>
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/t_top_0.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_top_0.png)
 
 <br>
 <br>
@@ -77,7 +77,7 @@ NOTA 3: Se o módulo for reiniciado antes de salvar as informações na flash to
 <br>
 - Exemplo de funcionamento **SEM USAR** o recurso de pino virtual.<br>
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/t_top_3.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_top_3.png)
 
 
 <br>
@@ -97,7 +97,7 @@ NOTA 3: Se o módulo for reiniciado antes de salvar as informações na flash to
 <br>
 - Exemplo de funcionamento **USANDO** o recurso de pino virtual.<br>
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/t_top_4.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_top_4.png)
 
  
   - Veja agora que o pino de origem não precisa ser o mesmo nas duas placas, porém, você não está usando um número de pino físico válido. Neste caso todas as GPIO poderão ser usadas como saídas (destinos) para informar alertas.<br>
@@ -115,7 +115,7 @@ NOTA 3: Se o módulo for reiniciado antes de salvar as informações na flash to
 <br>
 - Exemplo de funcionamento USANDO o recurso de pino virtual com 2 módulos transmissores.<br>
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/t_top_5.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_top_5.png)
 
 
   - Veja que o pino de origem pode ser o mesmo nas duas placas, porém, você não está usando um número de pino físico válido. Neste caso todas as GPIO poderão ser usadas como saídas (destinos) para informar alertas.<br>
@@ -167,8 +167,8 @@ NOTA 3: Se o módulo for reiniciado antes de salvar as informações na flash to
 - Se quiser salvar as informações na memória flash do ESP32, Vá para tela inicial clique em "Gerenciar Arquivos", despois clique em "Salvar Configurações".<br>
   Responda "Sim" à pergunta e clique em "Confirmar".<br>
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_pinos_t3.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_pinos_t3.png)
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/t_salvar_t2.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t2.png)
 
-![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/t_salvar_t3.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t3.png)
