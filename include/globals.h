@@ -69,6 +69,21 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
     long vI_gmtOffsetSec;           // Offset GMT em segundos
     int vI_daylightOffsetSec;       // Offset de horário de verão em segundos
 
+    // 6. Configurações da Interface Web
+    bool vB_statusPinosEnabled;     // Habilita/desabilita status dos pinos na página inicial
+    bool vB_interModulosEnabled;    // Habilita/desabilita info de inter-módulos na página inicial
+    String vS_corStatusComAlerta;   // Cor do status quando há alerta (padrão HTML)
+    String vS_corStatusSemAlerta;   // Cor do status quando não há alerta (padrão HTML)
+    uint16_t vU16_tempoRefresh;     // Tempo de refresh da página inicial em segundos
+
+    // 7. Configurações do Watchdog
+    bool vB_watchdogEnabled;        // Habilita/desabilita execução do watchdog
+    uint16_t vU16_clockEsp32Mhz;    // Velocidade do clock do ESP32 em MHz
+    uint32_t vU32_tempoWatchdogUs;  // Tempo para reset do watchdog em microsegundos
+
+    // 8. Configurações dos Pinos
+    uint8_t vU8_quantidadePinos;    // Quantidade total de pinos configuráveis (max 254)
+
 };
 
 // Instância global da sua configuração em memória (sua running-config)
@@ -101,9 +116,16 @@ String fS_formatUptime(unsigned long vL_ms);
 
 /* Funções do Servidor Web (servidor_web.cpp) */
 void fV_setupWebServer(); 
-void fV_handleSaveConfig(AsyncWebServerRequest *request); // Handler para salvar a config inicial
+void fV_handleSaveConfig(AsyncWebServerRequest *request); // Handler para salvar a config inicial (com restart)
+void fV_handleApplyConfig(AsyncWebServerRequest *request); // Handler para aplicar config (running-config apenas)
+void fV_handleSaveToFlash(AsyncWebServerRequest *request); // Handler para salvar running-config na flash (sem restart)
+void fV_handleStatusJson(AsyncWebServerRequest *request); // Handler para API JSON de status
+void fV_handleConfigPage(AsyncWebServerRequest *request); // Handler para página de configurações
+void fV_handleResetPage(AsyncWebServerRequest *request); // Handler para página de reset
+void fV_handleSoftReset(AsyncWebServerRequest *request); // Handler para reinicialização simples
+void fV_handleFactoryReset(AsyncWebServerRequest *request); // Handler para reset de fábrica
+void fV_handleNetworkReset(AsyncWebServerRequest *request); // Handler para reset de rede
 void fV_handleNotFound(AsyncWebServerRequest *request); // Handler 404
-void fV_handleStatusJson(AsyncWebServerRequest *request);
 
 /* Funções de NTP (ntp_func.cpp) */
 void fV_setupNtp();

@@ -13,14 +13,22 @@ This is an ESP32-based modular sensor/actuator system with web configuration int
 ## Key Components & Data Flow
 
 ### Configuration System (`MainConfig_t` struct in `globals.h`)
-- **Runtime Config**: `vSt_mainConfig` - in-memory configuration state
+- **Runtime Config**: `vSt_mainConfig` - in-memory configuration state including NTP settings
 - **Persistent Storage**: NVS with separate namespaces (`smcrconf` for main, `smcr_generic_configs` for misc)
-- **Startup Pattern**: Load config → Initialize systems → Start web server
+- **Startup Pattern**: Load config → Initialize systems → Start NTP → Start web server
+- **NTP Integration**: `vS_ntpServer1`, `vI_gmtOffsetSec`, `vI_daylightOffsetSec` in config struct
 
 ### Network Management (`rede.cpp`)
 - **Dual Mode**: Attempts WiFi STA connection, falls back to AP mode for configuration
 - **State Tracking**: `vB_wifiIsConnected` global flag with event-driven updates
 - **Auto-Recovery**: Non-blocking reconnection attempts every 15 seconds in `loop()`
+- **Uptime Formatting**: `fS_formatUptime()` provides human-readable uptime strings
+
+### Time Synchronization (`ntp_func.cpp`)
+- **Non-blocking NTP**: `fV_setupNtp()` configures NTP service with pool.ntp.br as primary
+- **Time Formatting**: `fS_getFormattedTime()` returns "DD/MM/YYYY HH:MM:SS" or fallback message
+- **Status Checking**: `fS_getNtpStatus()` returns sync state ("Sincronizado", "Aguardando", etc.)
+- **Fallback Behavior**: Uses uptime display when NTP sync fails
 
 ### Debugging System (`utils.cpp`)
 - **Bitmasked Logging**: Use `fV_printSerialDebug(LOG_NETWORK | LOG_WEB, "message", args...)`
@@ -40,9 +48,15 @@ platformio device monitor         # Serial monitor
 ### First-Time Setup Workflow
 1. Flash firmware → ESP32 boots in AP mode
 2. Connect to `esp32modularx Ponto de Acesso` (password: `senha12345678`)
-3. Navigate to `http://192.168.4.1/` for initial config
+3. Navigate to `http://192.168.4.1:8080/` for initial config (`web_modoap.h`)
 4. Configure hostname, WiFi credentials → ESP32 restarts in STA mode
-5. Access via assigned IP or `http://esp32modularx.local/`
+5. Access via assigned IP or `http://esp32modularx.local:8080/` → Dashboard (`web_dashboard.h`)
+
+### Web Interface Workflow
+- **AP Mode**: Serves configuration page from `web_modoap.h` (Tailwind CSS styling)
+- **STA Mode**: Serves dashboard from `web_dashboard.h` with real-time status cards
+- **API Endpoint**: `/status/json` provides live data (IP, uptime, heap, NTP status)
+- **Polling**: Dashboard updates every 15 seconds via JavaScript fetch
 
 ### Configuration Management
 - **Load sequence**: `fV_carregarMainConfig()` → validate defaults → populate runtime struct
@@ -81,15 +95,26 @@ platformio device monitor         # Serial monitor
 ### Web API Patterns
 ```cpp
 // Standard request handler pattern
-SERVIDOR_WEB_ASYNC->on("/endpoint", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->hasArg("param")) {
+SERVIDOR_WEB_ASYNC->on("/endpoint", HTTP_POST, [](AsyncWebServerRequest *req) {
+    if (req->hasArg("param")) {
         // Update vSt_mainConfig
         // Call fV_salvarMainConfig()
-        request->send(200, "text/plain", "OK");
+        req->send(200, "text/plain", "OK");
     } else {
-        request->send(400, "text/plain", "Missing params");
+        req->send(400, "text/plain", "Missing params");
     }
 });
+
+// JSON API response pattern (like /status/json)
+void fV_handleStatusJson(AsyncWebServerRequest *request) {
+    StaticJsonDocument<512> doc;
+    doc["system"]["hostname"] = vSt_mainConfig.vS_hostname;
+    doc["wifi"]["status"] = vB_wifiIsConnected ? "Conectado" : "Desconectado";
+    
+    String response;
+    serializeJson(doc, response);
+    request->send(200, "application/json", response);
+}
 ```
 
 ## Critical Implementation Notes

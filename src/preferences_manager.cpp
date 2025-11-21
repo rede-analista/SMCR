@@ -70,6 +70,21 @@ const char* KEY_NTP_SERVER1 = "ntp1";
 const char* KEY_GMT_OFFSET_SEC = "gmtofs";
 const char* KEY_DAYLIGHT_OFFSET_SEC = "dltofs";
 
+// Chaves da interface web
+const char* KEY_STATUS_PINOS = "st_pinos";
+const char* KEY_INTER_MODULOS = "inter_mod";
+const char* KEY_COR_COM_ALERTA = "cor_alert";
+const char* KEY_COR_SEM_ALERTA = "cor_ok";
+const char* KEY_TEMPO_REFRESH = "refresh";
+
+// Chaves do watchdog
+const char* KEY_WATCHDOG_ENABLED = "wdt_en";
+const char* KEY_CLOCK_ESP32 = "clk_mhz";
+const char* KEY_TEMPO_WATCHDOG = "wdt_time";
+
+// Chaves dos pinos
+const char* KEY_QTD_PINOS = "qtd_pinos";
+
 void fV_carregarMainConfig(void) {
 
     preferences.begin(NVS_NAMESPACE_MAIN_CONFIG, true); // Abre para leitura
@@ -91,9 +106,26 @@ void fV_carregarMainConfig(void) {
     
     // 4. Configurações de Checagem de Rede
     vSt_mainConfig.vU32_wifiCheckInterval = preferences.getULong(KEY_WIFI_CHECK_INTERVAL, 32000); // 15 segundos
+    
+    // 5. Configurações NTP
     vSt_mainConfig.vS_ntpServer1 = preferences.getString(KEY_NTP_SERVER1, "pool.ntp.br"); // Servidor NTP padrão do Brasil
     vSt_mainConfig.vI_gmtOffsetSec = preferences.getInt(KEY_GMT_OFFSET_SEC, -10800); // -3 horas em segundos
     vSt_mainConfig.vI_daylightOffsetSec = preferences.getInt(KEY_DAYLIGHT_OFFSET_SEC, 0); // 0 segundos por padrão
+
+    // 6. Configurações da Interface Web
+    vSt_mainConfig.vB_statusPinosEnabled = preferences.getBool(KEY_STATUS_PINOS, true);
+    vSt_mainConfig.vB_interModulosEnabled = preferences.getBool(KEY_INTER_MODULOS, true);
+    vSt_mainConfig.vS_corStatusComAlerta = preferences.getString(KEY_COR_COM_ALERTA, "#ff0000");
+    vSt_mainConfig.vS_corStatusSemAlerta = preferences.getString(KEY_COR_SEM_ALERTA, "#00ff00");
+    vSt_mainConfig.vU16_tempoRefresh = preferences.getUInt(KEY_TEMPO_REFRESH, 15);
+
+    // 7. Configurações do Watchdog
+    vSt_mainConfig.vB_watchdogEnabled = preferences.getBool(KEY_WATCHDOG_ENABLED, false);
+    vSt_mainConfig.vU16_clockEsp32Mhz = preferences.getUInt(KEY_CLOCK_ESP32, 240);
+    vSt_mainConfig.vU32_tempoWatchdogUs = preferences.getULong(KEY_TEMPO_WATCHDOG, 8000000);
+
+    // 8. Configurações dos Pinos
+    vSt_mainConfig.vU8_quantidadePinos = preferences.getUChar(KEY_QTD_PINOS, 16);
 
     preferences.end();
 
@@ -128,9 +160,26 @@ void fV_salvarMainConfig(void) {
 
     // 4. Configurações de Checagem de Rede
     preferences.putULong(KEY_WIFI_CHECK_INTERVAL, vSt_mainConfig.vU32_wifiCheckInterval);
+    
+    // 5. Configurações NTP
     preferences.putString(KEY_NTP_SERVER1, vSt_mainConfig.vS_ntpServer1);
     preferences.putInt(KEY_GMT_OFFSET_SEC, vSt_mainConfig.vI_gmtOffsetSec);
     preferences.putInt(KEY_DAYLIGHT_OFFSET_SEC, vSt_mainConfig.vI_daylightOffsetSec);
+
+    // 6. Configurações da Interface Web
+    preferences.putBool(KEY_STATUS_PINOS, vSt_mainConfig.vB_statusPinosEnabled);
+    preferences.putBool(KEY_INTER_MODULOS, vSt_mainConfig.vB_interModulosEnabled);
+    preferences.putString(KEY_COR_COM_ALERTA, vSt_mainConfig.vS_corStatusComAlerta);
+    preferences.putString(KEY_COR_SEM_ALERTA, vSt_mainConfig.vS_corStatusSemAlerta);
+    preferences.putUInt(KEY_TEMPO_REFRESH, vSt_mainConfig.vU16_tempoRefresh);
+
+    // 7. Configurações do Watchdog
+    preferences.putBool(KEY_WATCHDOG_ENABLED, vSt_mainConfig.vB_watchdogEnabled);
+    preferences.putUInt(KEY_CLOCK_ESP32, vSt_mainConfig.vU16_clockEsp32Mhz);
+    preferences.putULong(KEY_TEMPO_WATCHDOG, vSt_mainConfig.vU32_tempoWatchdogUs);
+
+    // 8. Configurações dos Pinos
+    preferences.putUChar(KEY_QTD_PINOS, vSt_mainConfig.vU8_quantidadePinos);
 
     preferences.end();
 

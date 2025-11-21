@@ -37,7 +37,7 @@ const char web_dashboard_html[] PROGMEM = R"raw_string(
             <h1 class="text-xl font-bold text-gray-800">SMCR - Central de Controle</h1>
             <nav class="space-x-4 text-sm font-medium">
                 <a href="/" class="text-blue-600 hover:text-blue-800">Status</a>
-                <a href="/config" class="text-gray-600 hover:text-blue-600">Configurações Gerais</a>
+                <a href="/configuracao" class="text-gray-600 hover:text-blue-600">Configurações</a>
                 <a href="/pinos" class="text-gray-600 hover:text-blue-600">Pinos/Relés</a>
                 <a href="/mqtt" class="text-gray-600 hover:text-blue-600">MQTT/Serviços</a>
                 <a href="/reset" class="text-red-600 hover:text-red-800">Reset</a>
@@ -162,10 +162,25 @@ const char web_dashboard_html[] PROGMEM = R"raw_string(
             }
         }
 
-        // Atualiza a cada 15 segundos (intervalo definido na MainConfig_t)
+        // Atualiza conforme o tempo de refresh configurado (padrão 15 segundos)
+        let refreshInterval = 15000; // Padrão
+        
         window.onload = function() {
             fetchStatusData();
-            setInterval(fetchStatusData, 15000); 
+            
+            // Busca o tempo de refresh configurado
+            fetch('/config/json')
+                .then(response => response.json())
+                .then(config => {
+                    if (config.tempo_refresh) {
+                        refreshInterval = config.tempo_refresh * 1000; // Converte para ms
+                    }
+                    setInterval(fetchStatusData, refreshInterval);
+                })
+                .catch(error => {
+                    console.error("Erro ao carregar configurações:", error);
+                    setInterval(fetchStatusData, refreshInterval); // Usa padrão se houver erro
+                });
         };
     </script>
 </body>
