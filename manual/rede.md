@@ -1,6 +1,8 @@
 # Funcionamento e Configurações de Rede
 
-No momento inicial(primeiro boot) após a gravação do firmware, o módulo vem com a função "Modo AP" ativada, esta função proporciona uma facilidade de conectar e configurar o ssid e senha para que o módulo consiga se conectar na rede wifi que o módulo vai usar.<br>
+O SMCR possui um sistema avançado de configuração de rede com interface empresarial profissional, suportando configurações estáticas, fallback automático e sincronização NTP.
+
+No momento inicial (primeiro boot) após a gravação do firmware, o módulo vem com a função "Modo AP" ativada, proporcionando facilidade para conectar e configurar o SSID e senha para que o módulo consiga se conectar na rede WiFi de trabalho.<br>
 
 ## Funcionamento no Modo AP (quando ativado)
 - Ao ligar o módulo ele carrega as informações de rede que estão na flash e tenta se conectar na rede wifi que foi configurada, caso não consiga em 4 tentativas, ele aciona o modo AP, neste caso o módulo vai gerar uma rede wifi própria para que você possa se conectar no módulo e realizar a configuração básica do wifi.<br>
@@ -22,51 +24,262 @@ Se a configuração default não foi alterada o nome da rede própria do módulo
 
 
 
-## Configurações de Rede
+## Nova Interface de Configuração de Rede
 
-- Depois que já estiver realizado a configuração inicial do wifi e já puder acessar o módulo pelo navegador, voce pode acessar mais configurações de rede. Para isto na tela inicial acesse o menu de "Configurações Gerais".<br>
+O sistema agora possui uma interface moderna e profissional para configurações de rede, acessível através do menu **"Configurações Gerais" → "Configuração Geral"**.
 
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_geral_t1.png) 
-<br>
+### Sistema Profissional de Configuração
 
-- Parâmetro SSID
-  - É a informação do nome da rede wifi que o módulo vai usar para se conectar durante o funcionamento normal(rede de trabalho/nome do seu wifi).
-    
-- Parâmetro SENHA
-  - É a informação da senha da rede wifi que o módulo vai usar para se conectar durante o funcionamento normal(rede de trabalho/nome do seu wifi).
-  
-- Parâmetro HOSTNAME  (mDNS)
-  - É a informação de nome que o módulo vai usar para configuração de rede, este nome deve ser único na sua rede para não gerar conflito. O Hostname pode ser usado para acessar o módulo sem que você saiba qual foi o IP que o módulo recebeu da sua rede wifi.<br>
+A interface utiliza o conceito de **Configuração Ativa** vs **Configuração Persistente**:
+- **Configuração Ativa**: Configurações ativas na memória (temporárias)
+- **Configuração Persistente**: Configurações salvas na flash (permanentes)
+- **Aplicar**: Aplica configurações na memória para teste
+- **Salvar na Flash**: Salva configurações testadas permanentemente
+- **Salvar e Reiniciar**: Salva e reinicia para aplicar mudanças de rede
 
-  Você pode acessar o módulo pelo navegador usando o seguinte formato "http://" + "hostname" + ".local" + ":" + "porta"<br>
-  - Alguns exemplos:
-    - http://esp32modularx.local:8080
-    - http://192.168.50.10:8080
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_rede_novo_t1.png)
+![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_rede_novo_t2.png)
 
-  O módulo usa o serviço de mDNS para que o acesso por nome funcione na sua rede local.
+## Configurações Detalhadas de Rede
 
-  NOTA 2: Como sugestão você pode identificar qual é o IP que o módulo está usando na sua rede atraves do seu roteador ou apenas executando o comando "ping esp32modularx.local", a informação de IP pode ser usada para acessar o módulo caso a resolução de nomes não funcione corretamente.<br><br>
-  NOTA 3: Ao ativar o recurso de notificação por assistentes o serviço de mDNS não resolve o nome do módulo, sendo assim a informação de IP da "NOTA 1" deve ser usado para acessar o módulo.
+### 1. Configurações Básicas de WiFi
 
-- Parâmetro Porta do Servidor WEB
-  - É a informação de qual porta tcp será usada para que você consiga acessar o módulo, o padrão é a porta 8080.<br>
+#### **SSID da Rede WiFi**
+- Nome da rede WiFi que o módulo usará para conexão durante o funcionamento normal
+- Campo pré-preenchido com valor atual para facilitar edição
+- Essencial para conectividade básica do módulo
 
-- Parâmetro Tentativas de Conexão do Wifi
-  - É a informação de quantas tentativas o módulo vai executar para se conectar a serviços remotos durante o boot, por exemplo, conectar no wifi, conectar no MqTT, conectar em um assistente, etc. <br>
-  - Após essa quantidade de tentativas o módulo continua a carregar as configurações deixando o serviço que falhou sem ser utilizado.<br>
+#### **Senha da Rede WiFi**
+- Senha de acesso à rede WiFi configurada
+- Campo pré-preenchido com senha atual (mesmo que seja alterada)
+- Suporte a WPA/WPA2/WPA3
 
-    NOTA 4: Este parâmetro foi implementado para que o módulo não fique "preso" durante o boot por falta de conexão com algum serviço externo que o impeça de iniciar o funcionamento local do módulo.
+#### **Hostname do Módulo (mDNS)**
+- Nome único do módulo na rede local
+- Usado para acesso sem conhecer o IP: `http://hostname.local:8080`
+- Deve ser único na rede para evitar conflitos
+- Exemplos de acesso:
+  - `http://esp32modularx.local:8080`
+  - `http://192.168.50.10:8080`
 
-- Parâmetro Nome de Usuário WEB
-  - É a informação de usuário para acessar módulo pela interface web caso a autenticação esteja ativada.<br>
+💡 **Dica**: Use `ping hostname.local` para descobrir o IP do módulo
 
-- Parâmetro Senha WEB
-  - É a informação de senha para acessar módulo pela interface web caso a autenticação esteja ativada.<br>
+#### **Tentativas de Conexão WiFi**
+- Número de tentativas antes de ativar o modo AP fallback
+- Padrão: 15 tentativas
+- Evita travamento do módulo por problemas de rede
+- Após as tentativas, o módulo continua funcionando localmente
 
-- Parâmetro Servidor 1 NTP
-  - É a informação de servidor NTP para ser usado no sincronismo de horário do módulo.
+### 2. Configurações Avançadas de Rede
+
+#### **IP Estático (Opcional)**
+- Endereço IP fixo para o módulo
+- Deixar vazio para DHCP automático
+- Formato: `192.168.1.100`
+- Recomendado para comunicação inter-módulos
+
+#### **Gateway Padrão**
+- Endereço do roteador da rede
+- Necessário apenas se usar IP estático
+- Formato: `192.168.1.1`
+
+#### **Máscara de Sub-rede**
+- Máscara de rede para IP estático
+- Padrão: `255.255.255.0`
+- Configure conforme sua rede local
+
+#### **DNS Primário**
+- Servidor DNS principal para resolução de nomes
+- Padrão: `8.8.8.8` (Google DNS)
+- Importante para conectividade com serviços externos
+
+#### **DNS Secundário**
+- Servidor DNS alternativo
+- Padrão: `8.8.4.4` (Google DNS secundário)
+- Backup caso o DNS primário falhe
+
+### 3. Configurações de Access Point (Fallback)
+
+#### **SSID do Modo AP**
+- Nome da rede WiFi criada pelo módulo em modo fallback
+- Padrão: `esp32modularx Ponto de Acesso`
+- Ativado automaticamente se a conexão WiFi falhar
+
+#### **Senha do Modo AP**
+- Senha para acessar a rede do módulo em modo AP
+- Padrão: `senha12345678`
+- Mínimo 8 caracteres para segurança WPA2
+
+#### **Habilitar Fallback AP**
+- Ativa/desativa o modo AP automático
+- Recomendado: **Habilitado** para recuperação remota
+- Permite reconfiguração mesmo com problemas de rede
+
+### 4. Configurações de Tempo (NTP)
+
+#### **Servidor NTP Primário**
+- Servidor para sincronização de horário
+- Padrão: `pool.ntp.br` (servidores brasileiros)
+- Importante para logs com timestamp correto
+
+#### **Fuso Horário (GMT Offset)**
+- Diferença em relação ao GMT em segundos
+- Brasil: `-10800` (GMT-3) ou `-7200` (GMT-2 no horário de verão)
+- Calculado automaticamente para horário de Brasília
+
+#### **Offset Horário de Verão**
+- Ajuste adicional para horário de verão
+- Brasil: `3600` (1 hora) quando aplicável
+- Configuração automática baseada no período do ano
+
+### 5. Configurações de Monitoramento
+
+#### **Intervalo de Verificação WiFi**
+- Tempo em milissegundos entre verificações de conectividade
+- Padrão: `15000` ms (15 segundos)
+- Detecta e reconecta automaticamente em caso de queda
+
+### 6. Configurações de Segurança Web
+
+#### **Habilitar Autenticação**
+- Ativa/desativa login na interface web
+- Recomendado para ambientes corporativos
+- Protege contra acesso não autorizado
+
+#### **Usuário Administrador**
+- Nome de usuário para acesso à interface
+- Campo obrigatório se autenticação estiver ativa
+- Use nomes seguros e não óbvios
+
+#### **Senha Administrador**
+- Senha para autenticação na interface web
+- Mínimo 8 caracteres recomendado
+- Campo pré-preenchido para facilitar alterações
 
 
 
-# Não esqueça de salvar as informações antes de reiniciar/desligar o módulo.
-## Se o módulor for reiniciado antes de salvar as informações na flash as configurações realizadas serão perdidas.
+## Workflow de Configuração Profissional
+
+### 🔧 Processo Recomendado de Configuração
+
+1. **Configurar Parâmetros**: Preencha os campos necessários na interface
+2. **Aplicar**: Testa as configurações na Configuração Ativa (memória)
+3. **Validar Funcionamento**: Verifique se a conectividade funciona corretamente
+4. **Salvar na Flash**: Salva as configurações testadas permanentemente
+5. **Salvar e Reiniciar**: Use apenas se necessário (mudanças de IP/rede)
+
+### ⚡ Comandos de Configuração
+
+#### **Aplicar Configurações**
+- ✅ Aplica configurações na **Configuração Ativa** (temporário)
+- ✅ Permite testar sem salvar permanentemente
+- ✅ Ideal para validar conectividade
+- ⚠️ Configurações serão perdidas se reiniciar sem salvar
+
+#### **Salvar na Flash**
+- 💾 Persiste **Configuração Ativa** na **Configuração Persistente**
+- 💾 Configurações mantidas mesmo após reboot
+- 💾 Recomendado após validar funcionamento
+
+#### **Salvar e Reiniciar**
+- 🔄 Salva e reinicia imediatamente
+- 🔄 Necessário para mudanças de rede/IP
+- 🔄 Aplica todas as configurações de sistema
+
+## Cenários de Uso e Exemplos
+
+### 🏠 Configuração Doméstica Simples
+```
+SSID: MinhaRedeWiFi
+Senha: minhasenha123
+Hostname: esp32-sala
+IP: DHCP (automático)
+DNS: Automático
+```
+
+### 🏢 Configuração Corporativa com IP Fixo
+```
+SSID: RedeEmpresa
+Senha: senhaSegura2024
+Hostname: smcr-producao-01
+IP Estático: 192.168.100.50
+Gateway: 192.168.100.1
+DNS Primário: 192.168.100.10
+DNS Secundário: 8.8.8.8
+```
+
+### 🔧 Configuração para Múltiplos Módulos
+```
+SSID: RedeIoT
+Senha: iot@2024!
+Hostname: smcr-modulo-[01-99]
+IP Estático: 192.168.200.10-99
+Gateway: 192.168.200.1
+Fallback AP: Habilitado
+```
+
+## Resolução de Problemas de Rede
+
+### 🚨 Módulo Não Conecta ao WiFi
+1. **Verifique credenciais**: SSID/senha corretos
+2. **Teste modo AP**: Conecte em `esp32modularx Ponto de Acesso`
+3. **Reconfigure**: Use interface AP em `192.168.4.1:8080`
+4. **Reset de rede**: Use menu Reset → "Reset Configurações de Rede"
+
+### 🚨 Não Consegue Acessar por Hostname
+1. **Teste IP direto**: Use `ping hostname.local` para descobrir IP
+2. **Verifique mDNS**: Alguns roteadores bloqueiam mDNS
+3. **Use IP estático**: Configure IP fixo para acesso confiável
+4. **Verificar porta**: Confirme se está usando porta 8080
+
+### 🚨 Problemas de Sincronização NTP
+1. **Verifique conectividade**: Módulo deve ter acesso à internet
+2. **Teste servidor NTP**: Use `pool.ntp.br` para servidores brasileiros
+3. **Configurar firewall**: Liberação da porta 123 UDP
+4. **Reset NTP**: Menu Reset → "Reset Configurações NTP"
+
+## ⚠️ Avisos Importantes sobre Configuração de Rede
+
+### 🔒 Segurança
+- **Senhas fortes**: Use senhas com 8+ caracteres
+- **Rede isolada**: Considere VLAN separada para dispositivos IoT
+- **Autenticação**: Habilite login web em ambientes corporativos
+- **Backup**: Anote configurações antes de mudanças críticas
+
+### 🌐 Conectividade
+- **DHCP vs Estático**: IP estático recomendado para inter-módulos
+- **DNS confiável**: Use servidores DNS estáveis (Google 8.8.8.8)
+- **Fallback AP**: Sempre habilite para recuperação remota
+- **Monitoramento**: Intervalo de 15s adequado para a maioria dos casos
+
+### ⚡ Performance
+- **Qualidade do sinal**: WiFi com -70dBm ou melhor
+- **Largura de banda**: 2.4GHz suficiente para IoT
+- **Latência**: <100ms para comunicação inter-módulos
+- **Interferência**: Evite canais congestionados
+
+## Sistema de Configuração Dual
+
+### 📋 Configuração Ativa (Memória)
+- Configurações carregadas na memória RAM
+- Aplicadas imediatamente para teste
+- Perdidas se o módulo for reiniciado sem salvar
+- Permite validação sem comprometimento
+
+### 💾 Configuração Persistente (Flash)
+- Configurações salvas na memória flash NVS
+- Carregadas automaticamente no boot
+- Mantidas mesmo após reinicializações
+- Base para a configuração inicial
+
+### 🔄 Sincronização de Configurações
+```
+Boot → Carregar Configuração Persistente → Configuração Ativa
+Aplicar → Atualizar Configuração Ativa (temporário)
+Salvar na Flash → Configuração Ativa → Configuração Persistente
+Reiniciar → Carregar nova Configuração Persistente → Configuração Ativa
+```
+
+# ⚠️ IMPORTANTE: Sistema de Configuração Profissional
+## Sempre use "Salvar na Flash" após validar configurações com "Aplicar"
+### Configurações aplicadas apenas com "Aplicar" serão perdidas no próximo reboot!
