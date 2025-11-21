@@ -13,7 +13,7 @@ Se a configuração default não foi alterada o nome da rede própria do módulo
 
 
   - Depois de salvar as informações o módulo irá reiniciar e conectar na sua rede wifi.<br>
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_wifi_inicial_t2.png)  
+
 
   NOTA 1:
   - Após configurar o wifi o módulo irá reiniciar e conectar na rede wifi que você acabou de informar, a partir deste ponto você deve acessar o módulo pelo IP que foi atribuído pelo seu roteador.<br>
@@ -24,16 +24,10 @@ Se a configuração default não foi alterada o nome da rede própria do módulo
 
 ## Configurações de Rede
 
-- Depois que já estiver realizado a configuração inicial do wifi e já puder acessar o módulo pelo navegador, voce pode acessar mais configurações de rede. Para isto na tela inicial acesse o menu de "Configurações Gerais" e depois "Configuração de Rede".<br>
+- Depois que já estiver realizado a configuração inicial do wifi e já puder acessar o módulo pelo navegador, voce pode acessar mais configurações de rede. Para isto na tela inicial acesse o menu de "Configurações Gerais".<br>
 
 ![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_geral_t1.png) 
 <br>
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_rede_t2.png) 
-<br>
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_wifi_t1.png) 
-
-- Habilita Modo AP
-  - Se estiver marcado o módulo irá gerar uma rede wifi própria caso não consiga se conectar no wifi que está configurada.
 
 - Parâmetro SSID
   - É a informação do nome da rede wifi que o módulo vai usar para se conectar durante o funcionamento normal(rede de trabalho/nome do seu wifi).
