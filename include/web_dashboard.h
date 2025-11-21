@@ -1,3 +1,4 @@
+// Conteúdo de web_dashboard.h
 #ifndef WEB_DASHBOARD_H
 #define WEB_DASHBOARD_H
 
@@ -10,103 +11,162 @@ const char web_dashboard_html[] PROGMEM = R"raw_string(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMCR | Dashboard de Status</title>
+    <title>SMCR - Central de Controle</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .card { transition: transform 0.2s; }
-        .card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .card {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+        .card:hover { transform: translateY(-3px); }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800">
-    <div class="min-h-screen flex flex-col">
-        <!-- Menu Superior (Navbar) -->
-        <header class="bg-white shadow-md">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-                <div class="text-xl font-bold text-blue-600">SMCR - Central de Controle</div>
-                <nav class="hidden md:flex space-x-4">
-                    <a href="/" class="text-gray-600 hover:text-blue-600 font-medium">Status</a>
-                    <a href="/config" class="text-gray-600 hover:text-blue-600 font-medium">Configurações Gerais</a>
-                    <a href="/pinos" class="text-gray-600 hover:text-blue-600 font-medium">Pinos/Relés</a>
-                    <a href="/mqtt" class="text-gray-600 hover:text-blue-600 font-medium">MQTT/Serviços</a>
-                    <a href="/reset" class="text-red-500 hover:text-red-700 font-medium">Reset</a>
-                </nav>
-                <!-- Botão Menu Mobile (hidden) -->
-            </div>
-        </header>
+<body class="min-h-screen">
 
-        <!-- Conteúdo Principal -->
-        <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-            <h1 class="text-3xl font-extrabold mb-6">Status do Módulo</h1>
+    <!-- Menu Superior (Navbar) -->
+    <header class="bg-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-gray-800">SMCR - Central de Controle</h1>
+            <nav class="space-x-4 text-sm font-medium">
+                <a href="/" class="text-blue-600 hover:text-blue-800">Status</a>
+                <a href="/config" class="text-gray-600 hover:text-blue-600">Configurações Gerais</a>
+                <a href="/pinos" class="text-gray-600 hover:text-blue-600">Pinos/Relés</a>
+                <a href="/mqtt" class="text-gray-600 hover:text-blue-600">MQTT/Serviços</a>
+                <a href="/reset" class="text-red-600 hover:text-red-800">Reset</a>
+            </nav>
+        </div>
+    </header>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                <!-- Card 1: Status da Rede -->
-                <div class="card bg-white p-6 rounded-xl shadow-lg border-b-4 border-green-500">
-                    <h2 class="text-lg font-semibold mb-3 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-2 text-green-500"><path d="M12 21.5s-4-3-4-9c0-4.4 3.6-8 8-8s8 3.6 8 8c0 6-4 9-4 9z"/><path d="M12 11v-4"/><path d="M12 15h0"/></svg>
-                        Rede Wi-Fi
-                    </h2>
-                    <p class="text-sm text-gray-600 mb-1">Status: <span id="wifi_status" class="font-bold text-green-700">Conectado</span></p>
-                    <p class="text-sm text-gray-600 mb-1">SSID: <span id="wifi_ssid" class="font-medium">Carregando...</span></p>
-                    <p class="text-sm text-gray-600">IP Local: <span id="local_ip" class="font-medium text-blue-600">Carregando...</span></p>
-                </div>
+    <!-- Conteúdo Principal -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        <h2 class="text-2xl font-semibold text-gray-700 mb-6">Status do Módulo</h2>
 
-                <!-- Card 2: Status do Sistema -->
-                <div class="card bg-white p-6 rounded-xl shadow-lg border-b-4 border-blue-500">
-                    <h2 class="text-lg font-semibold mb-3 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-2 text-blue-500"><path d="M12 21c-4.4 0-8-3.6-8-8V3h16v10c0 4.4-3.6 8-8 8z"/><path d="M12 3v10"/><path d="M15 17h-6"/></svg>
-                        Sistema
-                    </h2>
-                    <p class="text-sm text-gray-600 mb-1">Hostname: <span id="sys_hostname" class="font-medium">Carregando...</span></p>
-                    <p class="text-sm text-gray-600 mb-1">Tempo de Atividade (Uptime): <span id="sys_uptime" class="font-medium">Carregando...</span></p>
-                    <p class="text-sm text-gray-600">Memória Livre (Heap): <span id="sys_heap" class="font-medium">Carregando...</span></p>
-                </div>
-
-                <!-- Card 3: Serviços -->
-                <div class="card bg-white p-6 rounded-xl shadow-lg border-b-4 border-yellow-500">
-                    <h2 class="text-lg font-semibold mb-3 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-2 text-yellow-500"><path d="M12 21v-4"/><path d="M5 12H2"/><path d="M22 12h-3"/><path d="M15.5 4.5l-2.4 2.4"/><path d="M8.5 19.5l2.4-2.4"/><path d="M19.5 8.5l-2.4 2.4"/><path d="M4.5 15.5l2.4-2.4"/><circle cx="12" cy="12" r="3"/></svg>
-                        Sincronização
-                    </h2>
-                    <p class="text-sm text-gray-600 mb-1">NTP: <span id="ntp_status" class="font-medium">Desabilitado</span></p>
-                    <p class="text-sm text-gray-600 mb-1">MQTT: <span id="mqtt_status" class="font-medium">Desabilitado</span></p>
-                    <p class="text-sm text-gray-600">Última Atualização: <span id="last_update" class="font-medium">Carregando...</span></p>
-                </div>
-            </div>
-
-            <div class="mt-8 p-6 bg-white rounded-xl shadow-lg">
-                <h2 class="text-2xl font-bold mb-4">Informações de Pinos (Ainda Não Implementadas)</h2>
-                <p class="text-gray-600">Esta seção será preenchida com o status em tempo real dos seus relés e sensores.</p>
-            </div>
-        </main>
-
-        <!-- Rodapé (Footer) -->
-        <footer class="bg-gray-200 py-4 text-center text-sm text-gray-600 mt-4">
-            &copy; 2025 SMCR - Sistema de Controle e Monitoramento Remoto
-        </footer>
-    </div>
-
-    <!-- Script de Atualização (Placeholder) -->
-    <script>
-        function updateStatus() {
-            // Em uma proxima etapa, faremos uma chamada AJAX para o ESP32 (ex: /status/json)
-            // para obter dados em tempo real.
-            console.log("Atualizando status...");
-            // Exemplo de como usar a variavel global de configuracao (se disponivel no C++)
-            // document.getElementById('sys_hostname').textContent = 'Valor de vSt_mainConfig.vS_hostname';
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             
-            // Placeholder:
-            document.getElementById('sys_uptime').textContent = '2d 4h 32m';
-            document.getElementById('sys_heap').textContent = `${ESP.getFreeHeap()} bytes`; 
-            document.getElementById('wifi_ssid').textContent = 'IoT24';
-            document.getElementById('local_ip').textContent = '192.168.1.100';
-            document.getElementById('last_update').textContent = new Date().toLocaleTimeString();
+            <!-- Card 1: Rede Wi-Fi -->
+            <div id="wifi-card" class="card border-t-4 border-green-500">
+                <h3 class="font-semibold text-xl text-gray-800 mb-3">Rede Wi-Fi</h3>
+                <ul class="text-gray-600 space-y-1 text-sm">
+                    <li>Status: <span id="wifi_status" class="font-medium text-green-500">Carregando...</span></li>
+                    <li>SSID: <span id="wifi_ssid">Carregando...</span></li>
+                    <li>IP Local: <span id="wifi_ip_local" class="font-mono">Carregando...</span></li>
+                    <li>IP do Usuário: <span id="wifi_ip_client" class="font-mono">Carregando...</span></li>
+                </ul>
+            </div>
+
+            <!-- Card 2: Sistema (AGORA COM DATA/HORA) -->
+            <div id="system-card" class="card border-t-4 border-blue-500">
+                <h3 class="font-semibold text-xl text-gray-800 mb-3">Sistema</h3>
+                <ul class="text-gray-600 space-y-1 text-sm">
+                    <li>Hostname: <span id="sys_hostname" class="font-medium">Carregando...</span></li>
+                    <!-- NOVO CAMPO: Data/Hora -->
+                    <li>Data/Hora Atual: <span id="sys_current_time" class="font-medium">Carregando...</span></li>
+                    <li>Tempo de Atividade (Uptime): <span id="sys_uptime" class="font-medium">Carregando...</span></li>
+                    <li>Memória Livre (Heap): <span id="sys_heap" class="font-mono">Carregando...</span></li>
+                </ul>
+            </div>
+
+            <!-- Card 3: Sincronização (FOCADO APENAS EM STATUS DE SERVIÇOS) -->
+            <div id="sync-card" class="card border-t-4 border-yellow-500">
+                <h3 class="font-semibold text-xl text-gray-800 mb-3">Sincronização</h3>
+                <ul class="text-gray-600 space-y-1 text-sm">
+                    <li>NTP Status: <span id="sync_ntp" class="font-medium">Carregando...</span></li>
+                    <li>MQTT Status: <span id="sync_mqtt" class="font-medium">Desabilitado</span></li>
+                    <!-- Última atualização movida para o Card Sistema (Data/Hora) -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- Informações de Pinos -->
+        <div class="card border-t-4 border-gray-400 mt-8">
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">Informações de Pinos (Ainda Não Implementadas)</h3>
+            <p class="text-gray-500 text-sm">Esta seção será preenchida com o status em tempo real dos seus relés e sensores.</p>
+        </div>
+    </main>
+
+    <!-- Rodapé (Footer) -->
+    <footer class="text-center text-xs text-gray-500 py-4 mt-8">
+        &copy; 2025 SMCR - Sistema de Controle e Monitoramento Remoto
+    </footer>
+
+    <!-- Script de Atualização -->
+    <script>
+        // Função utilitária para formatar bytes em KB, MB, etc.
+        function formatBytes(bytes, decimals = 1) {
+            if (bytes === 0) return '0 Bytes';
+            if (bytes === 1) return '1 Byte';
+
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
         }
 
-        // Simula o refresh a cada 5 segundos
-        // setInterval(updateStatus, 5000); 
-        // updateStatus();
+        // Função para atualizar o Dashboard com dados JSON reais
+        function updateStatus(data) {
+            // console.log("Dados recebidos:", data);
+
+            // 1. Rede Wi-Fi
+            document.getElementById('wifi_status').textContent = data.wifi.status;
+            document.getElementById('wifi_ssid').textContent = data.wifi.ssid;
+            document.getElementById('wifi_ip_local').textContent = data.wifi.local_ip;
+            document.getElementById('wifi_ip_client').textContent = data.system.client_ip || 'N/A';
+            
+            // 2. Sistema (Incluindo a Data/Hora)
+            document.getElementById('sys_hostname').textContent = data.system.hostname;
+            document.getElementById('sys_current_time').textContent = data.system.current_time || 'N/A';
+            document.getElementById('sys_uptime').textContent = data.system.uptime;
+            document.getElementById('sys_heap').textContent = formatBytes(data.system.free_heap);
+            
+            // 3. Sincronização
+            document.getElementById('sync_ntp').textContent = data.sync.ntp_status;
+            document.getElementById('sync_mqtt').textContent = data.sync.mqtt_status;
+            
+            // Lógica visual (cores)
+            const wifiStatusElement = document.getElementById('wifi_status');
+            if (data.wifi.status === 'Conectado') {
+                wifiStatusElement.classList.remove('text-red-700');
+                wifiStatusElement.classList.add('text-green-500');
+            } else {
+                wifiStatusElement.classList.remove('text-green-500');
+                wifiStatusElement.classList.add('text-red-700');
+            }
+        }
+
+        // Função para buscar dados REALES do ESP32 via rota /status/json
+        async function fetchStatusData() {
+            try {
+                const response = await fetch('/status/json');
+                
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                updateStatus(data); 
+                
+            } catch (error) {
+                console.error("Erro ao carregar status:", error);
+                document.getElementById('sys_heap').textContent = 'Erro';
+            }
+        }
+
+        // Atualiza a cada 15 segundos (intervalo definido na MainConfig_t)
+        window.onload = function() {
+            fetchStatusData();
+            setInterval(fetchStatusData, 15000); 
+        };
     </script>
 </body>
 </html>

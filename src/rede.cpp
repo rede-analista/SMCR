@@ -10,17 +10,18 @@ static unsigned long vL_lastCheckTime = 0;
 void fV_setupWifi() {
     fV_printSerialDebug(LOG_NETWORK, "Iniciando configuracao de rede...");
     
-    // Tenta conectar em modo STA (bloqueando apenas o setup por um tempo limitado)
+    // Tenta conectar em modo STA (AGORA NAO-BLOQUEANTE)
     fV_connectWifiSta();
 
     // Atualiza o estado após a tentativa inicial
     vB_wifiIsConnected = (WiFi.status() == WL_CONNECTED);
 
-    // Se a conexão falhar, verifica o fallback
+    // Se a conexão falhou, verifica o fallback
     if (!vB_wifiIsConnected) {
         if (vSt_mainConfig.vB_apFallbackEnabled) {
-            fV_printSerialDebug(LOG_NETWORK, "Falha na conexao STA. Ativando Ponto de Acesso (AP) para configuracao.");
-            fV_startWifiAp();
+            fV_printSerialDebug(LOG_NETWORK, "Tentativa de conexao em background. Configurando AP se necessario.");
+            // O servidor inicia. O loop() ira monitorar e tentar conectar.
+            // A ativacao do AP so e feita se o SSID for vazio.
         } else {
             fV_printSerialDebug(LOG_NETWORK, "Falha na conexao STA e Fallback AP desabilitado. Reiniciando...");
             delay(5000);
@@ -39,6 +40,8 @@ void fV_setupWifi() {
 void fV_connectWifiSta() {
     if (vSt_mainConfig.vS_wifiSsid.length() == 0) {
         fV_printSerialDebug(LOG_NETWORK, "Nenhuma SSID configurada. Pulando modo STA.");
+        // Se o SSID for vazio, inicia o AP de setup imediatamente (para a primeira execução)
+        fV_startWifiAp(); 
         return;
     }
     
@@ -48,24 +51,10 @@ void fV_connectWifiSta() {
     }
     
     WiFi.setHostname(vSt_mainConfig.vS_hostname.c_str());
-    //fV_printSerialDebug(LOG_NETWORK, "Usando SSID %s...", vSt_mainConfig.vS_wifiSsid.c_str());
-    //fV_printSerialDebug(LOG_NETWORK, "Usando SENHA %s...", vSt_mainConfig.vS_wifiPass.c_str());
-    // Inicia a conexao de forma nao-bloqueante
+    // Inicia a conexao de forma NAO-BLOQUEANTE
     WiFi.begin(vSt_mainConfig.vS_wifiSsid.c_str(), vSt_mainConfig.vS_wifiPass.c_str());
     fV_printSerialDebug(LOG_NETWORK, "Tentando conectar em modo STA a %s...", vSt_mainConfig.vS_wifiSsid.c_str());
-    
-    // ***************************************************************
-    // CORREÇÃO: Aumenta o tempo de espera entre as tentativas e adiciona um log
-    // ***************************************************************
-    uint16_t vL_attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && vL_attempts < vSt_mainConfig.vU16_wifiConnectAttempts) {
-        delay(2000); // Espera 2 segundos (mais tempo para varredura)
-        fV_printSerialDebug(LOG_NETWORK, "Conectando... (Tentativa %u de %u)", vL_attempts + 1, vSt_mainConfig.vU16_wifiConnectAttempts);
-        vL_attempts++;
-    }
-    // ***************************************************************
-    // Se a conexao falhou apos o loop, o log NETWORK mostrara a falha.
-    // ***************************************************************
+ 
 }
 
 //=======================================
@@ -125,6 +114,30 @@ void fV_checkWifiConnection(void) {
         WiFi.reconnect();
     }
     
-    // Chama yield() para garantir que o scheduler do ESP32 processe as requisições HTTP do servidor assíncrono.
-    yield();
+    // CORREÇÃO CRÍTICA: Adiciona um pequeno atraso para ceder tempo
+    // de execução ao FreeRTOS (scheduler) e ao servidor assíncrono.
+    // Isso evita o bloqueio da loopTask.
+    delay(10); // Cedemos 10ms
+}
+
+//=======================================
+// Formata o Uptime de milissegundos para string
+//=======================================
+String fS_formatUptime(unsigned long vL_ms) {
+    // Converte milissegundos para dias, horas, minutos e segundos
+    unsigned long vL_segundos = vL_ms / 1000;
+    unsigned int vI_dias = vL_segundos / 86400; // 24 * 60 * 60
+    vL_segundos %= 86400;
+    unsigned int vI_horas = vL_segundos / 3600; // 60 * 60
+    vL_segundos %= 3600;
+    unsigned int vI_minutos = vL_segundos / 60;
+    unsigned int vI_segundos = vL_segundos % 60;
+
+    String vS_uptime = "";
+    if (vI_dias > 0) vS_uptime += String(vI_dias) + "d ";
+    if (vI_horas > 0 || vI_dias > 0) vS_uptime += String(vI_horas) + "h ";
+    if (vI_minutos > 0 || vI_horas > 0 || vI_dias > 0) vS_uptime += String(vI_minutos) + "m ";
+    vS_uptime += String(vI_segundos) + "s";
+    
+    return vS_uptime;
 }

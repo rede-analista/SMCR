@@ -66,7 +66,9 @@ const char* KEY_AP_SSID = "a_ssid";
 const char* KEY_AP_PASS = "a_pass";
 const char* KEY_AP_FALLBACK = "a_fallb";
 const char* KEY_WIFI_CHECK_INTERVAL = "w_chkint";
-
+const char* KEY_NTP_SERVER1 = "ntp1";
+const char* KEY_GMT_OFFSET_SEC = "gmtofs";
+const char* KEY_DAYLIGHT_OFFSET_SEC = "dltofs";
 
 void fV_carregarMainConfig(void) {
 
@@ -88,7 +90,10 @@ void fV_carregarMainConfig(void) {
     vSt_mainConfig.vB_apFallbackEnabled = preferences.getBool(KEY_AP_FALLBACK, true); // Padrão é TRUE
     
     // 4. Configurações de Checagem de Rede
-    vSt_mainConfig.vU32_wifiCheckInterval = preferences.getULong(KEY_WIFI_CHECK_INTERVAL, 15000); // 15 segundos
+    vSt_mainConfig.vU32_wifiCheckInterval = preferences.getULong(KEY_WIFI_CHECK_INTERVAL, 32000); // 15 segundos
+    vSt_mainConfig.vS_ntpServer1 = preferences.getString(KEY_NTP_SERVER1, "pool.ntp.br"); // Servidor NTP padrão do Brasil
+    vSt_mainConfig.vI_gmtOffsetSec = preferences.getInt(KEY_GMT_OFFSET_SEC, -10800); // -3 horas em segundos
+    vSt_mainConfig.vI_daylightOffsetSec = preferences.getInt(KEY_DAYLIGHT_OFFSET_SEC, 0); // 0 segundos por padrão
 
     preferences.end();
 
@@ -123,6 +128,9 @@ void fV_salvarMainConfig(void) {
 
     // 4. Configurações de Checagem de Rede
     preferences.putULong(KEY_WIFI_CHECK_INTERVAL, vSt_mainConfig.vU32_wifiCheckInterval);
+    preferences.putString(KEY_NTP_SERVER1, vSt_mainConfig.vS_ntpServer1);
+    preferences.putInt(KEY_GMT_OFFSET_SEC, vSt_mainConfig.vI_gmtOffsetSec);
+    preferences.putInt(KEY_DAYLIGHT_OFFSET_SEC, vSt_mainConfig.vI_daylightOffsetSec);
 
     preferences.end();
 

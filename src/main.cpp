@@ -43,7 +43,10 @@ void setup() {
   // 3. INICIA A REDE: Tenta conectar ao Wi-Fi ou ativa o AP de Fallback
   fV_setupWifi();
 
-  // 4. INICIA O SERVIDOR WEB: Configura as rotas e inicia o servidor assíncrono
+  // 4. INICIA O NTP: Configura o NTP com base nas configurações carregadas
+  fV_setupNtp();
+
+  // 5. INICIA O SERVIDOR WEB: Configura as rotas e inicia o servidor assíncrono
   fV_setupWebServer();  
 
   fV_printSerialDebug(LOG_INIT, "Hostname: %s", vSt_mainConfig.vS_hostname.c_str());

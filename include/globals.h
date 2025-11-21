@@ -64,6 +64,11 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
     // 4. Configurações de Checagem de Rede
     uint32_t vU32_wifiCheckInterval; // Intervalo de checagem em ms (padrão 15000ms)
 
+    // 5. Configurações de NTP
+    String vS_ntpServer1;           // Servidor NTP primário
+    long vI_gmtOffsetSec;           // Offset GMT em segundos
+    int vI_daylightOffsetSec;       // Offset de horário de verão em segundos
+
 };
 
 // Instância global da sua configuração em memória (sua running-config)
@@ -92,10 +97,17 @@ void fV_setupWifi();
 void fV_checkWifiConnection(void); 
 void fV_connectWifiSta(void); // Auxiliar: Tenta conectar como station
 void fV_startWifiAp(void);    // Auxiliar: Inicia o Access Point
+String fS_formatUptime(unsigned long vL_ms);
 
 /* Funções do Servidor Web (servidor_web.cpp) */
 void fV_setupWebServer(); 
 void fV_handleSaveConfig(AsyncWebServerRequest *request); // Handler para salvar a config inicial
 void fV_handleNotFound(AsyncWebServerRequest *request); // Handler 404
+void fV_handleStatusJson(AsyncWebServerRequest *request);
+
+/* Funções de NTP (ntp_func.cpp) */
+void fV_setupNtp();
+String fS_getFormattedTime();
+String fS_getNtpStatus();
 
 #endif // GLOBALS_H
