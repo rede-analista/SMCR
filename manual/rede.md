@@ -66,19 +66,7 @@ Se a configuração default não foi alterada o nome da rede própria do módulo
 - Parâmetro Servidor 1 NTP
   - É a informação de servidor NTP para ser usado no sincronismo de horário do módulo.
 
-- Parâmetro Servidor 2 NTP
-  - É a informação de servidor NTP para ser usado no sincronismo de horário do módulo.
-
 
 
 # Não esqueça de salvar as informações antes de reiniciar/desligar o módulo.
 ## Se o módulor for reiniciado antes de salvar as informações na flash as configurações realizadas serão perdidas.
-
-- Se quiser salvar as informações na memória flash do módulo, Vá para tela inicial clique em "Gerenciar Arquivos", despois clique em "Salvar Configurações".<br>
-  Responda "Sim" à pergunta e clique em "Confirmar".<br>
-  
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t1.png)
-
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t2.png)
-
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t3.png)
