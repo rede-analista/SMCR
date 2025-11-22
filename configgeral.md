@@ -72,11 +72,12 @@ A interface de configuração está organizada em 8 seções principais:
 - **Debug Serial**: Habilita/desabilita mensagens de debug
 - **Nível de Debug**: Controla verbosidade das mensagens
 
-### 8. Configurações MQTT
-- **Servidor MQTT**: Endereço do broker MQTT
-- **Porta MQTT**: Porta de conexão (padrão 1883)
-- **Usuário MQTT**: Nome de usuário para autenticação
-- **Senha MQTT**: Senha para autenticação
+### 8. Configurações do Servidor Web
+- **Porta do Servidor Web**: Porta TCP para acesso à interface (padrão 8080)
+- **Habilitar Autenticação**: Ativa/desativa sistema de login web
+- **Usuário Administrador**: Nome do usuário para autenticação
+- **Senha Administrador**: Senha para acesso administrativo
+- **Dashboard Requer Autenticação**: Se o painel inicial precisa de login
 
 ## Workflow de Configuração Profissional
 

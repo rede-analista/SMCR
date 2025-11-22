@@ -9,11 +9,11 @@
 void fV_setupWebServer() {
     fV_printSerialDebug(LOG_WEB, "Configurando o servidor web...");
 
-    // Criação do servidor web na porta 80 (padrão HTTP)
+    // Criação do servidor web na porta configurada
     if (SERVIDOR_WEB_ASYNC != nullptr) {
         delete SERVIDOR_WEB_ASYNC;
     }
-    SERVIDOR_WEB_ASYNC = new AsyncWebServer(8080);
+    SERVIDOR_WEB_ASYNC = new AsyncWebServer(vSt_mainConfig.vU16_webServerPort);
 
     // Rota da página principal (Dashboard ou Configuração Inicial)
     SERVIDOR_WEB_ASYNC->on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -22,6 +22,12 @@ void fV_setupWebServer() {
              fV_printSerialDebug(LOG_WEB, "Servindo pagina de CONFIGURACAO INICIAL...");
              request->send(200, "text/html", web_config_html);
          } else {
+             // Verifica se o dashboard requer autenticação
+             if (vSt_mainConfig.vB_authEnabled && vSt_mainConfig.vB_dashboardAuthRequired) {
+                 if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                     return request->requestAuthentication();
+                 }
+             }
              // NOVO: Se estiver conectado, serve o Dashboard de Status (STA)
              fV_printSerialDebug(LOG_WEB, "Servindo DASHBOARD de Status...");
              request->send(200, "text/html", web_dashboard_html);
@@ -32,16 +38,48 @@ void fV_setupWebServer() {
     SERVIDOR_WEB_ASYNC->on("/save_config", HTTP_POST, fV_handleSaveConfig);
 
     // Rota para APLICAR configurações (running-config) - sem salvar na flash
-    SERVIDOR_WEB_ASYNC->on("/apply_config", HTTP_POST, fV_handleApplyConfig);
+    SERVIDOR_WEB_ASYNC->on("/apply_config", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleApplyConfig(request);
+    });
 
     // Rota para SALVAR configurações (startup-config) - salva na flash sem reiniciar
-    SERVIDOR_WEB_ASYNC->on("/save_to_flash", HTTP_POST, fV_handleSaveToFlash);
+    SERVIDOR_WEB_ASYNC->on("/save_to_flash", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleSaveToFlash(request);
+    });
 
     // Rota para página de configurações avançadas
-    SERVIDOR_WEB_ASYNC->on("/configuracao", HTTP_GET, fV_handleConfigPage);
+    SERVIDOR_WEB_ASYNC->on("/configuracao", HTTP_GET, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleConfigPage(request);
+    });
     
     // Rota para página de reset
-    SERVIDOR_WEB_ASYNC->on("/reset", HTTP_GET, fV_handleResetPage);
+    SERVIDOR_WEB_ASYNC->on("/reset", HTTP_GET, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleResetPage(request);
+    });
     
     // Rotas de reset (POST)
     SERVIDOR_WEB_ASYNC->on("/reset/soft", HTTP_POST, fV_handleSoftReset);
@@ -50,6 +88,13 @@ void fV_setupWebServer() {
     
     // Rota para obter configurações atuais em JSON
     SERVIDOR_WEB_ASYNC->on("/config/json", HTTP_GET, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
         fV_printSerialDebug(LOG_WEB, "[WEB] Solicitação para /config/json");
         
         JsonDocument doc;
@@ -80,6 +125,13 @@ void fV_setupWebServer() {
         // Configurações dos pinos
         doc["qtd_pinos"] = vSt_mainConfig.vU8_quantidadePinos;
         
+        // Configurações do servidor web
+        doc["web_port"] = vSt_mainConfig.vU16_webServerPort;
+        doc["auth_enabled"] = vSt_mainConfig.vB_authEnabled;
+        doc["web_username"] = vSt_mainConfig.vS_webUsername;
+        doc["web_password"] = vSt_mainConfig.vS_webPassword;
+        doc["dashboard_auth"] = vSt_mainConfig.vB_dashboardAuthRequired;
+        
         String response;
         serializeJson(doc, response);
         
@@ -95,7 +147,17 @@ void fV_setupWebServer() {
     
     // Inicia o servidor
     SERVIDOR_WEB_ASYNC->begin();
-    fV_printSerialDebug(LOG_WEB, "Servidor web assincrono iniciado na porta 8080");
+    fV_printSerialDebug(LOG_WEB, "Servidor web assincrono iniciado na porta %d", vSt_mainConfig.vU16_webServerPort);
+    if (vSt_mainConfig.vB_authEnabled) {
+        fV_printSerialDebug(LOG_WEB, "Autenticação habilitada para usuário: %s", vSt_mainConfig.vS_webUsername.c_str());
+        if (vSt_mainConfig.vB_dashboardAuthRequired) {
+            fV_printSerialDebug(LOG_WEB, "Dashboard também requer autenticação");
+        } else {
+            fV_printSerialDebug(LOG_WEB, "Dashboard acessível sem autenticação");
+        }
+    } else {
+        fV_printSerialDebug(LOG_WEB, "Autenticação desabilitada - acesso livre");
+    }
 }
 
 // Rota Handler: Funcao para salvar configurações (inicial e avançadas)
@@ -290,6 +352,19 @@ void fV_handleApplyConfig(AsyncWebServerRequest *request) {
     if (request->hasArg("qtd_pinos")) {
         vSt_mainConfig.vU8_quantidadePinos = request->arg("qtd_pinos").toInt();
     }
+    
+    // Configurações do servidor web
+    if (request->hasArg("web_port")) {
+        vSt_mainConfig.vU16_webServerPort = request->arg("web_port").toInt();
+    }
+    vSt_mainConfig.vB_authEnabled = request->hasArg("auth_enabled");
+    if (request->hasArg("web_username")) {
+        vSt_mainConfig.vS_webUsername = request->arg("web_username");
+    }
+    if (request->hasArg("web_password")) {
+        vSt_mainConfig.vS_webPassword = request->arg("web_password");
+    }
+    vSt_mainConfig.vB_dashboardAuthRequired = request->hasArg("dashboard_auth");
 
     fV_printSerialDebug(LOG_WEB, "[RUNNING-CONFIG] Configurações aplicadas em memória. Teste e depois salve se estiver OK.");
     request->send(200, "text/plain", "RUNNING-CONFIG aplicada com sucesso! Teste as configurações e depois salve.");

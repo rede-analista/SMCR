@@ -85,6 +85,13 @@ const char* KEY_TEMPO_WATCHDOG = "wdt_time";
 // Chaves dos pinos
 const char* KEY_QTD_PINOS = "qtd_pinos";
 
+// Chaves do servidor web e autenticação
+const char* KEY_WEB_PORT = "web_port";
+const char* KEY_AUTH_ENABLED = "auth_en";
+const char* KEY_WEB_USERNAME = "web_user";
+const char* KEY_WEB_PASSWORD = "web_pass";
+const char* KEY_DASHBOARD_AUTH = "dash_auth";
+
 void fV_carregarMainConfig(void) {
 
     preferences.begin(NVS_NAMESPACE_MAIN_CONFIG, true); // Abre para leitura
@@ -126,6 +133,13 @@ void fV_carregarMainConfig(void) {
 
     // 8. Configurações dos Pinos
     vSt_mainConfig.vU8_quantidadePinos = preferences.getUChar(KEY_QTD_PINOS, 16);
+
+    // 9. Configurações do Servidor Web e Autenticação
+    vSt_mainConfig.vU16_webServerPort = preferences.getUInt(KEY_WEB_PORT, 8080);
+    vSt_mainConfig.vB_authEnabled = preferences.getBool(KEY_AUTH_ENABLED, false); // Padrão desabilitado
+    vSt_mainConfig.vS_webUsername = preferences.getString(KEY_WEB_USERNAME, "admin");
+    vSt_mainConfig.vS_webPassword = preferences.getString(KEY_WEB_PASSWORD, "admin123");
+    vSt_mainConfig.vB_dashboardAuthRequired = preferences.getBool(KEY_DASHBOARD_AUTH, false); // Dashboard sem auth por padrão
 
     preferences.end();
 
@@ -180,6 +194,13 @@ void fV_salvarMainConfig(void) {
 
     // 8. Configurações dos Pinos
     preferences.putUChar(KEY_QTD_PINOS, vSt_mainConfig.vU8_quantidadePinos);
+
+    // 9. Configurações do Servidor Web e Autenticação
+    preferences.putUInt(KEY_WEB_PORT, vSt_mainConfig.vU16_webServerPort);
+    preferences.putBool(KEY_AUTH_ENABLED, vSt_mainConfig.vB_authEnabled);
+    preferences.putString(KEY_WEB_USERNAME, vSt_mainConfig.vS_webUsername);
+    preferences.putString(KEY_WEB_PASSWORD, vSt_mainConfig.vS_webPassword);
+    preferences.putBool(KEY_DASHBOARD_AUTH, vSt_mainConfig.vB_dashboardAuthRequired);
 
     preferences.end();
 

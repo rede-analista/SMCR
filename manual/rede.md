@@ -6,10 +6,10 @@ No momento inicial (primeiro boot) após a gravação do firmware, o módulo vem
 
 ## Funcionamento no Modo AP (quando ativado)
 - Ao ligar o módulo ele carrega as informações de rede que estão na flash e tenta se conectar na rede wifi que foi configurada, caso não consiga em 4 tentativas, ele aciona o modo AP, neste caso o módulo vai gerar uma rede wifi própria para que você possa se conectar no módulo e realizar a configuração básica do wifi.<br>
-Se a configuração default não foi alterada o nome da rede própria do módulo será "esp32modularx Ponto de Acesso" e a senha para se conectar nesta rede será "senha12345678".<br>
+Se a configuração default não foi alterada o nome da rede própria do módulo será "SMCR_AP_SETUP" e a senha para se conectar nesta rede será "senha12345678".<br>
 
   - Conecte-se na rede wifi.<br>
-  - Abra o browser e digite o endereço "http://192.168.4.1:8080/wifiinicio".<br>
+  - Abra o browser e digite o endereço "http://192.168.4.1:8080".<br>
   - Ao abrir a página informe o nome e senha da sua rede wifi e salve as informações.<br>
 ![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_wifi_inicial_t1.png)
 
@@ -35,10 +35,8 @@ A interface utiliza o conceito de **Configuração Ativa** vs **Configuração P
 - **Configuração Persistente**: Configurações salvas na flash (permanentes)
 - **Aplicar**: Aplica configurações na memória para teste
 - **Salvar na Flash**: Salva configurações testadas permanentemente
-- **Salvar e Reiniciar**: Salva e reinicia para aplicar mudanças de rede
+- **Salvar e Reiniciar**: Salva e reinicia para aplicar configurações gerais
 
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_rede_novo_t1.png)
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_rede_novo_t2.png)
 
 ## Configurações Detalhadas de Rede
 
@@ -141,20 +139,50 @@ A interface utiliza o conceito de **Configuração Ativa** vs **Configuração P
 
 ### 6. Configurações de Segurança Web
 
-#### **Habilitar Autenticação**
-- Ativa/desativa login na interface web
-- Recomendado para ambientes corporativos
-- Protege contra acesso não autorizado
+#### **Porta do Servidor Web**
+- Porta TCP utilizada para acesso à interface web
+- Padrão: `8080`
+- Intervalo válido: 80 a 65535
+- **Importante**: Alterações de porta requerem "Salvar e Reiniciar"
+
+#### **Habilitar Autenticação Web**
+- Ativa/desativa sistema de autenticação HTTP Basic
+- **Padrão**: Desabilitado (acesso livre)
+- Quando habilitado, protege páginas de configuração
+- Credenciais necessárias para acesso às funções administrativas
 
 #### **Usuário Administrador**
-- Nome de usuário para acesso à interface
+- Nome de usuário para autenticação web
 - Campo obrigatório se autenticação estiver ativa
 - Use nomes seguros e não óbvios
+- **Padrão**: `admin`
 
 #### **Senha Administrador**
 - Senha para autenticação na interface web
 - Mínimo 8 caracteres recomendado
 - Campo pré-preenchido para facilitar alterações
+- **Padrão**: `admin123`
+
+#### **Dashboard Requer Autenticação**
+- Controla se a página inicial (dashboard) requer login
+- **Opções**:
+  - ✅ **Habilitado**: Dashboard protegido por autenticação
+  - ❌ **Desabilitado**: Dashboard funciona como painel público
+- **Padrão**: Desabilitado
+- Permite usar dashboard como display de informações sem comprometer segurança
+
+### 🔐 **Sistema de Autenticação Inteligente**
+
+#### **Funcionamento da Autenticação**
+- **Autenticação Desabilitada**: Acesso livre a todas as páginas
+- **Autenticação Habilitada**:
+  - Páginas protegidas: `/configuracao`, `/reset`, `/config/json`, `/apply_config`, `/save_to_flash`
+  - Dashboard (`/`): Conforme configuração `Dashboard Requer Autenticação`
+
+#### **Cenários de Uso**
+1. **Ambiente Doméstico**: Autenticação desabilitada
+2. **Ambiente Corporativo**: Autenticação habilitada, dashboard público
+3. **Máxima Segurança**: Autenticação habilitada, dashboard protegido
 
 
 
@@ -222,7 +250,7 @@ Fallback AP: Habilitado
 
 ### 🚨 Módulo Não Conecta ao WiFi
 1. **Verifique credenciais**: SSID/senha corretos
-2. **Teste modo AP**: Conecte em `esp32modularx Ponto de Acesso`
+2. **Teste modo AP**: Conecte em `SMCR_AP_SETUP`
 3. **Reconfigure**: Use interface AP em `192.168.4.1:8080`
 4. **Reset de rede**: Use menu Reset → "Reset Configurações de Rede"
 

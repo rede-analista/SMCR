@@ -259,6 +259,43 @@ const char web_config_gerais_html[] PROGMEM = R"raw_string(
                 </div>
             </div>
 
+            <!-- Seção: Configurações do Servidor Web -->
+            <div class="form-section">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Configurações do Servidor Web</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-group">
+                        <label for="web_port">Porta do Servidor Web</label>
+                        <input type="number" id="web_port" name="web_port" min="80" max="65535" placeholder="8080">
+                    </div>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="auth_enabled" name="auth_enabled">
+                            <label for="auth_enabled">Habilitar Autenticação Web</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="web_username">Usuário Administrador</label>
+                        <input type="text" id="web_username" name="web_username" placeholder="admin">
+                    </div>
+                    <div class="form-group">
+                        <label for="web_password">Senha Administrador</label>
+                        <input type="password" id="web_password" name="web_password" placeholder="senha123">
+                    </div>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="dashboard_auth" name="dashboard_auth">
+                            <label for="dashboard_auth">Dashboard Requer Autenticação</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mt-4">
+                    <p class="text-sm text-blue-700">
+                        <strong>Nota:</strong> Quando a autenticação estiver habilitada, você pode escolher se o dashboard (página inicial) 
+                        também requerá login. Se desabilitado, o dashboard funcionará como painel público de apresentação.
+                    </p>
+                </div>
+            </div>
+
             <!-- Botões de Ação - Estilo Cisco -->
             <div class="flex gap-4 pt-4">
                 <button type="button" id="applyBtn" class="btn-primary">Aplicar (Running-Config)</button>
@@ -309,6 +346,13 @@ const char web_config_gerais_html[] PROGMEM = R"raw_string(
                     
                     // Configurações dos pinos
                     if (config.qtd_pinos !== undefined) document.getElementById('qtd_pinos').value = config.qtd_pinos;
+                    
+                    // Configurações do servidor web
+                    if (config.web_port !== undefined) document.getElementById('web_port').value = config.web_port;
+                    if (config.auth_enabled !== undefined) document.getElementById('auth_enabled').checked = config.auth_enabled;
+                    if (config.web_username !== undefined) document.getElementById('web_username').value = config.web_username;
+                    if (config.web_password !== undefined) document.getElementById('web_password').value = config.web_password;
+                    if (config.dashboard_auth !== undefined) document.getElementById('dashboard_auth').checked = config.dashboard_auth;
                     
                     console.log('Configurações carregadas e aplicadas com sucesso!');
                 } else {

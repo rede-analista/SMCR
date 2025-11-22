@@ -84,6 +84,13 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
     // 8. Configurações dos Pinos
     uint8_t vU8_quantidadePinos;    // Quantidade total de pinos configuráveis (max 254)
 
+    // 9. Configurações do Servidor Web
+    uint16_t vU16_webServerPort;    // Porta do servidor web (padrão 8080)
+    bool vB_authEnabled;            // Habilita/desabilita autenticação web
+    String vS_webUsername;          // Nome de usuário para autenticação web
+    String vS_webPassword;          // Senha para autenticação web
+    bool vB_dashboardAuthRequired;  // Se o dashboard requer autenticação (quando auth habilitada)
+
 };
 
 // Instância global da sua configuração em memória (sua running-config)
