@@ -1599,6 +1599,15 @@ void fV_handlePinDeleteApi(AsyncWebServerRequest *request) {
     
     uint8_t pinNumber = url.substring(lastSlash + 1).toInt();
     
+    // *** VALIDAÇÃO: Verifica se pino está em uso por ações ***
+    if (fB_isPinUsedByActions(pinNumber)) {
+        fV_printSerialDebug(LOG_WEB, "[API] ERRO: Pino %d não pode ser excluído - está em uso por ações", pinNumber);
+        request->send(409, "application/json", 
+            "{\"error\": \"Pino está em uso por ações\", "
+            "\"message\": \"Exclua todas as ações relacionadas a este pino antes de removê-lo\"}");
+        return;
+    }
+    
     // Remove o pino (apenas running config)
     bool success = fB_removePinConfig(pinNumber);
     if (!success) {

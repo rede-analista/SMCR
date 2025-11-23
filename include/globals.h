@@ -254,6 +254,7 @@ uint8_t fU8_findActionIndex(uint8_t pinOrigem, uint8_t numeroAcao);
 int fI_addActionConfig(const ActionConfig_t& config);
 bool fB_removeActionConfig(uint8_t pinOrigem, uint8_t numeroAcao);
 bool fB_updateActionConfig(uint8_t pinOrigem, uint8_t numeroAcao, const ActionConfig_t& config);
+bool fB_isPinUsedByActions(uint8_t pinNumber); // Verifica se pino está em uso por ações
 void fV_executeActionsTask(void); // Task periódica para execução de ações
 void fV_executeAction(uint8_t actionIndex); // Executa uma ação específica
 

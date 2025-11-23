@@ -619,7 +619,15 @@ const char web_pins_html[] PROGMEM = R"rawliteral(
                 fetch(`/api/pins/${pin.pino}`, {
                     method: 'DELETE'
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (response.status === 409) {
+                        // Conflito: pino está em uso por ações
+                        return response.json().then(data => {
+                            throw new Error(data.message || 'Pino está em uso por ações');
+                        });
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.success) {
                         showStatus('Pino excluido com sucesso!', 'success');
@@ -629,7 +637,8 @@ const char web_pins_html[] PROGMEM = R"rawliteral(
                     }
                 })
                 .catch(error => {
-                    showStatus('Erro de comunicacao.', 'error');
+                    showStatus('ERRO: ' + error.message, 'error');
+                    console.error('[DELETE PIN ERROR]', error);
                 });
             }
         }
@@ -666,7 +675,15 @@ const char web_pins_html[] PROGMEM = R"rawliteral(
                 fetch(`/api/pins/${originalPin}`, {
                     method: 'DELETE'
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (response.status === 409) {
+                        // Conflito: pino está em uso por ações
+                        return response.json().then(data => {
+                            throw new Error(data.message || 'Pino está em uso por ações e não pode ser editado');
+                        });
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (!data.success) {
                         throw new Error(data.error || 'Falha ao deletar pino antigo');

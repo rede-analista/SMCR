@@ -391,6 +391,30 @@ bool fB_updateActionConfig(uint8_t pinOrigem, uint8_t numeroAcao, const ActionCo
 }
 
 //========================================
+// Verifica se um pino está em uso por ações (origem ou destino)
+//========================================
+bool fB_isPinUsedByActions(uint8_t pinNumber) {
+    for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
+        // Pula ações desabilitadas
+        if (vA_actionConfigs[i].acao == ACTION_TYPE_NONE) {
+            continue;
+        }
+        
+        // Verifica se o pino é origem ou destino desta ação
+        if (vA_actionConfigs[i].pino_origem == pinNumber || 
+            vA_actionConfigs[i].pino_destino == pinNumber) {
+            fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Pino %d está em uso - Ação: origem=%d, destino=%d, tipo=%d", 
+                pinNumber, 
+                vA_actionConfigs[i].pino_origem, 
+                vA_actionConfigs[i].pino_destino,
+                vA_actionConfigs[i].acao);
+            return true;
+        }
+    }
+    return false;
+}
+
+//========================================
 // Helper: Escreve no pino respeitando nível de acionamento
 //========================================
 void fV_writeActionPin(uint8_t pinIndex, uint8_t pinGpio, bool ligar) {
