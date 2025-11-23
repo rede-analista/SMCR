@@ -13,6 +13,8 @@
 #include <variant>
 #include <string.h>
 #include <time.h>
+#include <FS.h>
+#include <LittleFS.h>
 
 
 #endif // INCLUDE_H

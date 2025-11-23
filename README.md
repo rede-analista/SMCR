@@ -60,7 +60,7 @@ A interface web pode disponibilizar até 254(uint8_t) posições de configuraç�
     8. ESPAsyncHTTPUpdateServer.
     9. asyncHTTPrequest.
      
-  NOTA: Na pasta ["build"](https://github.com/rede-analista/smcr/tree/main/.pio/build/upesy_wroom) deixarei o arquivo de fimware .bin já compilado caso queiram simplesmente realizar a gravação no ESP32 sem precisar compilar. Para gravação sem compílar pode usar qualquer ferramenta como exemplo "esptools".
+  NOTA: Na pasta ["build"](https://github.com/rede-analista/SMCR/tree/main/firmware) deixarei o arquivo de fimware .bin já compilado caso queiram simplesmente realizar a gravação no ESP32 sem precisar compilar. Para gravação sem compílar pode usar qualquer ferramenta como exemplo "esptools".
 
 # !!!! IMPORTANTE !!!!
 A programação atual não faz nenhuma tratativa com as informações que são inseridas/configuradas, não há tratativas para informações com acentuação e também não há tratativas para configurações incorretas de pinagem.<br>
@@ -83,3 +83,28 @@ Conecte-se na rede e pelo navegador você deve acessar o endereço "http://192.1
     - http://esp32modularx.local:8080  (esp32modularx é o nome default do módulo)
 
   - É recomendado realizar o recurso de reserva de IP do seu roteador para que o módulo sempre recebe o mesmo endereço IP. Isso é importante pois caso você configure comunicação entre módulos e o IP de uma das placas for alterado, a comunicação entre módulos pode não funcionar.
+
+## 📚 Documentação
+
+### Manual do Usuário
+- **[Configuração de Rede](manual/rede.md)** - Como configurar WiFi e acesso inicial
+- **[Cadastro de Pinos](manual/pinos.md)** - Como configurar pinos GPIO
+- **[Configuração Geral](manual/configgeral.md)** - Configurações globais do sistema
+- **[Cadastro de Ações](manual/acoes.md)** - Como criar ações automáticas
+- **[Inter Módulos](manual/intermod.md)** - Comunicação entre ESP32s
+- **[Reset do Sistema](manual/reset.md)** - Procedimentos de reset
+- **[Gravar Firmware](manual/gravafirmware.md)** - Como atualizar o firmware
+- **[Prints de Telas](manual/telas/prints.md)** - Screenshots da interface
+
+### Documentação Técnica
+- **[Implementações](manual/implementacoes/)** - Documentação detalhada de todas as implementações técnicas, correções de bugs e novas funcionalidades
+
+## 🛠️ Para Desenvolvedores
+
+Se você está contribuindo para o projeto ou quer entender como funciona internamente, consulte a **[documentação técnica](manual/implementacoes/)** que contém:
+
+- Detalhes de implementação de cada funcionalidade
+- Análise de problemas encontrados e suas soluções  
+- Arquivos modificados em cada implementação
+- Procedimentos de teste e validação
+- Histórico completo de mudanças técnicas

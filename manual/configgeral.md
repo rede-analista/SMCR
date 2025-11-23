@@ -4,14 +4,14 @@
 
 - Na página inicial clique em "Configurações Gerais" e depois em "Configuração Geral".<br>
 
-## Nova Interface de Configuração (Estilo Cisco)
+## Nova Interface de Configuração Profissional
 
-O sistema agora utiliza uma interface de configuração profissional inspirada nos equipamentos Cisco, com separação entre **Running Config** (configuração ativa) e **Startup Config** (configuração salva na flash).
+O sistema agora utiliza uma interface de configuração empresarial avançada, com separação entre **Configuração Ativa** (configuração em memória) e **Configuração Persistente** (configuração salva na flash).
 
 ### Conceitos Importantes:
 
-- **Running Config**: Configurações ativas na memória, aplicadas imediatamente para testes
-- **Startup Config**: Configurações persistentes salvas na memória flash
+- **Configuração Ativa**: Configurações carregadas na memória, aplicadas imediatamente para testes
+- **Configuração Persistente**: Configurações permanentes salvas na memória flash
 - **Aplicar**: Aplica configurações para teste sem salvar permanentemente
 - **Salvar na Flash**: Salva configurações testadas para a memória flash
 - **Salvar e Reiniciar**: Salva e reinicia o módulo para aplicar todas as alterações
@@ -25,9 +25,9 @@ A nova interface apresenta:
 - Validação de campos em tempo real
 - Interface intuitiva e profissional
 
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_geral_novo_t1.png) 
+![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_geral_novo_t1.png) 
 <br>
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_geral_novo_t2.png)
+![image](https://github.com/rede-analista/smcr/blob/develop/manual/telas/c_geral_novo_t2.png)
 
 
 ## Seções de Configuração
@@ -72,11 +72,12 @@ A interface de configuração está organizada em 8 seções principais:
 - **Debug Serial**: Habilita/desabilita mensagens de debug
 - **Nível de Debug**: Controla verbosidade das mensagens
 
-### 8. Configurações MQTT
-- **Servidor MQTT**: Endereço do broker MQTT
-- **Porta MQTT**: Porta de conexão (padrão 1883)
-- **Usuário MQTT**: Nome de usuário para autenticação
-- **Senha MQTT**: Senha para autenticação
+### 8. Configurações do Servidor Web
+- **Porta do Servidor Web**: Porta TCP para acesso à interface (padrão 8080)
+- **Habilitar Autenticação**: Ativa/desativa sistema de login web
+- **Usuário Administrador**: Nome do usuário para autenticação
+- **Senha Administrador**: Senha para acesso administrativo
+- **Dashboard Requer Autenticação**: Se o painel inicial precisa de login
 
 ## Workflow de Configuração Profissional
 
@@ -140,9 +141,9 @@ A interface de configuração está organizada em 8 seções principais:
 
 ## ⚠️ Avisos Importantes sobre o Sistema de Configuração
 
-### Sistema Running-Config vs Startup-Config
-- **Running Config**: Configuração ativa em memória (temporária)
-- **Startup Config**: Configuração salva na flash (permanente)
+### Sistema Configuração Ativa vs Configuração Persistente
+- **Configuração Ativa**: Configuração carregada em memória (temporária)
+- **Configuração Persistente**: Configuração salva na flash (permanente)
 - **Aplicar**: Aplica mudanças apenas na Configuração Ativa para testes
 - **Salvar na Flash**: Persiste Configuração Ativa na Configuração Persistente
 - **Salvar e Reiniciar**: Salva e reinicia para aplicar todas as mudanças

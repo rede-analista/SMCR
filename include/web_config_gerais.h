@@ -5,453 +5,535 @@
 #include <Arduino.h>
 
 // Página de Configurações Gerais
-const char web_config_gerais_html[] PROGMEM = R"raw_string(
+const char web_config_gerais_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMCR - Configurações Gerais</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>SMCR - Configuracoes Gerais</title>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f0f0f0; 
         }
-        .form-section {
-            background-color: white;
-            padding: 1.5rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-            margin-bottom: 1.5rem;
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
         }
-        .form-group {
-            margin-bottom: 1rem;
+        h1 { 
+            text-align: center; 
+            color: #333; 
+            margin-bottom: 10px; 
+            border-bottom: 2px solid #007bff; 
+            padding-bottom: 10px; 
         }
-        .form-group label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: #374151;
+        .menu { 
+            text-align: center; 
+            margin: 20px 0; 
+            padding: 10px; 
+            background: #f8f9fa; 
+            border-radius: 4px; 
         }
-        .form-group input, .form-group select {
+        .menu a { 
+            margin: 0 15px; 
+            text-decoration: none; 
+            color: #007bff; 
+            font-weight: bold; 
+        }
+        .menu a:hover { 
+            text-decoration: underline; 
+        }
+        .section { 
+            margin: 30px 0; 
+        }
+        .section-title { 
+            font-size: 18px; 
+            font-weight: bold; 
+            color: #444; 
+            margin-bottom: 15px; 
+            padding: 8px 0; 
+            border-bottom: 1px solid #ddd; 
+        }
+        .config-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 20px; 
+        }
+        .config-table td { 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            vertical-align: middle; 
+        }
+        .config-table td:first-child { 
+            font-weight: bold; 
+            color: #555; 
+            width: 35%; 
+            background: #f8f9fa; 
+        }
+        .config-table input, .config-table select { 
+            width: 100%; 
+            padding: 8px 12px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            font-size: 14px; 
+            box-sizing: border-box; 
+        }
+        .config-table input:focus, .config-table select:focus { 
+            outline: none; 
+            border-color: #007bff; 
+            box-shadow: 0 0 5px rgba(0,123,255,0.3); 
+        }
+        .action-menu { 
+            text-align: center; 
+            margin: 20px 0; 
+            padding: 15px; 
+            background: #f8f9fa; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+        }
+        .btn { 
+            margin: 5px; 
+            padding: 10px 15px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 14px; 
+            font-weight: bold; 
+            text-decoration: none; 
+            display: inline-block; 
+        }
+        .btn-primary { 
+            background: #007bff; 
+            color: white; 
+        }
+        .btn-primary:hover { 
+            background: #0056b3; 
+        }
+        .btn-success { 
+            background: #28a745; 
+            color: white; 
+        }
+        .btn-success:hover { 
+            background: #1e7e34; 
+        }
+        .btn-warning { 
+            background: #ffc107; 
+            color: #212529; 
+        }
+        .btn-warning:hover { 
+            background: #e0a800; 
+        }
+        .status-message { 
+            margin-top: 15px; 
+            padding: 10px; 
+            border-radius: 4px; 
+            text-align: center; 
+            display: none; 
+        }
+        .status-success { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb; 
+        }
+        .status-error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 1px solid #f5c6cb; 
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.5rem;
-            background-color: #f9fafb;
-            color: #111827;
-        }
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: #2563eb;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
-        }
-        .checkbox-group {
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
             display: flex;
+            justify-content: center;
             align-items: center;
-            gap: 0.5rem;
+            z-index: 9999;
         }
-        .checkbox-group input[type="checkbox"] {
-            width: auto;
-            margin: 0;
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
         }
-        .btn-primary {
-            background-color: #2563eb;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
-        .btn-primary:hover {
-            background-color: #1d4ed8;
-        }
-        .btn-success {
-            background-color: #059669;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .btn-success:hover {
-            background-color: #047857;
-        }
-        .btn-warning {
-            background-color: #d97706;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .btn-warning:hover {
-            background-color: #b45309;
-        }
-        .btn-secondary {
-            background-color: #6b7280;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .btn-secondary:hover {
-            background-color: #4b5563;
-        }
-        .status-message {
-            margin-top: 1rem;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            text-align: center;
-            font-weight: 500;
-            display: none;
-        }
-        .status-success {
-            background-color: #d1fae5;
-            color: #065f46;
-        }
-        .status-error {
-            background-color: #fee2e2;
-            color: #991b1b;
-        }
-        .status-info {
-            background-color: #dbeafe;
-            color: #1e40af;
-        }
-        .status-warning {
-            background-color: #fef3c7;
-            color: #92400e;
+        .loading-text {
+            margin-left: 15px;
+            font-size: 16px;
+            color: #007bff;
         }
     </style>
 </head>
-<body class="min-h-screen">
-    <!-- Menu Superior (Navbar) -->
-    <header class="bg-white shadow-md">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-gray-800">SMCR - Configurações Gerais</h1>
-            <nav class="space-x-4 text-sm font-medium">
-                <a href="/" class="text-gray-600 hover:text-blue-600">Status</a>
-                <a href="/configuracao" class="text-blue-600 hover:text-blue-800">Configurações Gerais</a>
-                <a href="/pinos" class="text-gray-600 hover:text-blue-600">Pinos/Relés</a>
-                <a href="/mqtt" class="text-gray-600 hover:text-blue-600">MQTT/Serviços</a>
-                <a href="/reset" class="text-red-600 hover:text-red-800">Reset</a>
-            </nav>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Carregando configurações...</div>
+    </div>
+
+    <div class="container">
+        <h1>SMCR - Configuracoes Gerais</h1>
+        
+        <div class="menu">
+            <a href="/">Status</a>
+            <a href="/configuracao">Configuracoes Gerais</a>
+            <a href="/pins">Pinos/Reles</a>
+            <a href="/mqtt">MQTT/Servicos</a>
+            <a href="/arquivos">Arquivos</a>
+            <a href="/reset">Reset</a>
         </div>
-    </header>
 
-    <!-- Conteúdo Principal -->
-    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <form id="configForm" class="space-y-6">
-            
-            <!-- Seção: Configurações de Rede -->
-            <div class="form-section">
-                <h3 class="text-lg font-semibold text-gray-700 mb-4">Configurações de Rede</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="form-group">
-                        <label for="hostname">Hostname</label>
-                        <input type="text" id="hostname" name="hostname" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="wifi_ssid">SSID da Rede WiFi</label>
-                        <input type="text" id="wifi_ssid" name="wifi_ssid">
-                    </div>
-                    <div class="form-group">
-                        <label for="wifi_pass">Senha da Rede WiFi</label>
-                        <input type="password" id="wifi_pass" name="wifi_pass">
-                    </div>
-                    <div class="form-group">
-                        <label for="wifi_attempts">Tentativas de Conexão WiFi</label>
-                        <input type="number" id="wifi_attempts" name="wifi_attempts" min="1" max="60">
-                    </div>
-                </div>
-            </div>
+        <div class="action-menu">
+            <a href="#" onclick="saveConfig()" class="btn btn-success">Aplicar</a>
+        </div>
 
-            <!-- Seção: Configurações de NTP -->
-            <div class="form-section">
-                <h3 class="text-lg font-semibold text-gray-700 mb-4">Configurações de Tempo (NTP)</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="form-group">
-                        <label for="ntp_server1">Servidor NTP</label>
-                        <input type="text" id="ntp_server1" name="ntp_server1" placeholder="pool.ntp.br">
-                    </div>
-                    <div class="form-group">
-                        <label for="gmt_offset">Fuso Horário GMT (segundos)</label>
-                        <input type="number" id="gmt_offset" name="gmt_offset" placeholder="-10800">
-                    </div>
-                    <div class="form-group">
-                        <label for="daylight_offset">Horário de Verão (segundos)</label>
-                        <input type="number" id="daylight_offset" name="daylight_offset" placeholder="0">
-                    </div>
-                </div>
-            </div>
+        <form id="configForm">
+            <div class="section">
+                <div class="section-title">Configuracoes de Rede</div>
+                <table class="config-table">
+                    <tr><td>Hostname:</td><td><input type="text" name="hostname" id="hostname" maxlength="32"></td></tr>
+                    <tr><td>SSID da Rede WiFi:</td><td><input type="text" name="wifi_ssid" id="wifi_ssid" maxlength="32"></td></tr>
+                    <tr><td>Senha WiFi:</td><td><input type="password" name="wifi_pass" id="wifi_pass" maxlength="64" placeholder="Deixe em branco para manter atual"></td></tr>
+                    <tr><td>Tentativas de Conexao:</td><td><input type="number" name="wifi_attempts" id="wifi_attempts" min="5" max="50" value="15"></td></tr>
+                    <tr><td>Intervalo de Checagem (ms):</td><td><input type="number" name="wifi_check_interval" id="wifi_check_interval" min="10000" max="60000" value="15000"></td></tr>
+                </table>
 
-            <!-- Seção: Configurações da Interface -->
-            <div class="form-section">
-                <h3 class="text-lg font-semibold text-gray-700 mb-4">Configurações da Interface</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="form-group">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="status_pinos" name="status_pinos">
-                            <label for="status_pinos">Status dos Pinos na Página Inicial</label>
+                <div class="section-title">Configuracoes de NTP (Sincronizacao de Tempo)</div>
+                <table class="config-table">
+                    <tr><td>Servidor NTP Primario:</td><td><input type="text" name="ntp_server1" id="ntp_server1" value="pool.ntp.br"></td></tr>
+                    <tr><td>Fuso Horario GMT (segundos):</td><td><input type="number" name="gmt_offset" id="gmt_offset" value="-10800"></td></tr>
+                    <tr><td>Horario de Verao (segundos):</td><td><input type="number" name="daylight_offset" id="daylight_offset" value="0"></td></tr>
+                </table>
+
+                <div class="section-title">Configuracoes da Interface Web</div>
+                <table class="config-table">
+                    <tr><td>Mostrar Status de Pinos:</td><td><select name="status_pinos_enabled" id="status_pinos_enabled"><option value="1">Habilitado</option><option value="0">Desabilitado</option></select></td></tr>
+                    <tr><td>Mostrar Info Inter-Modulos:</td><td><select name="inter_modulos_enabled" id="inter_modulos_enabled"><option value="1">Habilitado</option><option value="0">Desabilitado</option></select></td></tr>
+                    <tr><td>Cor Status com Alerta:</td><td>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="color" name="cor_com_alerta" id="cor_com_alerta" value="#ff0000" style="width: 60px;">
+                            <span id="cor_com_alerta_name" style="font-size: 12px; color: #666;">Vermelho</span>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="inter_modulos" name="inter_modulos">
-                            <label for="inter_modulos">Inter Módulos na Página Inicial</label>
+                    </td></tr>
+                    <tr><td>Cor Status sem Alerta:</td><td>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="color" name="cor_sem_alerta" id="cor_sem_alerta" value="#00ff00" style="width: 60px;">
+                            <span id="cor_sem_alerta_name" style="font-size: 12px; color: #666;">Verde</span>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="cor_com_alerta">Cor Status Com Alerta</label>
-                        <input type="color" id="cor_com_alerta" name="cor_com_alerta" value="#ff0000">
-                    </div>
-                    <div class="form-group">
-                        <label for="cor_sem_alerta">Cor Status Sem Alerta</label>
-                        <input type="color" id="cor_sem_alerta" name="cor_sem_alerta" value="#00ff00">
-                    </div>
-                    <div class="form-group">
-                        <label for="tempo_refresh">Tempo de Refresh (segundos)</label>
-                        <input type="number" id="tempo_refresh" name="tempo_refresh" min="5" max="300">
-                    </div>
-                </div>
-            </div>
+                    </td></tr>
+                    <tr><td>Tempo de Refresh (segundos):</td><td><input type="number" name="tempo_refresh" id="tempo_refresh" min="5" max="300" value="15"></td></tr>
+                </table>
 
-            <!-- Seção: Configurações do Watchdog -->
-            <div class="form-section">
-                <h3 class="text-lg font-semibold text-gray-700 mb-4">Configurações do Watchdog</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="form-group">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="watchdog_enabled" name="watchdog_enabled">
-                            <label for="watchdog_enabled">Executar Watchdog</label>
+                <div class="section-title">Configuracoes de Sistema</div>
+                <table class="config-table">
+                    <tr><td>Quantidade de Pinos:</td><td><input type="number" name="qtd_pinos" id="qtd_pinos" min="1" max="50" value="10"></td></tr>
+                    <tr><td>Debug Serial:</td><td>
+                        <select name="serial_debug_enabled" id="serial_debug_enabled">
+                            <option value="0">Desabilitado</option>
+                            <option value="1">Habilitado - Logs Basicos</option>
+                            <option value="511">Habilitado - Logs Completos</option>
+                        </select>
+                    </td></tr>
+                    <tr><td>Categorias de Debug:</td><td>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 12px;">
+                            <label><input type="checkbox" id="log_init" value="1"> Inicializacao</label>
+                            <label><input type="checkbox" id="log_network" value="2"> Rede/WiFi</label>
+                            <label><input type="checkbox" id="log_pins" value="4"> Pinos/GPIO</label>
+                            <label><input type="checkbox" id="log_flash" value="8"> Flash/Storage</label>
+                            <label><input type="checkbox" id="log_web" value="16"> Interface Web</label>
+                            <label><input type="checkbox" id="log_sensor" value="32"> Sensores</label>
+                            <label><input type="checkbox" id="log_actions" value="64"> Acoes</label>
+                            <label><input type="checkbox" id="log_intermod" value="128"> Inter-Modulos</label>
+                            <label><input type="checkbox" id="log_watchdog" value="256"> Watchdog</label>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="clock_esp32">Clock do ESP32 (MHz)</label>
-                        <input type="number" id="clock_esp32" name="clock_esp32" min="80" max="240" placeholder="240">
-                    </div>
-                    <div class="form-group">
-                        <label for="tempo_watchdog">Tempo para Watchdog (µs)</label>
-                        <input type="number" id="tempo_watchdog" name="tempo_watchdog" min="1000000" placeholder="8000000">
-                    </div>
-                </div>
-            </div>
+                    </td></tr>
+                    <tr><td>Watchdog Habilitado:</td><td><select name="watchdog_enabled" id="watchdog_enabled"><option value="1">Habilitado</option><option value="0">Desabilitado</option></select></td></tr>
+                    <tr><td>Tempo Watchdog (microseg):</td><td><input type="number" name="tempo_watchdog_us" id="tempo_watchdog_us" min="1000000" max="8000000" value="2000000"></td></tr>
+                    <tr><td>Clock ESP32 (MHz):</td><td>
+                        <select name="clock_esp32_mhz" id="clock_esp32_mhz">
+                            <option value="80">80 MHz</option>
+                            <option value="160">160 MHz</option>
+                            <option value="240">240 MHz (Padrao)</option>
+                        </select>
+                    </td></tr>
+                </table>
 
-            <!-- Seção: Configurações dos Pinos -->
-            <div class="form-section">
-                <h3 class="text-lg font-semibold text-gray-700 mb-4">Configurações dos Pinos</h3>
-                <div class="form-group">
-                    <label for="qtd_pinos">Quantidade Total de Pinos</label>
-                    <input type="number" id="qtd_pinos" name="qtd_pinos" min="1" max="254" placeholder="16">
-                </div>
-            </div>
+                <div class="section-title">Configuracoes do Servidor Web</div>
+                <table class="config-table">
+                    <tr><td>Porta do Servidor:</td><td><input type="number" name="web_server_port" id="web_server_port" min="80" max="65535" value="8080"></td></tr>
+                    <tr><td>Autenticacao Habilitada:</td><td><select name="auth_enabled" id="auth_enabled"><option value="1">Habilitado</option><option value="0">Desabilitado</option></select></td></tr>
+                    <tr><td>Dashboard Requer Auth:</td><td><select name="dashboard_auth_required" id="dashboard_auth_required"><option value="1">Sim</option><option value="0">Nao</option></select></td></tr>
+                </table>
 
-            <!-- Seção: Configurações do Servidor Web -->
-            <div class="form-section">
-                <h3 class="text-lg font-semibold text-gray-700 mb-4">Configurações do Servidor Web</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="form-group">
-                        <label for="web_port">Porta do Servidor Web</label>
-                        <input type="number" id="web_port" name="web_port" min="80" max="65535" placeholder="8080">
-                    </div>
-                    <div class="form-group">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="auth_enabled" name="auth_enabled">
-                            <label for="auth_enabled">Habilitar Autenticação Web</label>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="web_username">Usuário Administrador</label>
-                        <input type="text" id="web_username" name="web_username" placeholder="admin">
-                    </div>
-                    <div class="form-group">
-                        <label for="web_password">Senha Administrador</label>
-                        <input type="password" id="web_password" name="web_password" placeholder="senha123">
-                    </div>
-                    <div class="form-group">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="dashboard_auth" name="dashboard_auth">
-                            <label for="dashboard_auth">Dashboard Requer Autenticação</label>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mt-4">
-                    <p class="text-sm text-blue-700">
-                        <strong>Nota:</strong> Quando a autenticação estiver habilitada, você pode escolher se o dashboard (página inicial) 
-                        também requerá login. Se desabilitado, o dashboard funcionará como painel público de apresentação.
-                    </p>
-                </div>
-            </div>
+                <div class="section-title">Configuracoes do Access Point (Fallback)</div>
+                <table class="config-table">
+                    <tr><td>SSID do Access Point:</td><td><input type="text" name="ap_ssid" id="ap_ssid" maxlength="32" value="esp32modularx Ponto de Acesso"></td></tr>
+                    <tr><td>Senha do Access Point:</td><td><input type="password" name="ap_pass" id="ap_pass" maxlength="64" placeholder="Deixe em branco para manter atual"></td></tr>
+                    <tr><td>Fallback AP Habilitado:</td><td><select name="ap_fallback_enabled" id="ap_fallback_enabled"><option value="1">Habilitado</option><option value="0">Desabilitado</option></select></td></tr>
+                </table>
 
-            <!-- Botões de Ação - Estilo Cisco -->
-            <div class="flex gap-4 pt-4">
-                <button type="button" id="applyBtn" class="btn-primary">Aplicar (Running-Config)</button>
-                <button type="button" id="saveBtn" class="btn-success">Salvar na Flash (Startup-Config)</button>
-                <button type="button" id="saveAndRebootBtn" class="btn-warning">Salvar e Reiniciar</button>
-                <a href="/" class="btn-secondary">Voltar ao Dashboard</a>
+                <div class="section-title">Autenticacao Web</div>
+                <table class="config-table">
+                    <tr><td>Usuario Web:</td><td><input type="text" name="web_username" id="web_username" maxlength="32"></td></tr>
+                    <tr><td>Senha Web:</td><td><input type="password" name="web_password" id="web_password" maxlength="64" placeholder="Deixe em branco para manter atual"></td></tr>
+                </table>
             </div>
-
-            <div id="status" class="status-message"></div>
         </form>
-    </main>
+
+        <div id="status" class="status-message"></div>
+    </div>
 
     <script>
-        // Carregar configurações atuais quando a página carrega
-        async function carregarConfiguracoes() {
-            console.log('Iniciando carregamento das configurações...');
+        // Função para obter nome da cor baseado no valor hexadecimal
+        function getColorName(hex) {
+            const colors = {
+                '#000000': 'Preto', '#ffffff': 'Branco', '#ff0000': 'Vermelho', '#00ff00': 'Verde', 
+                '#0000ff': 'Azul', '#ffff00': 'Amarelo', '#ff00ff': 'Magenta', '#00ffff': 'Ciano',
+                '#800000': 'Vermelho Escuro', '#008000': 'Verde Escuro', '#000080': 'Azul Escuro',
+                '#808000': 'Amarelo Escuro', '#800080': 'Roxo', '#008080': 'Verde Azulado',
+                '#c0c0c0': 'Cinza Claro', '#808080': 'Cinza', '#404040': 'Cinza Escuro',
+                '#ffa500': 'Laranja', '#ffc0cb': 'Rosa', '#a52a2a': 'Marrom', '#90ee90': 'Verde Claro',
+                '#add8e6': 'Azul Claro', '#f0e68c': 'Cáqui', '#dda0dd': 'Ameixa', '#98fb98': 'Verde Menta'
+            };
             
-            try {
-                const response = await fetch('/config/json');
-                console.log('Resposta recebida:', response.status, response.statusText);
+            hex = hex.toLowerCase();
+            return colors[hex] || `Personalizada (${hex.toUpperCase()})`;
+        }
+        
+        // Função para atualizar nome da cor
+        function updateColorName(inputId, spanId) {
+            const colorInput = document.getElementById(inputId);
+            const colorSpan = document.getElementById(spanId);
+            colorSpan.textContent = getColorName(colorInput.value);
+        }
+
+        // Controle do loading
+        function showLoading(text = 'Carregando...') {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            document.querySelector('.loading-text').textContent = text;
+        }
+        
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+        
+        // Esconder loading quando página carregar completamente e carregar configuração atual
+        window.addEventListener('load', function() {
+            // Carregar configuração atual automaticamente
+            fetch('/config/json')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('hostname').value = data.hostname || '';
+                    document.getElementById('wifi_ssid').value = data.wifi_ssid || '';
+                    document.getElementById('wifi_attempts').value = data.wifi_attempts || 15;
+                    document.getElementById('wifi_check_interval').value = data.wifi_check_interval || 15000;
+                    document.getElementById('ntp_server1').value = data.ntp_server1 || 'pool.ntp.br';
+                    document.getElementById('gmt_offset').value = data.gmt_offset || -10800;
+                    document.getElementById('daylight_offset').value = data.daylight_offset || 0;
+                    document.getElementById('status_pinos_enabled').value = data.status_pinos_enabled ? '1' : '0';
+                    document.getElementById('inter_modulos_enabled').value = data.inter_modulos_enabled ? '1' : '0';
+                    document.getElementById('cor_com_alerta').value = data.cor_com_alerta || '#ff0000';
+                    document.getElementById('cor_sem_alerta').value = data.cor_sem_alerta || '#00ff00';
+                    
+                    // Atualizar nomes das cores
+                    updateColorName('cor_com_alerta', 'cor_com_alerta_name');
+                    updateColorName('cor_sem_alerta', 'cor_sem_alerta_name');
+                    document.getElementById('tempo_refresh').value = data.tempo_refresh || 15;
+                    document.getElementById('qtd_pinos').value = data.qtd_pinos || 10;
+                    document.getElementById('serial_debug_enabled').value = data.serial_debug_enabled ? (data.active_log_flags == 511 ? '511' : '1') : '0';
+                    
+                    // Configurar checkboxes de debug
+                    updateLogCheckboxes(data.active_log_flags || 0);
+                    
+                    document.getElementById('watchdog_enabled').value = data.watchdog_enabled ? '1' : '0';
+                    document.getElementById('tempo_watchdog_us').value = data.tempo_watchdog_us || 2000000;
+                    document.getElementById('clock_esp32_mhz').value = data.clock_esp32_mhz || 240;
+                    document.getElementById('web_server_port').value = data.web_server_port || 8080;
+                    document.getElementById('auth_enabled').value = data.auth_enabled ? '1' : '0';
+                    document.getElementById('dashboard_auth_required').value = data.dashboard_auth_required ? '1' : '0';
+                    document.getElementById('ap_ssid').value = data.ap_ssid || 'esp32modularx Ponto de Acesso';
+                    document.getElementById('ap_fallback_enabled').value = data.ap_fallback_enabled ? '1' : '0';
+                    document.getElementById('web_username').value = data.web_username || '';
+                    
+                    hideLoading();
+                })
+                .catch(error => {
+                    hideLoading();
+                    console.error('Erro ao carregar configuração:', error);
+                    showStatus('Erro ao carregar configuração atual.', 'error');
+                });
+        });
+
+        function updateLogCheckboxes(logFlags) {
+            const checkboxes = [
+                { id: 'log_init', value: 1 },
+                { id: 'log_network', value: 2 },
+                { id: 'log_pins', value: 4 },
+                { id: 'log_flash', value: 8 },
+                { id: 'log_web', value: 16 },
+                { id: 'log_sensor', value: 32 },
+                { id: 'log_actions', value: 64 },
+                { id: 'log_intermod', value: 128 },
+                { id: 'log_watchdog', value: 256 }
+            ];
+            
+            checkboxes.forEach(cb => {
+                document.getElementById(cb.id).checked = (logFlags & cb.value) !== 0;
+            });
+        }
+
+        function getLogFlags() {
+            let flags = 0;
+            const checkboxes = [
+                { id: 'log_init', value: 1 },
+                { id: 'log_network', value: 2 },
+                { id: 'log_pins', value: 4 },
+                { id: 'log_flash', value: 8 },
+                { id: 'log_web', value: 16 },
+                { id: 'log_sensor', value: 32 },
+                { id: 'log_actions', value: 64 },
+                { id: 'log_intermod', value: 128 },
+                { id: 'log_watchdog', value: 256 }
+            ];
+            
+            checkboxes.forEach(cb => {
+                if (document.getElementById(cb.id).checked) {
+                    flags |= cb.value;
+                }
+            });
+            
+            return flags;
+        }
+
+        function saveConfig() {
+            if (confirm('Aplicar configurações gerais? O ESP será reiniciado.')) {
+                showLoading('Aplicando configurações e reiniciando...');
                 
-                if (response.ok) {
-                    const config = await response.json();
-                    console.log('Configurações recebidas:', config);
-                    
-                    // Configurações de rede
-                    if (config.hostname !== undefined) document.getElementById('hostname').value = config.hostname;
-                    if (config.wifi_ssid !== undefined) document.getElementById('wifi_ssid').value = config.wifi_ssid;
-                    if (config.wifi_pass !== undefined) document.getElementById('wifi_pass').value = config.wifi_pass;
-                    if (config.wifi_attempts !== undefined) document.getElementById('wifi_attempts').value = config.wifi_attempts;
-                    
-                    // Configurações de NTP
-                    if (config.ntp_server1 !== undefined) document.getElementById('ntp_server1').value = config.ntp_server1;
-                    if (config.gmt_offset !== undefined) document.getElementById('gmt_offset').value = config.gmt_offset;
-                    if (config.daylight_offset !== undefined) document.getElementById('daylight_offset').value = config.daylight_offset;
-                    
-                    // Configurações da interface
-                    if (config.status_pinos !== undefined) document.getElementById('status_pinos').checked = config.status_pinos;
-                    if (config.inter_modulos !== undefined) document.getElementById('inter_modulos').checked = config.inter_modulos;
-                    if (config.cor_com_alerta !== undefined) document.getElementById('cor_com_alerta').value = config.cor_com_alerta;
-                    if (config.cor_sem_alerta !== undefined) document.getElementById('cor_sem_alerta').value = config.cor_sem_alerta;
-                    if (config.tempo_refresh !== undefined) document.getElementById('tempo_refresh').value = config.tempo_refresh;
-                    
-                    // Configurações do watchdog
-                    if (config.watchdog_enabled !== undefined) document.getElementById('watchdog_enabled').checked = config.watchdog_enabled;
-                    if (config.clock_esp32 !== undefined) document.getElementById('clock_esp32').value = config.clock_esp32;
-                    if (config.tempo_watchdog !== undefined) document.getElementById('tempo_watchdog').value = config.tempo_watchdog;
-                    
-                    // Configurações dos pinos
-                    if (config.qtd_pinos !== undefined) document.getElementById('qtd_pinos').value = config.qtd_pinos;
-                    
-                    // Configurações do servidor web
-                    if (config.web_port !== undefined) document.getElementById('web_port').value = config.web_port;
-                    if (config.auth_enabled !== undefined) document.getElementById('auth_enabled').checked = config.auth_enabled;
-                    if (config.web_username !== undefined) document.getElementById('web_username').value = config.web_username;
-                    if (config.web_password !== undefined) document.getElementById('web_password').value = config.web_password;
-                    if (config.dashboard_auth !== undefined) document.getElementById('dashboard_auth').checked = config.dashboard_auth;
-                    
-                    console.log('Configurações carregadas e aplicadas com sucesso!');
-                } else {
-                    console.error('Erro na resposta:', response.status, response.statusText);
-                    const errorText = await response.text();
-                    console.error('Detalhes do erro:', errorText);
-                }
-            } catch (error) {
-                console.error('Erro ao carregar configurações:', error);
-                console.error('Stack trace:', error.stack);
+                const formData = new FormData(document.getElementById('configForm'));
+                
+                // Adicionar flags de debug calculadas
+                const logFlags = getLogFlags();
+                formData.append('active_log_flags', logFlags);
+                
+                fetch('/save_config', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.text())
+                .then(result => {
+                    if (result === 'Configurações salvas! O sistema será reiniciado...' || result.includes('salvas')) {
+                        showStatus('Configurações aplicadas! Reiniciando ESP...', 'success');
+                        
+                        // Aguardar 3 segundos e redirecionar para página inicial
+                        setTimeout(() => {
+                            showLoading('Redirecionando para página inicial...');
+                            window.location.href = '/';
+                        }, 3000);
+                    } else {
+                        hideLoading();
+                        showStatus('Erro ao aplicar configurações.', 'error');
+                    }
+                })
+                .catch(error => {
+                    hideLoading();
+                    console.error('Erro:', error);
+                    showStatus('Erro de comunicação.', 'error');
+                });
             }
         }
 
-        // Função para coletar dados do formulário
-        function coletarDadosFormulario() {
-            const form = document.getElementById('configForm');
-            return new URLSearchParams(new FormData(form));
-        }
-
-        // Função para mostrar status
-        function mostrarStatus(mensagem, tipo) {
+        function showStatus(message, type) {
             const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status-message status-' + type;
             statusDiv.style.display = 'block';
-            statusDiv.className = `status-message status-${tipo}`;
-            statusDiv.textContent = mensagem;
+            
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
         }
 
-        // Botão APLICAR (Running-Config) - Estilo Cisco
-        document.getElementById('applyBtn').addEventListener('click', async function() {
-            const formData = coletarDadosFormulario();
-            mostrarStatus('Aplicando configurações em memória (Running-Config)...', 'info');
-
-            try {
-                const response = await fetch('/apply_config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData
-                });
-
-                if (response.ok) {
-                    const text = await response.text();
-                    mostrarStatus('✅ Running-Config aplicada! Teste as funcionalidades e depois salve se estiver OK.', 'success');
-                } else {
-                    mostrarStatus('❌ Erro ao aplicar configurações.', 'error');
-                }
-            } catch (error) {
-                mostrarStatus(`❌ Erro de conexão: ${error.message}`, 'error');
+        // Sincronizar dropdown de debug com checkboxes
+        document.getElementById('serial_debug_enabled').addEventListener('change', function() {
+            const value = this.value;
+            if (value === '0') {
+                // Desabilitar todos
+                updateLogCheckboxes(0);
+            } else if (value === '1') {
+                // Habilitar basicos (INIT + NETWORK + WEB)
+                updateLogCheckboxes(1 + 2 + 16);
+            } else if (value === '511') {
+                // Habilitar todos
+                updateLogCheckboxes(511);
             }
         });
 
-        // Botão SALVAR na Flash (Startup-Config) - Estilo Cisco
-        document.getElementById('saveBtn').addEventListener('click', async function() {
-            mostrarStatus('Salvando Running-Config na Flash (Startup-Config)...', 'info');
-
-            try {
-                const response = await fetch('/save_to_flash', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: ''
-                });
-
-                if (response.ok) {
-                    const text = await response.text();
-                    mostrarStatus('✅ Startup-Config salva! Configurações persistidas na flash.', 'success');
+        // Atualizar dropdown quando checkboxes mudarem
+        document.querySelectorAll('input[type="checkbox"][id^="log_"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const flags = getLogFlags();
+                const dropdown = document.getElementById('serial_debug_enabled');
+                if (flags === 0) {
+                    dropdown.value = '0';
+                } else if (flags === 511) {
+                    dropdown.value = '511';
                 } else {
-                    mostrarStatus('❌ Erro ao salvar na flash.', 'error');
+                    dropdown.value = '1';
                 }
-            } catch (error) {
-                mostrarStatus(`❌ Erro de conexão: ${error.message}`, 'error');
-            }
+            });
         });
+    </script>
 
-        // Botão SALVAR e REINICIAR (Comportamento original)
-        document.getElementById('saveAndRebootBtn').addEventListener('click', async function() {
-            const formData = coletarDadosFormulario();
-            mostrarStatus('Salvando e reiniciando módulo...', 'warning');
+    <!-- Indicador de Performance -->
+    <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-family: monospace; display: none;" id="performance-indicator">
+        Tempo de Carregamento: <span id="load-time">-</span>
+    </div>
 
-            try {
-                const response = await fetch('/save_config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData
-                });
-
-                if (response.ok) {
-                    mostrarStatus('✅ Configurações salvas! Módulo reiniciando...', 'success');
-                } else {
-                    mostrarStatus('❌ Erro ao salvar e reiniciar.', 'error');
-                }
-            } catch (error) {
-                mostrarStatus(`❌ Erro de conexão: ${error.message}`, 'error');
-            }
+    <script>
+        // === SISTEMA DE MONITORAMENTO DE PERFORMANCE ===
+        const pageStartTime = performance.now();
+        
+        // Função para mostrar indicador de performance
+        function showPerformanceIndicator() {
+            const loadTime = performance.now() - pageStartTime;
+            document.getElementById('load-time').textContent = loadTime.toFixed(2) + 'ms';
+            document.getElementById('performance-indicator').style.display = 'block';
+            
+            console.log(`[PERFORMANCE] Configurações carregadas em ${loadTime.toFixed(2)}ms`);
+        }
+        
+        // Mostrar indicador após carregamento
+        window.addEventListener('load', function() {
+            setTimeout(showPerformanceIndicator, 100);
         });
-
-        // Carrega as configurações quando a página é aberta
-        window.onload = carregarConfiguracoes;
+        
+        // Adicionar listeners para atualizar nomes das cores em tempo real
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('cor_com_alerta').addEventListener('input', function() {
+                updateColorName('cor_com_alerta', 'cor_com_alerta_name');
+            });
+            
+            document.getElementById('cor_sem_alerta').addEventListener('input', function() {
+                updateColorName('cor_sem_alerta', 'cor_sem_alerta_name');
+            });
+        });
     </script>
 </body>
 </html>
-)raw_string";
+)rawliteral";
 
-#endif // WEB_CONFIG_GERAIS_H
+#endif

@@ -6,166 +6,185 @@
 
 // Rota de configuração inicial (HTML para a primeira execução)
 // Variável para armazenar o conteúdo do HTML da página de configuração.
-const char web_config_html[] PROGMEM = R"raw_string(
+const char web_config_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configuração SMCR</title>
-    <!-- Incluindo Tailwind CSS para estilização moderna e responsiva -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <title>Configuracao Inicial SMCR</title>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
-            color: #1f2937;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 1rem;
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #f0f0f0; 
+            margin: 0; 
+            padding: 20px; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
         }
-        .container {
-            background-color: #ffffff;
-            border-radius: 1rem;
-            padding: 2rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            width: 100%;
-            max-width: 28rem;
+        .config-container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            width: 100%; 
+            max-width: 500px; 
         }
-        h1 {
-            text-align: center;
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1.5rem;
+        h1 { 
+            text-align: center; 
+            color: #333; 
+            margin-bottom: 10px; 
+            font-size: 24px; 
         }
-        p {
-            text-align: center;
-            font-size: 1rem;
-            color: #6b7280;
-            margin-bottom: 2rem;
+        .subtitle { 
+            text-align: center; 
+            color: #666; 
+            margin-bottom: 30px; 
+            font-size: 14px; 
         }
-        .input-group {
-            margin-bottom: 1rem;
+        .config-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 20px; 
         }
-        .input-group label {
-            display: block;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
+        .config-table td { 
+            padding: 10px; 
+            vertical-align: middle; 
         }
-        .input-group input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.5rem;
-            box-sizing: border-box;
-            background-color: #f9fafb;
+        .config-table td:first-child { 
+            font-weight: bold; 
+            color: #444; 
+            width: 40%; 
+            text-align: right; 
+            padding-right: 15px; 
         }
-        .input-group input:focus {
-            outline: none;
-            border-color: #2563eb;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        .config-table input { 
+            width: 100%; 
+            padding: 8px 12px; 
+            border: 2px solid #ddd; 
+            border-radius: 4px; 
+            font-size: 14px; 
+            box-sizing: border-box; 
         }
-        button {
-            width: 100%;
-            padding: 0.75rem;
-            background-color: #2563eb;
-            color: #ffffff;
-            font-weight: 700;
-            border: none;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
+        .config-table input:focus { 
+            outline: none; 
+            border-color: #007bff; 
+            box-shadow: 0 0 5px rgba(0,123,255,0.3); 
         }
-        button:hover {
-            background-color: #1d4ed8;
+        .btn-save { 
+            width: 100%; 
+            padding: 12px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            margin-top: 10px; 
         }
-        .status-message {
-            margin-top: 1.5rem;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            text-align: center;
-            font-weight: 500;
-            display: none;
+        .btn-save:hover { 
+            background: #0056b3; 
         }
-        .status-success {
-            background-color: #d1fae5;
-            color: #065f46;
+        .status-message { 
+            margin-top: 15px; 
+            padding: 10px; 
+            border-radius: 4px; 
+            text-align: center; 
+            display: none; 
         }
-        .status-error {
-            background-color: #fee2e2;
-            color: #991b1b;
+        .status-success { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb; 
+        }
+        .status-error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 1px solid #f5c6cb; 
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Configuração Inicial</h1>
-        <p>Insira as informações da rede Wi-Fi para o dispositivo se conectar.</p>
+    <div class="config-container">
+        <h1>Configuracao Inicial</h1>
+        <p class="subtitle">Insira as informacoes da rede Wi-Fi para o dispositivo se conectar:</p>
+        
         <form id="configForm" action="/save_config" method="POST">
-            <div class="input-group">
-                <label for="hostname">Hostname</label>
-                <input type="text" id="hostname" name="hostname" required>
-            </div>
-            <div class="input-group">
-                <label for="ssid">SSID da Rede</label>
-                <input type="text" id="ssid" name="ssid" required>
-            </div>
-            <div class="input-group">
-                <label for="password">Senha da Rede</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            <button type="submit">Salvar e Conectar</button>
+            <table class="config-table">
+                <tr>
+                    <td>Hostname:</td>
+                    <td><input type="text" name="hostname" id="hostname" placeholder="esp32modularx" maxlength="32" required></td>
+                </tr>
+                <tr>
+                    <td>SSID da Rede:</td>
+                    <td><input type="text" name="ssid" id="ssid" placeholder="Nome da sua rede Wi-Fi" maxlength="32" required></td>
+                </tr>
+                <tr>
+                    <td>Senha da Rede:</td>
+                    <td><input type="password" name="password" id="password" placeholder="Senha do Wi-Fi" maxlength="64" required></td>
+                </tr>
+            </table>
+            
+            <button type="submit" class="btn-save">Salvar e Conectar</button>
         </form>
+        
         <div id="status" class="status-message"></div>
     </div>
 
     <script>
-        document.getElementById('configForm').addEventListener('submit', async function(event) {
-            event.preventDefault();
-            const form = event.target;
+        document.getElementById('configForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
             const statusDiv = document.getElementById('status');
-            const button = form.querySelector('button');
-
-            // Converte os dados do formulário para o formato URL-encoded para envio via POST
-            const formData = new URLSearchParams(new FormData(form)).toString();
-
-            statusDiv.style.display = 'block';
-            statusDiv.className = 'status-message';
-            statusDiv.textContent = 'Salvando configurações...';
-            button.disabled = true;
-
+            const submitBtn = document.querySelector('.btn-save');
+            
+            const hostname = document.getElementById('hostname').value.trim();
+            const ssid = document.getElementById('ssid').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!hostname || !ssid || !password) {
+                statusDiv.className = 'status-message status-error';
+                statusDiv.style.display = 'block';
+                statusDiv.textContent = 'Preencha todos os campos obrigatorios';
+                return;
+            }
+            
+            submitBtn.textContent = 'Salvando...';
+            submitBtn.disabled = true;
+            
             try {
-                // A requisição fetch usará automaticamente o método POST e a URL de action="/save_config"
-                const response = await fetch('/save_config', { // CORREÇÃO AQUI: Garante que o fetch va para /save_config
-                    method: 'POST', 
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: formData // Envia os dados no corpo
+                const formData = new FormData(this);
+                const response = await fetch(this.action, {
+                    method: 'POST',
+                    body: formData
                 });
-
+                
                 if (response.ok) {
                     statusDiv.className = 'status-message status-success';
-                    statusDiv.textContent = 'Configurações salvas! O dispositivo está reiniciando para se conectar à nova rede.';
-                    // O ESP32 irá reiniciar (delay(3000) e ESP.restart() em fV_handleSaveConfig)
+                    statusDiv.style.display = 'block';
+                    statusDiv.textContent = 'Configuracao salva com sucesso! Reiniciando...';
+                    
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 3000);
                 } else {
-                    const errorText = await response.text();
-                    statusDiv.className = 'status-message status-error';
-                    statusDiv.textContent = \`Erro ao salvar: ${errorText || response.statusText}\`;
-                    button.disabled = false;
+                    throw new Error('Erro ao salvar configuracao');
                 }
             } catch (error) {
                 statusDiv.className = 'status-message status-error';
-                statusDiv.textContent = \`Erro de conexão: ${error.message}\`;
-                button.disabled = false;
+                statusDiv.style.display = 'block';
+                statusDiv.textContent = 'Erro ao salvar configuracao. Tente novamente.';
+                
+                submitBtn.textContent = 'Salvar e Conectar';
+                submitBtn.disabled = false;
             }
         });
     </script>
 </body>
 </html>
-)raw_string";
+)rawliteral";
 
-#endif // WEB_WEB_MODOAP_H
+#endif

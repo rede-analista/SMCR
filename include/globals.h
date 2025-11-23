@@ -93,14 +93,46 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
 
 };
 
+// --- Estrutura para Configuração de Pinos ---
+struct PinConfig_t {
+    String nome;                 // Nome descritivo do pino
+    uint8_t pino;               // Número físico do GPIO (0-254)
+    uint16_t tipo;              // Tipo: 0=Sem Uso, 1=Digital, 192=Analógico, 65534=Remoto
+    uint8_t modo;               // pinMode(): 0=SEM_USO, 1=INPUT, 3=OUTPUT, etc.
+    uint8_t xor_logic;          // Lógica invertida (0=normal, 1=invertido)
+    uint32_t tempo_retencao;    // Tempo em millisegundos para ações temporizadas
+    uint16_t status_atual;      // Status: 0-1 (digital) ou 0-4095 (analógico)
+    uint16_t ignore_contador;   // Contador para ignore temporário
+    unsigned long ultimo_acionamento_ms; // Timestamp da última mudança (para tempo de retenção)
+    // Nível de acionamento
+    uint16_t nivel_acionamento_min;  // Digital: 0 ou 1 | Analógico: valor mínimo do range
+    uint16_t nivel_acionamento_max;  // Digital: igual ao min | Analógico: valor máximo do range
+};
+
 // Instância global da sua configuração em memória (sua running-config)
 extern MainConfig_t vSt_mainConfig; // vSt_ para variável do tipo Struct
+
+// --- Variáveis globais para gerenciamento de pinos ---
+extern PinConfig_t* vA_pinConfigs;   // Array dinâmico de configurações de pinos
+extern uint8_t vU8_activePinsCount;  // Contador de pinos ativos configurados
 
 // --- Novas funções para carregar e salvar a estrutura MainConfig_t ---
 // Estas serão as funções de interface para a sua "startup-config"
 void fV_carregarMainConfig(void); // Carrega da Flash para vSt_mainConfig
 void fV_salvarMainConfig(void);   // Salva de vSt_mainConfig para a Flash
 void fV_clearPreferences(void) ; // Limpa todas as preferências (Reset de Fábrica)
+void fV_clearConfigExceptNetwork(void); // Limpa todas as configurações exceto rede
+
+// --- Funções para gerenciamento de pinos ---
+void fV_initPinSystem(void);       // Inicializa sistema de pinos
+void fV_loadPinConfigs(void);      // Carrega configurações de pinos do LittleFS
+bool fB_savePinConfigs(void);      // Salva configurações de pinos no LittleFS (retorna true se sucesso)
+void fV_clearPinConfigs(void);     // Limpa todas as configurações de pinos
+void fV_setupConfiguredPins(void); // Aplica pinMode() para pinos configurados
+uint8_t fU8_findPinIndex(uint8_t pinNumber); // Encontra índice do pino no array
+int fI_addPinConfig(const PinConfig_t& config); // Adiciona nova configuração de pino
+bool fB_removePinConfig(uint8_t pinNumber);    // Remove configuração de pino
+bool fB_updatePinConfig(uint8_t pinNumber, const PinConfig_t& config); // Atualiza configuração
 
 
 //Gera um ID para o módulo com base nas informações do chip ESP32
@@ -129,14 +161,47 @@ void fV_handleSaveToFlash(AsyncWebServerRequest *request); // Handler para salva
 void fV_handleStatusJson(AsyncWebServerRequest *request); // Handler para API JSON de status
 void fV_handleConfigPage(AsyncWebServerRequest *request); // Handler para página de configurações
 void fV_handleResetPage(AsyncWebServerRequest *request); // Handler para página de reset
+void fV_handleMqttPage(AsyncWebServerRequest *request); // Handler para página de MQTT/Serviços
 void fV_handleSoftReset(AsyncWebServerRequest *request); // Handler para reinicialização simples
 void fV_handleFactoryReset(AsyncWebServerRequest *request); // Handler para reset de fábrica
 void fV_handleNetworkReset(AsyncWebServerRequest *request); // Handler para reset de rede
+void fV_handleConfigReset(AsyncWebServerRequest *request); // Handler para reset de config (mantém rede)
+void fV_handlePinsReset(AsyncWebServerRequest *request);   // Handler para reset apenas de pinos
+void fV_handlePinAdd(AsyncWebServerRequest *request);     // Handler para adicionar novo pino
+void fV_handleRestart(AsyncWebServerRequest *request);     // Handler para restart simples
 void fV_handleNotFound(AsyncWebServerRequest *request); // Handler 404
+void fV_handlePinsListApi(AsyncWebServerRequest *request); // Handler para API de listagem de pinos
+void fV_handlePinCreateApi(AsyncWebServerRequest *request); // Handler para API de criação de pinos
+void fV_handlePinUpdateApi(AsyncWebServerRequest *request); // Handler para API de atualização de pinos
+void fV_handlePinDeleteApi(AsyncWebServerRequest *request); // Handler para API de deleção de pinos
+void fV_handlePinsSaveApi(AsyncWebServerRequest *request); // Handler para API de salvamento de pinos
+void fV_handlePinsReloadApi(AsyncWebServerRequest *request); // Handler para API de reload de pinos
+void fV_handleFilesPage(AsyncWebServerRequest *request);    // Handler para página de arquivos
+void fV_handleNVSList(AsyncWebServerRequest *request);      // Handler para API de listagem NVS
+void fV_handleFilesList(AsyncWebServerRequest *request);    // Handler para API de listagem de arquivos
+void fV_handleFileDownload(AsyncWebServerRequest *request); // Handler para API de download de arquivos
+void fV_handleFileDelete(AsyncWebServerRequest *request);   // Handler para API de deleção de arquivos
+void fV_handleFormatFlash(AsyncWebServerRequest *request);  // Handler para API de formatação da flash
+void fV_handlePinsClearApi(AsyncWebServerRequest *request); // Handler para API de limpeza de pinos
 
 /* Funções de NTP (ntp_func.cpp) */
 void fV_setupNtp();
 String fS_getFormattedTime();
 String fS_getNtpStatus();
+
+/* Funções do Gerenciador de Pinos (pin_manager.cpp) */
+void fV_initPinSystem(void);
+void fV_loadPinConfigs(void);
+bool fB_savePinConfigs(void);
+void fV_clearPinConfigs(void);
+void fV_setupConfiguredPins(void);
+uint8_t fU8_findPinIndex(uint8_t pinNumber);
+int fI_addPinConfig(const PinConfig_t& config);
+bool fB_removePinConfig(uint8_t pinNumber);
+bool fB_updatePinConfig(uint8_t pinNumber, const PinConfig_t& config);
+bool fB_hasPinConfigChanges(void);
+void fV_updatePinStatus(void);
+void fV_readPinsTask(void); // Task periódica para leitura de pinos (ignora remotos)
+bool fB_isPinActivated(uint8_t pinIndex);  // Verifica se pino está acionado baseado no nível configurado
 
 #endif // GLOBALS_H

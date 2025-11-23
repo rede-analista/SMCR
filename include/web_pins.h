@@ -1,0 +1,762 @@
+// Conteúdo de web_pins.h
+#ifndef WEB_PINS_H
+#define WEB_PINS_H
+
+#include <Arduino.h>
+
+// Página de Configuração de Pinos
+const char web_pins_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMCR - Configuracao de Pinos</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f0f0f0; 
+        }
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        h1 { 
+            text-align: center; 
+            color: #333; 
+            margin-bottom: 10px; 
+            border-bottom: 2px solid #007bff; 
+            padding-bottom: 10px; 
+        }
+        .menu { 
+            text-align: center; 
+            margin: 20px 0; 
+            padding: 10px; 
+            background: #f8f9fa; 
+            border-radius: 4px; 
+        }
+        .menu a { 
+            margin: 0 15px; 
+            text-decoration: none; 
+            color: #007bff; 
+            font-weight: bold; 
+        }
+        .menu a:hover { 
+            text-decoration: underline; 
+        }
+        .section { 
+            margin: 30px 0; 
+        }
+        .section-title { 
+            font-size: 18px; 
+            font-weight: bold; 
+            color: #444; 
+            margin-bottom: 15px; 
+            padding: 8px 0; 
+            border-bottom: 1px solid #ddd; 
+        }
+        .action-menu { 
+            text-align: center; 
+            margin: 20px 0; 
+            padding: 15px; 
+            background: #f8f9fa; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+        }
+        .btn { 
+            margin: 5px; 
+            padding: 10px 15px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 14px; 
+            font-weight: bold; 
+            text-decoration: none; 
+            display: inline-block; 
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-primary:hover { background: #0056b3; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #1e7e34; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-warning:hover { background: #e0a800; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #545b62; }
+        
+        .pins-summary { 
+            background: #e3f2fd; 
+            padding: 15px; 
+            border-radius: 4px; 
+            border-left: 4px solid #2196f3; 
+            margin: 20px 0; 
+        }
+        .config-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 20px; 
+        }
+        .config-table td { 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            vertical-align: middle; 
+        }
+        .config-table td:first-child { 
+            font-weight: bold; 
+            color: #555; 
+            width: 35%; 
+            background: #f8f9fa; 
+        }
+        .config-table input, .config-table select { 
+            width: 100%; 
+            padding: 8px 12px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            font-size: 14px; 
+            box-sizing: border-box; 
+        }
+        .pins-list { 
+            margin-top: 20px; 
+        }
+        .pin-item { 
+            background: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            margin: 10px 0; 
+            border-radius: 4px; 
+            overflow: hidden; 
+        }
+        .pin-header { 
+            background: #e9ecef; 
+            padding: 10px 15px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            cursor: pointer; 
+        }
+        .pin-details { 
+            padding: 15px; 
+            display: none; 
+        }
+        .pin-details.active { 
+            display: block; 
+        }
+        .pin-status { 
+            display: inline-block; 
+            padding: 3px 8px; 
+            border-radius: 3px; 
+            font-size: 12px; 
+            font-weight: bold; 
+            color: white; 
+        }
+        .pin-high { background: #28a745; }
+        .pin-low { background: #6c757d; }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-text {
+            margin-left: 15px;
+            font-size: 16px;
+            color: #007bff;
+        }
+        .status-message { 
+            margin-top: 15px; 
+            padding: 10px; 
+            border-radius: 4px; 
+            text-align: center; 
+            display: none; 
+        }
+        .status-success { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb; 
+        }
+        .status-error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 1px solid #f5c6cb; 
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Carregando pinos...</div>
+    </div>
+    
+    <div class="container">
+        <h1>Configuracao de Pinos</h1>
+        
+        <div class="menu">
+            <a href="/">Status</a>
+            <a href="/configuracao">Configuracoes Gerais</a>
+            <a href="/pins">Pinos/Reles</a>
+            <a href="/mqtt">MQTT/Servicos</a>
+            <a href="/arquivos">Arquivos</a>
+            <a href="/reset">Reset</a>
+        </div>
+
+        <div class="pins-summary">
+            <p><strong>Gerenciamento de pinos GPIO e reles</strong></p>
+            <p>Total: <span id="pins-count">0</span> pinos ativos</p>
+        </div>
+
+        <div class="action-menu">
+            <button onclick="applyPinConfig()" class="btn btn-primary">Aplicar</button>
+            <button onclick="showAddForm()" class="btn btn-success">Novo Pino</button>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Pinos Configurados</div>
+            <div id="pins-list" class="pins-list">
+                <p style="text-align: center; color: #666;">Nenhum pino configurado</p>
+            </div>
+        </div>
+
+        <div class="section" id="add-pin-section" style="display: none;">
+            <div class="section-title" id="form-title">Novo Pino</div>
+            <form id="pin-form">
+                <table class="config-table">
+                    <tr><td>Nome do Pino:</td><td><input type="text" id="pin-name" name="nome" maxlength="32" required></td></tr>
+                    <tr><td>Numero do Pino:</td><td><input type="number" id="pin-number" name="pino" min="0" max="39" required></td></tr>
+                    <tr><td>Tipo do Pino:</td><td>
+                        <select id="pin-type" name="tipo" onchange="updateModeOptions()">
+                            <option value="0">Não Utilizado</option>
+                            <option value="1">Digital</option>
+                            <option value="192">Analógico (ADC)</option>
+                            <option value="65534">Remoto (Inter-módulos)</option>
+                        </select>
+                    </td></tr>
+                    <tr><td>Modo:</td><td>
+                        <select id="pin-mode" name="modo">
+                            <option value="0">Não Utilizado</option>
+                            <option value="1">Input (Entrada)</option>
+                            <option value="3">Output (Saída)</option>
+                            <option value="5">Input Pull-Up (Entrada c/ Pull-Up)</option>
+                            <option value="9">Input Pull-Down (Entrada c/ Pull-Down)</option>
+                            <option value="12">Output Open-Drain (Saída Open-Drain)</option>
+                            <option value="192">Analógico (ADC)</option>
+                        </select>
+                    </td></tr>
+                    <tr><td>Logica XOR:</td><td>
+                        <select id="pin-xor" name="xor_logic">
+                            <option value="0">Normal (0)</option>
+                            <option value="1">Invertida (1)</option>
+                        </select>
+                    </td></tr>
+                    <tr><td>Tempo de Retencao (ms):</td><td><input type="number" id="pin-retention" name="tempo_retencao" min="0" max="60000" value="0"></td></tr>
+                </table>
+
+                <div class="section-title" style="font-size: 16px;">Nivel de Acionamento</div>
+                <table class="config-table">
+                    <tr><td>Valor de Acionamento:</td><td>
+                        <select id="pin-trigger">
+                            <option value="0">LOW (0V - Nível Baixo)</option>
+                            <option value="1">HIGH (3.3V - Nível Alto)</option>
+                        </select>
+                    </td></tr>
+                    <tr><td>Valor Mínimo (ADC):</td><td>
+                        <input type="number" id="pin-min" name="nivel_acionamento_min" min="0" max="4095" value="0">
+                        <small style="display: block; color: #666; font-size: 11px;">Para pinos analógicos: valor mínimo do ADC (0-4095)</small>
+                    </td></tr>
+                    <tr><td>Valor Máximo (ADC):</td><td>
+                        <input type="number" id="pin-max" name="nivel_acionamento_max" min="0" max="4095" value="2500">
+                        <small style="display: block; color: #666; font-size: 11px;">Para pinos analógicos: valor máximo do ADC (0-4095)</small>
+                    </td></tr>
+                </table>
+
+                <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; margin: 10px 0; font-size: 12px; color: #555;">
+                    <strong>Explicação dos Níveis de Acionamento:</strong><br>
+                    • <strong>Pinos Digitais:</strong> LOW (0V) ou HIGH (3.3V)<br>
+                    • <strong>Pinos PWM:</strong> Valor de 0-255 (duty cycle)<br>
+                    • <strong>Pinos Analógicos (ADC):</strong> Valor de 0-4095 (12-bit)<br>
+                    • <strong>Faixa Min/Max:</strong> Define quando pino analógico está "acionado"<br>
+                    • <strong>Pinos Remotos:</strong> Não possuem nível de acionamento local
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <button type="button" onclick="cancelAddPin()" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Salvar</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="status" class="status-message"></div>
+    </div>
+
+    <script>
+        // Atualiza opções de modo baseado no tipo de pino selecionado
+        function updateModeOptions() {
+            const pinType = parseInt(document.getElementById('pin-type').value);
+            const modeSelect = document.getElementById('pin-mode');
+            
+            // Limpa opções atuais
+            modeSelect.innerHTML = '';
+            
+            if (pinType === 0) {
+                // Não Utilizado
+                modeSelect.innerHTML = '<option value="0">Não Utilizado</option>';
+            } else if (pinType === 1) {
+                // Digital - modos INPUT/OUTPUT
+                modeSelect.innerHTML = `
+                    <option value="1">Input (Entrada)</option>
+                    <option value="3">Output (Saída)</option>
+                    <option value="5">Input Pull-Up (Entrada c/ Pull-Up)</option>
+                    <option value="9">Input Pull-Down (Entrada c/ Pull-Down)</option>
+                    <option value="12">Output Open-Drain (Saída Open-Drain)</option>
+                `;
+            } else if (pinType === 192) {
+                // Analógico
+                modeSelect.innerHTML = '<option value="192">Analógico (ADC)</option>';
+            } else if (pinType === 65534) {
+                // Remoto
+                modeSelect.innerHTML = '<option value="0">Remoto (Não aplicável)</option>';
+            }
+            
+            // Atualiza campos de acionamento
+            updateTriggerFields();
+        }
+        
+        // Controle do loading
+        function showLoading(text = 'Carregando...') {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            document.querySelector('.loading-text').textContent = text;
+        }
+        
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+        
+        // Esconder loading quando página carregar completamente
+        window.addEventListener('load', function() {
+            hideLoading();
+        });
+
+        let pinsData = [];
+
+        function loadPins() {
+            console.log('[DEBUG] Iniciando carregamento de pinos via /api/pins');
+            fetch('/api/pins')
+                .then(response => {
+                    console.log('[DEBUG] Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('[DEBUG] Dados recebidos:', data);
+                    pinsData = data.pins || [];
+                    console.log('[DEBUG] Pinos carregados:', pinsData.length);
+                    // Usar total dos pinos retornados, não o campo total do backend
+                    document.getElementById('pins-count').textContent = pinsData.length;
+                    renderPinsList();
+                })
+                .catch(error => {
+                    console.error('[ERROR] Erro ao carregar pinos:', error);
+                    showStatus('Erro ao carregar lista de pinos: ' + error.message, 'error');
+                });
+        }
+
+        function renderPinsList() {
+            const pinsList = document.getElementById('pins-list');
+            
+            if (pinsData.length === 0) {
+                pinsList.innerHTML = '<p style="text-align: center; color: #666;">Nenhum pino configurado</p>';
+                return;
+            }
+
+            let html = '';
+            pinsData.forEach((pin, index) => {
+                const statusClass = pin.status_atual ? 'pin-high' : 'pin-low';
+                const statusText = pin.status_atual ? 'HIGH' : 'LOW';
+                
+                // === MIGRAÇÃO: Mapear tipos antigos e novos ===
+                let tipoText = 'Desconhecido';
+                let modoText = 'Desconhecido';
+                
+                // Tipo de pino (com suporte a valores antigos 1-7)
+                if (pin.tipo === 0) {
+                    tipoText = 'Não Utilizado';
+                } else if (pin.tipo === 1) {
+                    tipoText = 'Digital';
+                } else if (pin.tipo >= 2 && pin.tipo <= 7) {
+                    // Valores antigos - mostrar como Digital (migração pendente)
+                    tipoText = 'Digital (antigo)';
+                } else if (pin.tipo === 192) {
+                    tipoText = 'Analógico';
+                } else if (pin.tipo === 65534) {
+                    tipoText = 'Remoto';
+                }
+                
+                // Modo do pino (valores reais do ESP32)
+                if (pin.modo === 0) {
+                    modoText = 'Não Utilizado';
+                } else if (pin.modo === 1) {
+                    modoText = 'Input';
+                } else if (pin.modo === 3) {
+                    modoText = 'Output';
+                } else if (pin.modo === 5) {
+                    modoText = 'Input Pull-Up';
+                } else if (pin.modo === 9) {
+                    modoText = 'Input Pull-Down';
+                } else if (pin.modo === 12) {
+                    modoText = 'Output Open-Drain';
+                } else if (pin.modo === 192) {
+                    modoText = 'Analógico';
+                }
+                
+                html += `
+                    <div class="pin-item">
+                        <div class="pin-header" onclick="togglePinDetails(${index})">
+                            <div>
+                                <strong>GPIO ${pin.pino} - ${pin.nome}</strong>
+                                <span style="margin-left: 15px; font-size: 12px; color: #666;">${tipoText} | ${modoText}</span>
+                            </div>
+                            <div>
+                                <span class="pin-status ${statusClass}">${statusText}</span>
+                                <button onclick="event.stopPropagation(); editPin(${index})" class="btn btn-primary" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">Editar</button>
+                                <button onclick="event.stopPropagation(); deletePin(${index})" class="btn btn-danger" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">Excluir</button>
+                            </div>
+                        </div>
+                        <div class="pin-details" id="pin-details-${index}">
+                            <table class="config-table" style="margin-top: 10px;">
+                                <tr><td>Logica XOR:</td><td>${pin.xor_logic ? 'Invertida' : 'Normal'}</td></tr>
+                                <tr><td>Tempo Retencao:</td><td>${pin.tempo_retencao}ms</td></tr>
+                                <tr><td>Nivel Min/Max:</td><td>${pin.nivel_acionamento_min} / ${pin.nivel_acionamento_max}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            pinsList.innerHTML = html;
+        }
+
+        function togglePinDetails(index) {
+            const details = document.getElementById(`pin-details-${index}`);
+            details.classList.toggle('active');
+        }
+
+        function showAddForm() {
+            document.getElementById('add-pin-section').style.display = 'block';
+            document.getElementById('pin-form').reset();
+            document.getElementById('form-title').textContent = 'Novo Pino';
+            document.getElementById('pin-form').setAttribute('data-mode', 'add');
+            document.getElementById('pin-form').removeAttribute('data-edit-index');
+            updateModeOptions(); // Atualizar opções de modo
+            updateTriggerFields(); // Atualizar campos ao abrir formulário
+        }
+        
+        // Função para atualizar campos de acionamento baseado no tipo/modo
+        function updateTriggerFields() {
+            const pinType = parseInt(document.getElementById('pin-type').value);
+            const pinMode = parseInt(document.getElementById('pin-mode').value);
+            const triggerRow = document.getElementById('pin-trigger').closest('tr');
+            const minRow = document.getElementById('pin-min').closest('tr');
+            const maxRow = document.getElementById('pin-max').closest('tr');
+            
+            // Verificar se é analógico (tipo 192 OU modo 192)
+            const isAnalog = (pinType === 192 || pinMode === 192);
+            
+            if (isAnalog) {
+                // Mostrar apenas campos ADC
+                triggerRow.style.display = 'none';
+                minRow.style.display = 'table-row';
+                maxRow.style.display = 'table-row';
+            } else {
+                // Mostrar apenas campo digital
+                triggerRow.style.display = 'table-row';
+                minRow.style.display = 'none';
+                maxRow.style.display = 'none';
+            }
+        }
+        
+        // Adicionar listeners para atualizar campos quando tipo ou modo mudar
+        document.getElementById('pin-type').addEventListener('change', updateTriggerFields);
+        document.getElementById('pin-mode').addEventListener('change', updateTriggerFields);
+
+        function editPin(index) {
+            const pin = pinsData[index];
+            console.log('[DEBUG] Editando pino:', pin);
+            
+            // === LIMPAR FORMULÁRIO PRIMEIRO ===
+            document.getElementById('pin-form').reset();
+            
+            // === MIGRAÇÃO DE VALORES ANTIGOS ===
+            // Converte valores do sistema antigo para o novo
+            let tipoAtualizado = pin.tipo;
+            let modoAtualizado = pin.modo;
+            
+            // Mapeamento de tipos antigos (1-7) para novos
+            if (pin.tipo >= 1 && pin.tipo <= 7) {
+                console.log('[DEBUG] Migrando tipo antigo', pin.tipo, 'para novo formato');
+                // Tipo antigo 1-7 eram todos digitais, agora tipo digital = 1
+                tipoAtualizado = 1;
+                
+                // Mapear modo baseado no tipo antigo
+                if (pin.tipo === 1 || pin.tipo === 2 || pin.tipo === 3) {
+                    // Output types -> modo 3 (OUTPUT)
+                    modoAtualizado = 3;
+                } else if (pin.tipo === 4) {
+                    // Input -> modo 1 (INPUT)
+                    modoAtualizado = 1;
+                } else if (pin.tipo === 5) {
+                    // Input Pull-Up -> modo 5
+                    modoAtualizado = 5;
+                } else if (pin.tipo === 6) {
+                    // Input Pull-Down -> modo 9
+                    modoAtualizado = 9;
+                }
+            }
+            
+            // Mostrar formulário
+            document.getElementById('add-pin-section').style.display = 'block';
+            document.getElementById('form-title').textContent = 'Editar Pino';
+            
+            // Preencher campos (após reset)
+            document.getElementById('pin-name').value = pin.nome || '';
+            document.getElementById('pin-number').value = pin.pino || '';
+            document.getElementById('pin-xor').value = pin.xor_logic || 0;
+            document.getElementById('pin-retention').value = pin.tempo_retencao || 0;
+            document.getElementById('pin-trigger').value = pin.nivel_acionamento_min === 1 ? '1' : '0';
+            document.getElementById('pin-min').value = pin.nivel_acionamento_min || 0;
+            document.getElementById('pin-max').value = pin.nivel_acionamento_max || 0;
+            
+            // Definir tipo (pode ser migrado)
+            document.getElementById('pin-type').value = tipoAtualizado;
+            
+            // Atualizar opções de modo baseado no tipo
+            updateModeOptions();
+            
+            // Após atualizar opções, definir o valor do modo (pode ser migrado)
+            document.getElementById('pin-mode').value = modoAtualizado;
+            
+            // Atualizar visibilidade dos campos
+            updateTriggerFields();
+            
+            // Marcar como modo edição
+            document.getElementById('pin-form').setAttribute('data-mode', 'edit');
+            document.getElementById('pin-form').setAttribute('data-edit-index', index);
+            document.getElementById('pin-form').setAttribute('data-original-pin', pin.pino);
+            
+            // Log dos valores após migração e preenchimento
+            console.log('[DEBUG] Nome do pino:', pin.nome);
+            console.log('[DEBUG] Tipo migrado:', pin.tipo, '->', tipoAtualizado);
+            console.log('[DEBUG] Modo migrado:', pin.modo, '->', modoAtualizado);
+            console.log('[DEBUG] Campo nome preenchido com:', document.getElementById('pin-name').value);
+        }
+
+        function cancelAddPin() {
+            document.getElementById('add-pin-section').style.display = 'none';
+        }
+
+        function applyPinConfig() {
+            if (confirm('Aplicar configuracoes de pinos? O ESP sera reiniciado.')) {
+                showLoading('Aplicando configuracoes e reiniciando...');
+                fetch('/pins/save_flash', { method: 'POST' })
+                    .then(response => response.text())
+                    .then(result => {
+                        if (result === 'OK') {
+                            showStatus('Configuracoes aplicadas! Reiniciando ESP...', 'success');
+                            // Reiniciar ESP após 2 segundos
+                            setTimeout(() => {
+                                fetch('/restart', { method: 'POST' })
+                                    .then(() => {
+                                        showStatus('ESP reiniciado com sucesso!', 'success');
+                                        // Recarregar página após reinicialização
+                                        setTimeout(() => {
+                                            window.location.reload();
+                                        }, 3000);
+                                    })
+                                    .catch(() => {
+                                        showStatus('ESP reiniciado. Recarregue a página manualmente.', 'success');
+                                    });
+                            }, 2000);
+                        } else {
+                            hideLoading();
+                            showStatus('Erro ao aplicar configuracoes.', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        showStatus('Erro de comunicacao.', 'error');
+                    });
+            }
+        }
+
+        function deletePin(index) {
+            const pin = pinsData[index];
+            if (confirm(`Tem certeza que deseja excluir o pino GPIO ${pin.pino} - ${pin.nome}?`)) {
+                fetch(`/api/pins/${pin.pino}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showStatus('Pino excluido com sucesso!', 'success');
+                        loadPins();
+                    } else {
+                        showStatus('Erro ao excluir pino: ' + (data.error || 'Desconhecido'), 'error');
+                    }
+                })
+                .catch(error => {
+                    showStatus('Erro de comunicacao.', 'error');
+                });
+            }
+        }
+
+        document.getElementById('pin-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const mode = this.getAttribute('data-mode');
+            const isEditMode = mode === 'edit';
+            
+            // Sincronizar valores de acionamento baseado no tipo do pino
+            const pinType = parseInt(document.getElementById('pin-type').value);
+            const pinMode = parseInt(document.getElementById('pin-mode').value);
+            
+            // Verificar se é analógico (tipo 192 OU modo 192)
+            if (pinType === 192 || pinMode === 192) {
+                // Analógico: usar valores min/max dos campos ADC
+                formData.set('nivel_acionamento_min', document.getElementById('pin-min').value);
+                formData.set('nivel_acionamento_max', document.getElementById('pin-max').value);
+            } else {
+                // Digital: usar valor do select trigger
+                const triggerValue = document.getElementById('pin-trigger').value;
+                formData.set('nivel_acionamento_min', triggerValue);
+                formData.set('nivel_acionamento_max', triggerValue);
+            }
+            
+            // Se for edição, primeiro deletar o pino antigo
+            if (isEditMode) {
+                const originalPin = this.getAttribute('data-original-pin');
+                console.log('[DEBUG] Modo edição - deletando pino antigo:', originalPin);
+                
+                // Deletar pino antigo primeiro
+                fetch(`/api/pins/${originalPin}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Falha ao deletar pino antigo');
+                    }
+                    console.log('[DEBUG] Pino antigo deletado com sucesso');
+                    // Agora adicionar o pino com as novas configurações
+                    return fetch('/pins/add', {
+                        method: 'POST',
+                        body: formData
+                    });
+                })
+                .then(response => response.text())
+                .then(result => {
+                    if (result === 'OK') {
+                        showStatus('Pino atualizado com sucesso!', 'success');
+                        cancelAddPin();
+                        loadPins();
+                    } else {
+                        showStatus('Erro ao atualizar pino: ' + result, 'error');
+                    }
+                })
+                .catch(error => {
+                    showStatus('Erro de comunicação ao atualizar pino.', 'error');
+                    console.error('[ERROR]', error);
+                });
+            } else {
+                // Modo adicionar normal
+                fetch('/pins/add', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.text())
+                .then(result => {
+                    if (result === 'OK') {
+                        showStatus('Pino adicionado com sucesso!', 'success');
+                        cancelAddPin();
+                        loadPins();
+                    } else {
+                        showStatus('Erro ao adicionar pino: ' + result, 'error');
+                    }
+                })
+                .catch(error => {
+                    showStatus('Erro de comunicacao.', 'error');
+                });
+            }
+        });
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status-message status-' + type;
+            statusDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // === SISTEMA DE MONITORAMENTO DE PERFORMANCE ===
+        const pageStartTime = performance.now();
+        const pageStartDate = new Date();
+        
+        // Função para mostrar indicador de performance
+        function showPerformanceIndicator() {
+            const loadTime = performance.now() - pageStartTime;
+            const indicator = document.createElement('div');
+            indicator.id = 'performance-indicator';
+            indicator.style.cssText = 'position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-family: monospace;';
+            indicator.innerHTML = `
+                <div>Tempo de Carregamento: ${loadTime.toFixed(2)}ms</div>
+                <div>Hora de Início: ${pageStartDate.toLocaleTimeString()}</div>
+            `;
+            document.body.appendChild(indicator);
+            
+            console.log(`[PERFORMANCE] Pinos carregados em ${loadTime.toFixed(2)}ms`);
+        }
+
+        // Carregar pinos ao abrir a pagina
+        loadPins();
+        setInterval(loadPins, 30000);
+        
+        // Inicializar campos ao carregar página
+        updateTriggerFields();
+        
+        // Mostrar indicador após carregamento
+        window.addEventListener('load', function() {
+            setTimeout(showPerformanceIndicator, 100);
+        });
+    </script>
+</body>
+</html>
+)rawliteral";
+
+#endif

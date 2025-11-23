@@ -138,14 +138,14 @@ void fV_carregarMainConfig(void) {
     vSt_mainConfig.vU16_webServerPort = preferences.getUInt(KEY_WEB_PORT, 8080);
     vSt_mainConfig.vB_authEnabled = preferences.getBool(KEY_AUTH_ENABLED, false); // Padrão desabilitado
     vSt_mainConfig.vS_webUsername = preferences.getString(KEY_WEB_USERNAME, "admin");
-    vSt_mainConfig.vS_webPassword = preferences.getString(KEY_WEB_PASSWORD, "admin123");
+    vSt_mainConfig.vS_webPassword = preferences.getString(KEY_WEB_PASSWORD, "admin1234");
     vSt_mainConfig.vB_dashboardAuthRequired = preferences.getBool(KEY_DASHBOARD_AUTH, false); // Dashboard sem auth por padrão
 
     preferences.end();
 
     if (vSt_mainConfig.vS_hostname.length() == 0) {
         // se for a primeira execução, atribui um hostname padrão baseado no ID do módulo
-        vSt_mainConfig.vS_hostname = preferences.getString(KEY_HOSTNAME, fS_idModulo());
+        vSt_mainConfig.vS_hostname = preferences.getString(KEY_HOSTNAME, "esp32modularx");
         if (vSt_mainConfig.vS_wifiSsid.length() == 0) {
           vSt_mainConfig.vB_apFallbackEnabled = true;
         }
@@ -225,4 +225,34 @@ void fV_clearPreferences(void) {
     preferences.end();
 
     fV_printSerialDebug(LOG_FLASH, "Limpeza de fabrica concluida. Configs de rede e sistema apagadas.");
+}
+
+// Limpa todas as configurações EXCETO as de rede (hostname, SSID, senha)
+void fV_clearConfigExceptNetwork(void) {
+    fV_printSerialDebug(LOG_FLASH, "Abrindo Preferences para LIMPEZA SELETIVA (preservando rede)...");
+
+    // Salva temporariamente as configurações de rede
+    String tempHostname = vSt_mainConfig.vS_hostname;
+    String tempWifiSsid = vSt_mainConfig.vS_wifiSsid;
+    String tempWifiPass = vSt_mainConfig.vS_wifiPass;
+    
+    // 1. Limpa o namespace principal (MainConfig_t)
+    preferences.begin(NVS_NAMESPACE_MAIN_CONFIG, false);
+    preferences.clear();
+    
+    // 2. Restaura apenas as configurações de rede usando as chaves corretas
+    preferences.putString(KEY_HOSTNAME, tempHostname);
+    preferences.putString(KEY_WIFI_SSID, tempWifiSsid);
+    preferences.putString(KEY_WIFI_PASS, tempWifiPass);
+    preferences.end();
+    
+    // 3. Limpa o namespace genérico (chaves avulsas) - mantém tudo limpo
+    preferences.begin(NVS_NAMESPACE_GENERIC, false);
+    preferences.clear();
+    preferences.end();
+    
+    // 4. Limpa configurações de pinos (arquivo LittleFS)
+    fV_clearPinConfigs();
+
+    fV_printSerialDebug(LOG_FLASH, "Limpeza seletiva concluida. Rede preservada: %s", tempHostname.c_str());
 }

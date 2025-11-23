@@ -6,6 +6,10 @@
 // Inicialização de Variáveis globais
 bool vB_wifiIsConnected = false;
 
+// Variáveis de controle de tempo para tasks periódicas
+unsigned long vU32_lastPinReadTime = 0;
+const unsigned long vU32_pinReadInterval = 500; // Leitura a cada 500ms
+
 // Definição do objeto Preferences.
 Preferences preferences;
 
@@ -49,6 +53,9 @@ void setup() {
   // 5. INICIA O SERVIDOR WEB: Configura as rotas e inicia o servidor assíncrono
   fV_setupWebServer();  
 
+  // 6. INICIALIZA SISTEMA DE GERENCIAMENTO DE PINOS
+  fV_initPinSystem();
+
   fV_printSerialDebug(LOG_INIT, "Hostname: %s", vSt_mainConfig.vS_hostname.c_str());
   fV_printSerialDebug(LOG_INIT, "--- Fim da inicializacao SMCR ---");
   // Use vSt_mainConfig.vS_hostname aqui se precisar
@@ -57,5 +64,12 @@ void setup() {
 void loop() {
   // 1. CHECAGEM E RECONEXAO: Mantém a conexao Wi-Fi ativa (checa a cada 15s)
   fV_checkWifiConnection();
+  
+  // 2. LEITURA PERIODICA DE PINOS: Atualiza status de pinos físicos (exceto remotos)
+  unsigned long vU32_currentTime = millis();
+  if (vU32_currentTime - vU32_lastPinReadTime >= vU32_pinReadInterval) {
+    vU32_lastPinReadTime = vU32_currentTime;
+    fV_readPinsTask();
+  }
   
 }

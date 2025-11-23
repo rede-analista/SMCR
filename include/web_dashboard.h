@@ -5,186 +5,375 @@
 #include <Arduino.h>
 
 // Dashboard principal de status (Acessado quando conectado ao Wi-Fi local)
-const char web_dashboard_html[] PROGMEM = R"raw_string(
+const char web_dashboard_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMCR - Central de Controle</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f0f0f0; 
         }
-        .card {
-            background-color: white;
-            padding: 1.5rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s;
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
         }
-        .card:hover { transform: translateY(-3px); }
+        h1 { 
+            text-align: center; 
+            color: #333; 
+            margin-bottom: 10px; 
+            border-bottom: 2px solid #007bff; 
+            padding-bottom: 10px; 
+        }
+        .menu { 
+            text-align: center; 
+            margin: 20px 0; 
+            padding: 10px; 
+            background: #f8f9fa; 
+            border-radius: 4px; 
+        }
+        .menu a { 
+            margin: 0 15px; 
+            text-decoration: none; 
+            color: #007bff; 
+            font-weight: bold; 
+        }
+        .menu a:hover { 
+            text-decoration: underline; 
+        }
+        .section { 
+            margin: 30px 0; 
+        }
+        .section-title { 
+            font-size: 18px; 
+            font-weight: bold; 
+            color: #444; 
+            margin-bottom: 15px; 
+            padding: 8px 0; 
+            border-bottom: 1px solid #ddd; 
+        }
+        .info-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 20px; 
+            background: white; 
+        }
+        .info-table td { 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            vertical-align: middle; 
+        }
+        .info-table td:first-child { 
+            font-weight: bold; 
+            color: #555; 
+            width: 35%; 
+            background: #f8f9fa; 
+        }
+        .status-ok { 
+            color: #28a745; 
+            font-weight: bold; 
+        }
+        .status-error { 
+            color: #dc3545; 
+            font-weight: bold; 
+        }
+        .status-warning { 
+            color: #ffc107; 
+            font-weight: bold; 
+        }
+        .pins-summary { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 4px; 
+            border-left: 4px solid #007bff; 
+        }
+        .pins-list { 
+            margin-top: 10px; 
+        }
+        .pin-item { 
+            padding: 8px 12px; 
+            margin: 5px 0; 
+            background: white; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        .pin-name { 
+            font-weight: bold; 
+            color: #333; 
+        }
+        .pin-status { 
+            font-size: 12px; 
+            padding: 3px 8px; 
+            border-radius: 3px; 
+            color: white; 
+        }
+        .pin-high { 
+            background: #28a745; 
+        }
+        .pin-low { 
+            background: #6c757d; 
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-text {
+            margin-left: 15px;
+            font-size: 16px;
+            color: #007bff;
+        }
     </style>
 </head>
-<body class="min-h-screen">
-
-    <!-- Menu Superior (Navbar) -->
-    <header class="bg-white shadow-md">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-gray-800">SMCR - Central de Controle</h1>
-            <nav class="space-x-4 text-sm font-medium">
-                <a href="/" class="text-blue-600 hover:text-blue-800">Status</a>
-                <a href="/configuracao" class="text-gray-600 hover:text-blue-600">Configurações</a>
-                <a href="/pinos" class="text-gray-600 hover:text-blue-600">Pinos/Relés</a>
-                <a href="/mqtt" class="text-gray-600 hover:text-blue-600">MQTT/Serviços</a>
-                <a href="/reset" class="text-red-600 hover:text-red-800">Reset</a>
-            </nav>
-        </div>
-    </header>
-
-    <!-- Conteúdo Principal -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <h2 class="text-2xl font-semibold text-gray-700 mb-6">Status do Módulo</h2>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            
-            <!-- Card 1: Rede Wi-Fi -->
-            <div id="wifi-card" class="card border-t-4 border-green-500">
-                <h3 class="font-semibold text-xl text-gray-800 mb-3">Rede Wi-Fi</h3>
-                <ul class="text-gray-600 space-y-1 text-sm">
-                    <li>Status: <span id="wifi_status" class="font-medium text-green-500">Carregando...</span></li>
-                    <li>SSID: <span id="wifi_ssid">Carregando...</span></li>
-                    <li>IP Local: <span id="wifi_ip_local" class="font-mono">Carregando...</span></li>
-                    <li>IP do Usuário: <span id="wifi_ip_client" class="font-mono">Carregando...</span></li>
-                </ul>
-            </div>
-
-            <!-- Card 2: Sistema (AGORA COM DATA/HORA) -->
-            <div id="system-card" class="card border-t-4 border-blue-500">
-                <h3 class="font-semibold text-xl text-gray-800 mb-3">Sistema</h3>
-                <ul class="text-gray-600 space-y-1 text-sm">
-                    <li>Hostname: <span id="sys_hostname" class="font-medium">Carregando...</span></li>
-                    <!-- NOVO CAMPO: Data/Hora -->
-                    <li>Data/Hora Atual: <span id="sys_current_time" class="font-medium">Carregando...</span></li>
-                    <li>Tempo de Atividade (Uptime): <span id="sys_uptime" class="font-medium">Carregando...</span></li>
-                    <li>Memória Livre (Heap): <span id="sys_heap" class="font-mono">Carregando...</span></li>
-                </ul>
-            </div>
-
-            <!-- Card 3: Sincronização (FOCADO APENAS EM STATUS DE SERVIÇOS) -->
-            <div id="sync-card" class="card border-t-4 border-yellow-500">
-                <h3 class="font-semibold text-xl text-gray-800 mb-3">Sincronização</h3>
-                <ul class="text-gray-600 space-y-1 text-sm">
-                    <li>NTP Status: <span id="sync_ntp" class="font-medium">Carregando...</span></li>
-                    <li>MQTT Status: <span id="sync_mqtt" class="font-medium">Desabilitado</span></li>
-                    <!-- Última atualização movida para o Card Sistema (Data/Hora) -->
-                </ul>
-            </div>
-        </div>
-
-        <!-- Informações de Pinos -->
-        <div class="card border-t-4 border-gray-400 mt-8">
-            <h3 class="text-lg font-semibold text-gray-700 mb-2">Informações de Pinos (Ainda Não Implementadas)</h3>
-            <p class="text-gray-500 text-sm">Esta seção será preenchida com o status em tempo real dos seus relés e sensores.</p>
-        </div>
-    </main>
-
-    <!-- Rodapé (Footer) -->
-    <footer class="text-center text-xs text-gray-500 py-4 mt-8">
-        &copy; 2025 SMCR - Sistema de Controle e Monitoramento Remoto
-    </footer>
-
-    <!-- Script de Atualização -->
-    <script>
-        // Função utilitária para formatar bytes em KB, MB, etc.
-        function formatBytes(bytes, decimals = 1) {
-            if (bytes === 0) return '0 Bytes';
-            if (bytes === 1) return '1 Byte';
-
-            const k = 1024;
-            const dm = decimals < 0 ? 0 : decimals;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-        }
-
-        // Função para atualizar o Dashboard com dados JSON reais
-        function updateStatus(data) {
-            // console.log("Dados recebidos:", data);
-
-            // 1. Rede Wi-Fi
-            document.getElementById('wifi_status').textContent = data.wifi.status;
-            document.getElementById('wifi_ssid').textContent = data.wifi.ssid;
-            document.getElementById('wifi_ip_local').textContent = data.wifi.local_ip;
-            document.getElementById('wifi_ip_client').textContent = data.system.client_ip || 'N/A';
-            
-            // 2. Sistema (Incluindo a Data/Hora)
-            document.getElementById('sys_hostname').textContent = data.system.hostname;
-            document.getElementById('sys_current_time').textContent = data.system.current_time || 'N/A';
-            document.getElementById('sys_uptime').textContent = data.system.uptime;
-            document.getElementById('sys_heap').textContent = formatBytes(data.system.free_heap);
-            
-            // 3. Sincronização
-            document.getElementById('sync_ntp').textContent = data.sync.ntp_status;
-            document.getElementById('sync_mqtt').textContent = data.sync.mqtt_status;
-            
-            // Lógica visual (cores)
-            const wifiStatusElement = document.getElementById('wifi_status');
-            if (data.wifi.status === 'Conectado') {
-                wifiStatusElement.classList.remove('text-red-700');
-                wifiStatusElement.classList.add('text-green-500');
-            } else {
-                wifiStatusElement.classList.remove('text-green-500');
-                wifiStatusElement.classList.add('text-red-700');
-            }
-        }
-
-        // Função para buscar dados REALES do ESP32 via rota /status/json
-        async function fetchStatusData() {
-            try {
-                const response = await fetch('/status/json');
-                
-                if (!response.ok) {
-                    throw new Error(`Erro HTTP: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                updateStatus(data); 
-                
-            } catch (error) {
-                console.error("Erro ao carregar status:", error);
-                document.getElementById('sys_heap').textContent = 'Erro';
-            }
-        }
-
-        // Atualiza conforme o tempo de refresh configurado (padrão 15 segundos)
-        let refreshInterval = 15000; // Padrão
+<body>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Carregando status...</div>
+    </div>
+    <div class="container">
+        <h1>SMCR - Central de Controle</h1>
         
-        window.onload = function() {
-            fetchStatusData();
+        <div class="menu">
+            <a href="/">Status</a>
+            <a href="/configuracao">Configuracoes Gerais</a>
+            <a href="/pins">Pinos/Reles</a>
+            <a href="/mqtt">MQTT/Servicos</a>
+            <a href="/arquivos">Arquivos</a>
+            <a href="/reset">Reset</a>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Pinos Cadastrados</div>
+            <div class="pins-summary">
+                <div><strong>Total:</strong> <span id="pins-count">0</span> pinos de <span id="pins-max">-</span></div>
+                <div id="pins-list" class="pins-list"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Status do Modulo</div>
             
-            // Busca o tempo de refresh configurado
-            fetch('/config/json')
+            <div class="section-title" style="font-size: 16px; margin-top: 20px;">Rede Wi-Fi</div>
+            <table class="info-table">
+                <tr><td>Status:</td><td id="wifi-status" class="status-warning">Carregando...</td></tr>
+                <tr><td>SSID:</td><td id="wifi-ssid">-</td></tr>
+                <tr><td>IP Local:</td><td id="wifi-ip">-</td></tr>
+                <tr><td>IP do Usuario:</td><td id="user-ip">-</td></tr>
+            </table>
+
+            <div class="section-title" style="font-size: 16px;">Sistema</div>
+            <table class="info-table">
+                <tr><td>Hostname:</td><td id="hostname">-</td></tr>
+                <tr><td>Data/Hora Atual:</td><td id="current-time">-</td></tr>
+                <tr><td>Tempo de Atividade (Uptime):</td><td id="uptime">-</td></tr>
+                <tr><td>Memoria Livre (Heap):</td><td id="free-heap">-</td></tr>
+            </table>
+
+            <div class="section-title" style="font-size: 16px;">Sincronizacao</div>
+            <table class="info-table">
+                <tr><td>NTP Status:</td><td id="ntp-status" class="status-warning">-</td></tr>
+                <tr><td>MQTT Status:</td><td class="status-error">Desabilitado</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Indicador de Performance -->
+    <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-family: monospace; display: none;" id="performance-indicator">
+        Tempo de Carregamento: <span id="load-time">-</span>
+    </div>
+
+    <script>
+        // === SISTEMA DE MONITORAMENTO DE PERFORMANCE ===
+        const pageStartTime = performance.now();
+        
+        // Função para mostrar indicador de performance
+        function showPerformanceIndicator() {
+            const loadTime = performance.now() - pageStartTime;
+            document.getElementById('load-time').textContent = loadTime.toFixed(2) + 'ms';
+            document.getElementById('performance-indicator').style.display = 'block';
+            
+            console.log(`[PERFORMANCE] Dashboard carregado em ${loadTime.toFixed(2)}ms`);
+        }
+        
+        // Controle do loading
+        function showLoading(text = 'Carregando...') {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            document.querySelector('.loading-text').textContent = text;
+        }
+        
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+        
+        // Esconder loading quando página carregar completamente
+        window.addEventListener('load', function() {
+            hideLoading();
+            // Mostrar indicador de performance após carregamento completo
+            setTimeout(showPerformanceIndicator, 100);
+        });
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function updateStatus() {
+            fetch('/status/json')
                 .then(response => response.json())
-                .then(config => {
-                    if (config.tempo_refresh) {
-                        refreshInterval = config.tempo_refresh * 1000; // Converte para ms
+                .then(data => {
+                    // Rede Wi-Fi
+                    const wifiStatus = document.getElementById('wifi-status');
+                    if (data.wifi && data.wifi.status === 'Conectado') {
+                        wifiStatus.textContent = data.wifi.status;
+                        wifiStatus.className = 'status-ok';
+                        document.getElementById('wifi-ssid').textContent = data.wifi.ssid || '-';
+                        document.getElementById('wifi-ip').textContent = data.wifi.local_ip || '-';
+                    } else {
+                        wifiStatus.textContent = 'Desconectado';
+                        wifiStatus.className = 'status-error';
                     }
-                    setInterval(fetchStatusData, refreshInterval);
+                    
+                    document.getElementById('user-ip').textContent = data.system.client_ip || '-';
+
+                    // Sistema
+                    document.getElementById('hostname').textContent = data.system.hostname || '-';
+                    document.getElementById('current-time').textContent = data.system.current_time || '-';
+                    document.getElementById('uptime').textContent = data.system.uptime || '-';
+                    document.getElementById('free-heap').textContent = formatBytes(data.system.free_heap || 0);
+
+                    // Sincronizacao
+                    const ntpStatus = document.getElementById('ntp-status');
+                    if (data.sync && data.sync.ntp_status === 'Sincronizado') {
+                        ntpStatus.textContent = data.sync.ntp_status;
+                        ntpStatus.className = 'status-ok';
+                    } else {
+                        ntpStatus.textContent = data.sync ? data.sync.ntp_status : 'Aguardando';
+                        ntpStatus.className = 'status-warning';
+                    }
+
+                    // Pinos
+                    const pinsCount = data.pins ? data.pins.length : 0;
+                    const pinsMax = data.system ? data.system.max_pins || 16 : 16;
+                    const showPinStatus = data.system ? data.system.show_pin_status : true;
+                    const corAlerta = data.system ? data.system.cor_com_alerta || '#dc3545' : '#dc3545';
+                    const corOk = data.system ? data.system.cor_sem_alerta || '#28a745' : '#28a745';
+                    
+                    document.getElementById('pins-count').textContent = pinsCount;
+                    document.getElementById('pins-max').textContent = pinsMax;
+                    
+                    const pinsList = document.getElementById('pins-list');
+                    
+                    // Verificar se deve mostrar status dos pinos
+                    if (!showPinStatus) {
+                        pinsList.innerHTML = '<p style="text-align: center; color: #ff9800; margin: 10px 0; font-style: italic;">📊 Mostrar Status Desativado</p>';
+                    } else if (pinsCount > 0) {
+                        pinsList.innerHTML = '';
+                        data.pins.forEach(pin => {
+                            const pinDiv = document.createElement('div');
+                            pinDiv.className = 'pin-item';
+                            
+                            // Determinar tipo de pino (Entrada/Saída)
+                            let tipoStr = 'Desconhecido';
+                            const modo = pin.modo || 0;
+                            const tipo = pin.tipo || 0;
+                            
+                            // Constantes de modo (devem corresponder ao pin_manager.cpp)
+                            const PIN_MODE_INPUT = 1;
+                            const PIN_MODE_OUTPUT = 3;
+                            const PIN_MODE_INPUT_PULLUP = 5;
+                            const PIN_MODE_INPUT_PULLDOWN = 9;
+                            const PIN_MODE_OUTPUT_OPEN_DRAIN = 12;
+                            const PIN_TYPE_ANALOG = 192;
+                            const PIN_TYPE_REMOTE = 65534;
+                            
+                            if (tipo === PIN_TYPE_REMOTE) {
+                                tipoStr = 'Remoto';
+                            } else if (tipo === PIN_TYPE_ANALOG) {
+                                tipoStr = 'Analógico';
+                            } else if (modo === PIN_MODE_OUTPUT || modo === PIN_MODE_OUTPUT_OPEN_DRAIN) {
+                                tipoStr = 'Saída';
+                            } else if (modo === PIN_MODE_INPUT || modo === PIN_MODE_INPUT_PULLUP || modo === PIN_MODE_INPUT_PULLDOWN) {
+                                tipoStr = 'Entrada';
+                            }
+                            
+                            // Valor atual do pino
+                            const valorAtual = pin.status_atual !== undefined ? pin.status_atual : 0;
+                            
+                            // Determinar se está em alerta ou ok baseado no nível de acionamento
+                            let isAlerta = false;
+                            if (tipo === 192) {
+                                // Pino analógico: verifica se está dentro do range configurado
+                                const nivelMin = pin.nivel_acionamento_min || 0;
+                                const nivelMax = pin.nivel_acionamento_max || 4095;
+                                isAlerta = (valorAtual >= nivelMin && valorAtual <= nivelMax);
+                            } else {
+                                // Pino digital: verifica se corresponde ao nível configurado
+                                const nivelAcionamento = pin.nivel_acionamento_min || 0;
+                                isAlerta = (valorAtual === nivelAcionamento);
+                            }
+                            
+                            const bgColor = isAlerta ? corAlerta : corOk;
+                            
+                            pinDiv.innerHTML = `
+                                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                    <div>
+                                        <span class="pin-name">GPIO ${pin.gpio} - ${pin.description || 'Pino'}</span>
+                                        <span style="font-size: 11px; color: #666; margin-left: 10px;">(${tipoStr})</span>
+                                    </div>
+                                    <span class="pin-status" style="background-color: ${bgColor};">${valorAtual}</span>
+                                </div>
+                            `;
+                            pinsList.appendChild(pinDiv);
+                        });
+                    } else {
+                        pinsList.innerHTML = '<p style="text-align: center; color: #666; margin: 10px 0;">Nenhum pino cadastrado</p>';
+                    }
                 })
                 .catch(error => {
-                    console.error("Erro ao carregar configurações:", error);
-                    setInterval(fetchStatusData, refreshInterval); // Usa padrão se houver erro
+                    console.error('Erro ao carregar status:', error);
                 });
-        };
+        }
+
+        // Atualizar status a cada 15 segundos
+        updateStatus();
+        setInterval(updateStatus, 15000);
     </script>
 </body>
 </html>
-)raw_string";
+)rawliteral";
 
 #endif // WEB_DASHBOARD_H
