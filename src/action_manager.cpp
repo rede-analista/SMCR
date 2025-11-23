@@ -454,16 +454,21 @@ void fV_executeActionsTask(void) {
                 fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Ação iniciada: Origem=%d, Ação#%d", 
                     vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].numero_acao);
             } else {
-                // Pino origem desativou - desliga destino para ações LIGA e LIGA_DELAY
-                if (vA_actionConfigs[i].acao == ACTION_TYPE_LIGA || 
-                    vA_actionConfigs[i].acao == ACTION_TYPE_LIGA_DELAY) {
-                    uint8_t pinDestinoIndex = fU8_findPinIndex(vA_actionConfigs[i].pino_destino);
-                    if (pinDestinoIndex != 255) {
+                // Pino origem desativou - desliga destino e reseta contadores
+                uint8_t pinDestinoIndex = fU8_findPinIndex(vA_actionConfigs[i].pino_destino);
+                if (pinDestinoIndex != 255) {
+                    // Desliga o pino destino para todas as ações (exceto STATUS/SINCRONISMO)
+                    if (vA_actionConfigs[i].acao != ACTION_TYPE_STATUS && 
+                        vA_actionConfigs[i].acao != ACTION_TYPE_SINCRONISMO) {
                         fV_writeActionPin(pinDestinoIndex, vA_actionConfigs[i].pino_destino, false);
-                        fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Desligando GPIO %d (origem desativada)", 
-                            vA_actionConfigs[i].pino_destino);
+                        fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Desligando GPIO %d (origem desativada) - Ação tipo %d", 
+                            vA_actionConfigs[i].pino_destino, vA_actionConfigs[i].acao);
                     }
                 }
+                
+                // Reseta contadores e estado da ação
+                vA_actionConfigs[i].contador_on = 0;
+                vA_actionConfigs[i].contador_off = 0;
                 vA_actionConfigs[i].estado_acao = false;
             }
         }
