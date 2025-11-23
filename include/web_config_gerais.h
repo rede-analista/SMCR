@@ -191,7 +191,8 @@ const char web_config_gerais_html[] PROGMEM = R"rawliteral(
         <div class="menu">
             <a href="/">Status</a>
             <a href="/configuracao">Configuracoes Gerais</a>
-            <a href="/pins">Pinos/Reles</a>
+            <a href="/pinos">Pinos/Reles</a>
+            <a href="/acoes">Acoes</a>
             <a href="/mqtt">MQTT/Servicos</a>
             <a href="/arquivos">Arquivos</a>
             <a href="/reset">Reset</a>
@@ -236,6 +237,8 @@ const char web_config_gerais_html[] PROGMEM = R"rawliteral(
                         </div>
                     </td></tr>
                     <tr><td>Tempo de Refresh (segundos):</td><td><input type="number" name="tempo_refresh" id="tempo_refresh" min="5" max="300" value="15"></td></tr>
+                    <tr><td>Mostrar Histórico Analógico:</td><td><select name="show_analog_history" id="show_analog_history"><option value="1">Habilitado</option><option value="0">Desabilitado</option></select></td></tr>
+                    <tr><td>Mostrar Histórico Digital:</td><td><select name="show_digital_history" id="show_digital_history"><option value="1">Habilitado</option><option value="0">Desabilitado</option></select></td></tr>
                 </table>
 
                 <div class="section-title">Configuracoes de Sistema</div>
@@ -353,6 +356,8 @@ const char web_config_gerais_html[] PROGMEM = R"rawliteral(
                     updateColorName('cor_com_alerta', 'cor_com_alerta_name');
                     updateColorName('cor_sem_alerta', 'cor_sem_alerta_name');
                     document.getElementById('tempo_refresh').value = data.tempo_refresh || 15;
+                    document.getElementById('show_analog_history').value = data.show_analog_history !== undefined ? (data.show_analog_history ? '1' : '0') : '1';
+                    document.getElementById('show_digital_history').value = data.show_digital_history !== undefined ? (data.show_digital_history ? '1' : '0') : '0';
                     document.getElementById('qtd_pinos').value = data.qtd_pinos || 10;
                     document.getElementById('serial_debug_enabled').value = data.serial_debug_enabled ? (data.active_log_flags == 511 ? '511' : '1') : '0';
                     

@@ -10,6 +10,9 @@ bool vB_wifiIsConnected = false;
 unsigned long vU32_lastPinReadTime = 0;
 const unsigned long vU32_pinReadInterval = 500; // Leitura a cada 500ms
 
+unsigned long vU32_lastActionExecTime = 0;
+const unsigned long vU32_actionExecInterval = 100; // Execução de ações a cada 100ms
+
 // Definição do objeto Preferences.
 Preferences preferences;
 
@@ -56,6 +59,17 @@ void setup() {
   // 6. INICIALIZA SISTEMA DE GERENCIAMENTO DE PINOS
   fV_initPinSystem();
 
+  // 7. INICIALIZA SISTEMA DE AÇÕES
+  fV_initActionSystem();
+  
+  // 8. LEITURA INICIAL DOS PINOS: Garante que todos os pinos tenham estado atualizado ANTES da primeira ação
+  fV_printSerialDebug(LOG_INIT, "Realizando leitura inicial de pinos...");
+  fV_readPinsTask();
+  
+  // 9. EXECUÇÃO INICIAL DE AÇÕES: Aplica ações baseadas no estado atual dos pinos
+  fV_printSerialDebug(LOG_INIT, "Executando sincronização inicial de ações...");
+  fV_executeActionsTask();
+
   fV_printSerialDebug(LOG_INIT, "Hostname: %s", vSt_mainConfig.vS_hostname.c_str());
   fV_printSerialDebug(LOG_INIT, "--- Fim da inicializacao SMCR ---");
   // Use vSt_mainConfig.vS_hostname aqui se precisar
@@ -70,6 +84,12 @@ void loop() {
   if (vU32_currentTime - vU32_lastPinReadTime >= vU32_pinReadInterval) {
     vU32_lastPinReadTime = vU32_currentTime;
     fV_readPinsTask();
+  }
+  
+  // 3. EXECUÇÃO DE AÇÕES: Processa ações automáticas (a cada 100ms)
+  if (vU32_currentTime - vU32_lastActionExecTime >= vU32_actionExecInterval) {
+    vU32_lastActionExecTime = vU32_currentTime;
+    fV_executeActionsTask();
   }
   
 }

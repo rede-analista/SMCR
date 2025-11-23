@@ -167,7 +167,8 @@ const char web_dashboard_html[] PROGMEM = R"rawliteral(
         <div class="menu">
             <a href="/">Status</a>
             <a href="/configuracao">Configuracoes Gerais</a>
-            <a href="/pins">Pinos/Reles</a>
+            <a href="/pinos">Pinos/Reles</a>
+            <a href="/acoes">Acoes</a>
             <a href="/mqtt">MQTT/Servicos</a>
             <a href="/arquivos">Arquivos</a>
             <a href="/reset">Reset</a>
@@ -317,6 +318,7 @@ const char web_dashboard_html[] PROGMEM = R"rawliteral(
                             const PIN_MODE_INPUT_PULLUP = 5;
                             const PIN_MODE_INPUT_PULLDOWN = 9;
                             const PIN_MODE_OUTPUT_OPEN_DRAIN = 12;
+                            const PIN_TYPE_DIGITAL = 1;
                             const PIN_TYPE_ANALOG = 192;
                             const PIN_TYPE_REMOTE = 65534;
                             
@@ -348,13 +350,53 @@ const char web_dashboard_html[] PROGMEM = R"rawliteral(
                             
                             const bgColor = isAlerta ? corAlerta : corOk;
                             
+                            // Prefixo: R para remoto, D para digital/analógico
+                            const prefixo = (tipo === PIN_TYPE_REMOTE) ? 'R' : 'D';
+                            
+                            // Mostrar histórico se disponível
+                            let statusDisplay = '';
+                            const history = pin.historico || [];
+                            
+                            if (tipo === PIN_TYPE_ANALOG && history.length > 0) {
+                                // Para pinos analógicos, mostrar histórico de 8 valores numéricos
+                                const nivelMin = pin.nivel_acionamento_min || 0;
+                                const nivelMax = pin.nivel_acionamento_max || 4095;
+                                
+                                // Criar display com cada valor tendo sua própria cor
+                                const historySpans = history.map(valor => {
+                                    const isValorAlerta = (valor >= nivelMin && valor <= nivelMax);
+                                    const valorBgColor = isValorAlerta ? corAlerta : corOk;
+                                    return `<span style="background-color: ${valorBgColor}; color: white; padding: 3px 6px; margin: 0 2px; border-radius: 3px; display: inline-block; min-width: 30px; text-align: center; font-weight: bold;">${valor}</span>`;
+                                }).join('');
+                                statusDisplay = `<div style="display: flex; align-items: center; font-family: monospace; font-size: 12px;">${historySpans}</div>`;
+                                
+                            } else if (tipo === PIN_TYPE_DIGITAL && history.length > 0) {
+                                // Para pinos digitais, mostrar histórico de 8 estados (valores 0/1)
+                                const nivelMin = pin.nivel_acionamento_min || 0;
+                                
+                                console.log(`Histórico digital do pino ${pin.gpio}:`, history, `nivelMin=${nivelMin}`);
+                                
+                                // Criar display com cada estado tendo sua própria cor
+                                const historySpans = history.map(estado => {
+                                    // Se estado coincide com nivelMin, está ativo/alerta
+                                    const isAtivo = (estado == nivelMin);
+                                    const estadoBgColor = isAtivo ? corAlerta : corOk;
+                                    return `<span style="background-color: ${estadoBgColor}; color: white; padding: 3px 6px; margin: 0 2px; border-radius: 3px; display: inline-block; min-width: 30px; text-align: center; font-weight: bold;">${estado}</span>`;
+                                }).join('');
+                                statusDisplay = `<div style="display: flex; align-items: center; font-family: monospace; font-size: 12px;">${historySpans}</div>`;
+                                
+                            } else {
+                                // Sem histórico ou tipo não suportado - exibe status atual
+                                statusDisplay = `<span class="pin-status" style="background-color: ${bgColor};">${valorAtual}</span>`;
+                            }
+                            
                             pinDiv.innerHTML = `
                                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                                     <div>
-                                        <span class="pin-name">GPIO ${pin.gpio} - ${pin.description || 'Pino'}</span>
+                                        <span class="pin-name">${prefixo}${pin.gpio} - ${pin.description || 'Pino'}</span>
                                         <span style="font-size: 11px; color: #666; margin-left: 10px;">(${tipoStr})</span>
                                     </div>
-                                    <span class="pin-status" style="background-color: ${bgColor};">${valorAtual}</span>
+                                    ${statusDisplay}
                                 </div>
                             `;
                             pinsList.appendChild(pinDiv);

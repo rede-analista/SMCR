@@ -92,6 +92,10 @@ const char* KEY_WEB_USERNAME = "web_user";
 const char* KEY_WEB_PASSWORD = "web_pass";
 const char* KEY_DASHBOARD_AUTH = "dash_auth";
 
+// Chaves de histórico
+const char* KEY_SHOW_ANALOG_HISTORY = "show_ahist";
+const char* KEY_SHOW_DIGITAL_HISTORY = "show_dhist";
+
 void fV_carregarMainConfig(void) {
 
     preferences.begin(NVS_NAMESPACE_MAIN_CONFIG, true); // Abre para leitura
@@ -140,6 +144,10 @@ void fV_carregarMainConfig(void) {
     vSt_mainConfig.vS_webUsername = preferences.getString(KEY_WEB_USERNAME, "admin");
     vSt_mainConfig.vS_webPassword = preferences.getString(KEY_WEB_PASSWORD, "admin1234");
     vSt_mainConfig.vB_dashboardAuthRequired = preferences.getBool(KEY_DASHBOARD_AUTH, false); // Dashboard sem auth por padrão
+
+    // 10. Configurações de Histórico no Dashboard
+    vSt_mainConfig.vB_showAnalogHistory = preferences.getBool(KEY_SHOW_ANALOG_HISTORY, false); // Padrão habilitado
+    vSt_mainConfig.vB_showDigitalHistory = preferences.getBool(KEY_SHOW_DIGITAL_HISTORY, false); // Padrão desabilitado
 
     preferences.end();
 
@@ -201,6 +209,10 @@ void fV_salvarMainConfig(void) {
     preferences.putString(KEY_WEB_USERNAME, vSt_mainConfig.vS_webUsername);
     preferences.putString(KEY_WEB_PASSWORD, vSt_mainConfig.vS_webPassword);
     preferences.putBool(KEY_DASHBOARD_AUTH, vSt_mainConfig.vB_dashboardAuthRequired);
+
+    // 10. Configurações de Histórico no Dashboard
+    preferences.putBool(KEY_SHOW_ANALOG_HISTORY, vSt_mainConfig.vB_showAnalogHistory);
+    preferences.putBool(KEY_SHOW_DIGITAL_HISTORY, vSt_mainConfig.vB_showDigitalHistory);
 
     preferences.end();
 

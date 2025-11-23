@@ -91,6 +91,10 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
     String vS_webPassword;          // Senha para autenticação web
     bool vB_dashboardAuthRequired;  // Se o dashboard requer autenticação (quando auth habilitada)
 
+    // 10. Configurações de Histórico no Dashboard
+    bool vB_showAnalogHistory;      // Exibe histórico de 8 leituras para pinos analógicos
+    bool vB_showDigitalHistory;     // Exibe histórico de 8 estados para pinos digitais
+
 };
 
 // --- Estrutura para Configuração de Pinos ---
@@ -107,6 +111,33 @@ struct PinConfig_t {
     // Nível de acionamento
     uint16_t nivel_acionamento_min;  // Digital: 0 ou 1 | Analógico: valor mínimo do range
     uint16_t nivel_acionamento_max;  // Digital: igual ao min | Analógico: valor máximo do range
+    // Histórico (últimos 8 valores/estados)
+    uint16_t historico_analogico[8]; // Array circular para armazenar últimas 8 leituras analógicas
+    uint8_t historico_digital[8];    // Array circular para armazenar últimos 8 estados digitais (0 ou 1)
+    uint8_t historico_index;         // Índice atual no array circular (0-7)
+    uint8_t historico_count;         // Quantidade de valores válidos no histórico (0-8)
+};
+
+// --- Estrutura para Configuração de Ações ---
+struct ActionConfig_t {
+    uint8_t pino_origem;         // GPIO que dispara a ação (pino de entrada/sensor)
+    uint8_t numero_acao;         // Número da ação (1, 2, 3 ou 4)
+    uint8_t pino_destino;        // GPIO que será acionado (pino de saída/controle)
+    uint16_t acao;               // Tipo de ação: 0=NENHUMA, 1=LIGA, 2=LIGA_DELAY, 3=PISCA, 4=PULSO, 5=PULSO_DELAY_ON, 65534=STATUS, 65535=SINCRONISMO
+    uint16_t tempo_on;           // Tempo ON em ciclos (0-65535)
+    uint16_t tempo_off;          // Tempo OFF em ciclos (0-65535)
+    uint8_t pino_remoto;         // Máscara do pino no módulo remoto (0-254)
+    uint16_t envia_modulo;       // ID do módulo destino (0=nenhum, 1-65533=ID do módulo)
+    bool telegram;               // Envia notificação para Telegram
+    bool assistente;             // Envia notificação para Assistente
+    bool mqtt;                   // Publica no broker MQTT
+    String classe_mqtt;          // Classe do device MQTT (ex: "binary_sensor", "switch")
+    String icone_mqtt;           // Ícone MDI para MQTT (ex: "mdi:door")
+    // Controle interno da ação
+    uint16_t contador_on;        // Contador atual de ciclos ON
+    uint16_t contador_off;       // Contador atual de ciclos OFF
+    bool estado_acao;            // Estado atual da ação (true=executando, false=parada)
+    bool ultimo_estado_origem;   // Último estado do pino origem (para detectar mudanças)
 };
 
 // Instância global da sua configuração em memória (sua running-config)
@@ -115,6 +146,10 @@ extern MainConfig_t vSt_mainConfig; // vSt_ para variável do tipo Struct
 // --- Variáveis globais para gerenciamento de pinos ---
 extern PinConfig_t* vA_pinConfigs;   // Array dinâmico de configurações de pinos
 extern uint8_t vU8_activePinsCount;  // Contador de pinos ativos configurados
+
+// --- Variáveis globais para gerenciamento de ações ---
+extern ActionConfig_t* vA_actionConfigs;  // Array dinâmico de configurações de ações
+extern uint8_t vU8_activeActionsCount;    // Contador de ações ativas configuradas
 
 // --- Novas funções para carregar e salvar a estrutura MainConfig_t ---
 // Estas serão as funções de interface para a sua "startup-config"
@@ -183,6 +218,12 @@ void fV_handleFileDownload(AsyncWebServerRequest *request); // Handler para API 
 void fV_handleFileDelete(AsyncWebServerRequest *request);   // Handler para API de deleção de arquivos
 void fV_handleFormatFlash(AsyncWebServerRequest *request);  // Handler para API de formatação da flash
 void fV_handlePinsClearApi(AsyncWebServerRequest *request); // Handler para API de limpeza de pinos
+void fV_handleActionsListApi(AsyncWebServerRequest *request); // Handler para API de listagem de ações
+void fV_handleActionCreateApi(AsyncWebServerRequest *request); // Handler para API de criação de ações
+void fV_handleActionUpdateApi(AsyncWebServerRequest *request); // Handler para API de atualização de ações
+void fV_handleActionDeleteApi(AsyncWebServerRequest *request); // Handler para API de deleção de ações
+void fV_handleActionsSaveApi(AsyncWebServerRequest *request); // Handler para API de salvamento de ações
+void fV_handleActionsPage(AsyncWebServerRequest *request); // Handler para página de ações
 
 /* Funções de NTP (ntp_func.cpp) */
 void fV_setupNtp();
@@ -203,5 +244,17 @@ bool fB_hasPinConfigChanges(void);
 void fV_updatePinStatus(void);
 void fV_readPinsTask(void); // Task periódica para leitura de pinos (ignora remotos)
 bool fB_isPinActivated(uint8_t pinIndex);  // Verifica se pino está acionado baseado no nível configurado
+
+/* Funções do Gerenciador de Ações (action_manager.cpp) */
+void fV_initActionSystem(void);
+void fV_loadActionConfigs(void);
+bool fB_saveActionConfigs(void);
+void fV_clearActionConfigs(void);
+uint8_t fU8_findActionIndex(uint8_t pinOrigem, uint8_t numeroAcao);
+int fI_addActionConfig(const ActionConfig_t& config);
+bool fB_removeActionConfig(uint8_t pinOrigem, uint8_t numeroAcao);
+bool fB_updateActionConfig(uint8_t pinOrigem, uint8_t numeroAcao, const ActionConfig_t& config);
+void fV_executeActionsTask(void); // Task periódica para execução de ações
+void fV_executeAction(uint8_t actionIndex); // Executa uma ação específica
 
 #endif // GLOBALS_H

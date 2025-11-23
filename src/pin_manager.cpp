@@ -173,6 +173,14 @@ void fV_loadPinConfigs(void) {
         vA_pinConfigs[index].ignore_contador = 0;
         vA_pinConfigs[index].ultimo_acionamento_ms = 0;  // Inicializa timestamp de retenção
         
+        // Inicializa históricos
+        vA_pinConfigs[index].historico_index = 0;
+        vA_pinConfigs[index].historico_count = 0;
+        for (uint8_t h = 0; h < 8; h++) {
+            vA_pinConfigs[index].historico_analogico[h] = 0;
+            vA_pinConfigs[index].historico_digital[h] = 0;
+        }
+        
         fV_printSerialDebug(LOG_PINS, "[PIN] Carregado: %s (GPIO %d, tipo %d)", vA_pinConfigs[index].nome.c_str(), pinNumber, vA_pinConfigs[index].tipo);
     }
     
@@ -591,24 +599,35 @@ void fV_readPinsTask(void) {
                 if (vA_pinConfigs[i].status_atual != value) {
                     vA_pinConfigs[i].status_atual = value;
                     
+                    // *** ADICIONAR AO HISTÓRICO DIGITAL (array circular) ***
+                    vA_pinConfigs[i].historico_digital[vA_pinConfigs[i].historico_index] = value ? 1 : 0;
+                    vA_pinConfigs[i].historico_index = (vA_pinConfigs[i].historico_index + 1) % 8; // Avança índice circular
+                    if (vA_pinConfigs[i].historico_count < 8) {
+                        vA_pinConfigs[i].historico_count++; // Incrementa até atingir 8
+                    }
+                    
                     // *** INICIAR TEMPO DE RETENÇÃO ***
                     // Marca o timestamp da mudança para iniciar período de retenção
                     if (tempoRetencao > 0) {
                         vA_pinConfigs[i].ultimo_acionamento_ms = currentTime;
-                        fV_printSerialDebug(LOG_PINS, "[PIN TASK] GPIO %d (%s) mudou para %s - Retenção iniciada por %lu ms", 
+                        fV_printSerialDebug(LOG_PINS, "[PIN TASK] GPIO %d (%s) mudou para %s - Retenção iniciada por %lu ms [Histórico: %d/%d]", 
                             pinNumber, 
                             vA_pinConfigs[i].nome.c_str(),
                             value ? "HIGH" : "LOW",
-                            tempoRetencao);
+                            tempoRetencao,
+                            vA_pinConfigs[i].historico_count,
+                            8);
                     } else {
-                        fV_printSerialDebug(LOG_PINS, "[PIN TASK] GPIO %d (%s) mudou para %s", 
+                        fV_printSerialDebug(LOG_PINS, "[PIN TASK] GPIO %d (%s) mudou para %s [Histórico: %d/%d]", 
                             pinNumber, 
                             vA_pinConfigs[i].nome.c_str(),
-                            value ? "HIGH" : "LOW");
+                            value ? "HIGH" : "LOW",
+                            vA_pinConfigs[i].historico_count,
+                            8);
                     }
                 }
             } else if (modo == PIN_MODE_OUTPUT) {
-                // Para outputs, apenas lê o estado atual para confirmar
+                // Para outputs, lê o estado atual e adiciona ao histórico digital
                 int value = digitalRead(pinNumber);
                 
                 // Aplicar XOR também em outputs (se configurado)
@@ -616,7 +635,26 @@ void fV_readPinsTask(void) {
                     value = !value;
                 }
                 
-                vA_pinConfigs[i].status_atual = value;
+                // Atualizar apenas se o valor mudou
+                if (vA_pinConfigs[i].status_atual != value) {
+                    vA_pinConfigs[i].status_atual = value;
+                    
+                    // *** ADICIONAR AO HISTÓRICO DIGITAL (array circular) ***
+                    vA_pinConfigs[i].historico_digital[vA_pinConfigs[i].historico_index] = value ? 1 : 0;
+                    vA_pinConfigs[i].historico_index = (vA_pinConfigs[i].historico_index + 1) % 8;
+                    if (vA_pinConfigs[i].historico_count < 8) {
+                        vA_pinConfigs[i].historico_count++;
+                    }
+                    
+                    fV_printSerialDebug(LOG_PINS, "[PIN TASK] GPIO %d (%s) OUTPUT mudou para %s [Histórico: %d/%d]", 
+                        pinNumber, 
+                        vA_pinConfigs[i].nome.c_str(),
+                        value ? "HIGH" : "LOW",
+                        vA_pinConfigs[i].historico_count,
+                        8);
+                } else {
+                    vA_pinConfigs[i].status_atual = value;
+                }
             }
             
         } else if (tipo == PIN_TYPE_ANALOG) {
@@ -628,6 +666,13 @@ void fV_readPinsTask(void) {
             if (diff > 5) {
                 vA_pinConfigs[i].status_atual = value;
                 
+                // *** ADICIONAR AO HISTÓRICO (array circular) ***
+                vA_pinConfigs[i].historico_analogico[vA_pinConfigs[i].historico_index] = value;
+                vA_pinConfigs[i].historico_index = (vA_pinConfigs[i].historico_index + 1) % 8; // Avança índice circular
+                if (vA_pinConfigs[i].historico_count < 8) {
+                    vA_pinConfigs[i].historico_count++; // Incrementa até atingir 8
+                }
+                
                 // Iniciar tempo de retenção para analógicos também
                 if (tempoRetencao > 0) {
                     vA_pinConfigs[i].ultimo_acionamento_ms = currentTime;
@@ -637,10 +682,12 @@ void fV_readPinsTask(void) {
                         value,
                         tempoRetencao);
                 } else {
-                    fV_printSerialDebug(LOG_PINS, "[PIN TASK] GPIO %d (%s) ADC: %d", 
+                    fV_printSerialDebug(LOG_PINS, "[PIN TASK] GPIO %d (%s) ADC: %d [Histórico: %d/%d]", 
                         pinNumber, 
                         vA_pinConfigs[i].nome.c_str(),
-                        value);
+                        value,
+                        vA_pinConfigs[i].historico_count,
+                        8);
                 }
             }
         }

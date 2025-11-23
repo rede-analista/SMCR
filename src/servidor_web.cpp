@@ -7,6 +7,7 @@
 #include "web_pins.h"
 #include "web_mqtt.h"
 #include "web_files.h"
+#include "web_actions.h"
 #include <LittleFS.h>
 #include <Preferences.h>
 
@@ -96,8 +97,8 @@ void fV_setupWebServer() {
         fV_handleConfigPage(request);
     });
     
-    // Rota para página de configuração de pinos
-    SERVIDOR_WEB_ASYNC->on("/pins", HTTP_GET, [](AsyncWebServerRequest *request) {
+    // Rota para página de configuração de pinos (/pins e /pinos)
+    auto pinsPageHandler = [](AsyncWebServerRequest *request) {
         // Verifica autenticação se habilitada
         if (vSt_mainConfig.vB_authEnabled) {
             if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
@@ -119,7 +120,10 @@ void fV_setupWebServer() {
         unsigned long endTime = millis();
         String endTimeStr = fS_getFormattedTime();
         fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento /pins - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
-    });
+    };
+    
+    SERVIDOR_WEB_ASYNC->on("/pins", HTTP_GET, pinsPageHandler);
+    SERVIDOR_WEB_ASYNC->on("/pinos", HTTP_GET, pinsPageHandler);
     
     // API: Listar todos os pinos configurados
     SERVIDOR_WEB_ASYNC->on("/api/pins", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -260,6 +264,52 @@ void fV_setupWebServer() {
         fV_handleFilesPage(request);
     });
     
+    // Rota para página de ações
+    SERVIDOR_WEB_ASYNC->on("/acoes", HTTP_GET, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleActionsPage(request);
+    });
+    
+    // ==== API de Ações ====
+    
+    // API: Listar todas as ações
+    SERVIDOR_WEB_ASYNC->on("/api/actions", HTTP_GET, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleActionsListApi(request);
+    });
+    
+    // API: Criar nova ação
+    SERVIDOR_WEB_ASYNC->on("/api/actions", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleActionCreateApi(request);
+    });
+    
+    // API: Salvar ações na flash
+    SERVIDOR_WEB_ASYNC->on("/api/actions/save", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleActionsSaveApi(request);
+    });
+    
     // Rotas de reset (POST)
     SERVIDOR_WEB_ASYNC->on("/reset/soft", HTTP_POST, fV_handleSoftReset);
     SERVIDOR_WEB_ASYNC->on("/reset/factory", HTTP_POST, fV_handleFactoryReset);
@@ -344,6 +394,8 @@ void fV_setupWebServer() {
         doc["cor_com_alerta"] = vSt_mainConfig.vS_corStatusComAlerta;
         doc["cor_sem_alerta"] = vSt_mainConfig.vS_corStatusSemAlerta;
         doc["tempo_refresh"] = vSt_mainConfig.vU16_tempoRefresh;
+        doc["show_analog_history"] = vSt_mainConfig.vB_showAnalogHistory;
+        doc["show_digital_history"] = vSt_mainConfig.vB_showDigitalHistory;
         
         // Configurações do watchdog
         doc["watchdog_enabled"] = vSt_mainConfig.vB_watchdogEnabled;
@@ -474,6 +526,13 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
             fV_printSerialDebug(LOG_WEB, "[CONFIG] tempo_refresh = %d", vSt_mainConfig.vU16_tempoRefresh);
         }
         
+        // Histórico
+        vSt_mainConfig.vB_showAnalogHistory = request->hasArg("show_analog_history") && request->arg("show_analog_history") != "0";
+        fV_printSerialDebug(LOG_WEB, "[CONFIG] show_analog_history = %d", vSt_mainConfig.vB_showAnalogHistory);
+        
+        vSt_mainConfig.vB_showDigitalHistory = request->hasArg("show_digital_history") && request->arg("show_digital_history") != "0";
+        fV_printSerialDebug(LOG_WEB, "[CONFIG] show_digital_history = %d", vSt_mainConfig.vB_showDigitalHistory);
+        
         // Sistema
         if (request->hasArg("qtd_pinos")) {
             vSt_mainConfig.vU8_quantidadePinos = request->arg("qtd_pinos").toInt();
@@ -556,6 +615,48 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
 
 // Rota Handler: 404 Not Found
 void fV_handleNotFound(AsyncWebServerRequest *request) {
+    // PRIMEIRO: Verifica se é DELETE para /api/actions/{pin}/{num}
+    String url = request->url();
+    if (request->method() == HTTP_DELETE && url.startsWith("/api/actions/")) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        // Tenta parsear a URL
+        int lastSlash = url.lastIndexOf('/');
+        int secondLastSlash = url.lastIndexOf('/', lastSlash - 1);
+        
+        if (lastSlash > secondLastSlash && secondLastSlash > 12) { // 12 = tamanho de "/api/actions/"
+            String pinStr = url.substring(secondLastSlash + 1, lastSlash);
+            String numStr = url.substring(lastSlash + 1);
+            
+            // Valida se são números
+            bool validPin = true;
+            bool validNum = true;
+            
+            for (unsigned int i = 0; i < pinStr.length(); i++) {
+                if (!isDigit(pinStr.charAt(i))) validPin = false;
+            }
+            for (unsigned int i = 0; i < numStr.length(); i++) {
+                if (!isDigit(numStr.charAt(i))) validNum = false;
+            }
+            
+            if (validPin && validNum) {
+                int pin = pinStr.toInt();
+                int num = numStr.toInt();
+                
+                if (num >= 1 && num <= 4 && pin <= 254) {
+                    fV_handleActionDeleteApi(request);
+                    return;
+                }
+            }
+        }
+    }
+    
+    // SEGUNDO: 404 padrão
     // Captura o IP do cliente que fez a requisição
     String vS_clientIP = (request->client() != nullptr) ? request->client()->remoteIP().toString() : "N/A";
 
@@ -625,6 +726,36 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
                 pin_obj["status_atual"] = vA_pinConfigs[i].status_atual;
                 pin_obj["nivel_acionamento_min"] = vA_pinConfigs[i].nivel_acionamento_min;
                 pin_obj["nivel_acionamento_max"] = vA_pinConfigs[i].nivel_acionamento_max;
+                
+                // Adiciona histórico para pinos analógicos (se habilitado)
+                if (vA_pinConfigs[i].tipo == 192 && vSt_mainConfig.vB_showAnalogHistory) { // PIN_TYPE_ANALOG
+                    JsonArray history_array = pin_obj["historico"].to<JsonArray>();
+                    
+                    // Monta o histórico na ordem correta (mais antigo para mais novo)
+                    uint8_t count = vA_pinConfigs[i].historico_count;
+                    if (count > 0) {
+                        uint8_t startIndex = (vA_pinConfigs[i].historico_index + 8 - count) % 8;
+                        for (uint8_t h = 0; h < count; h++) {
+                            uint8_t idx = (startIndex + h) % 8;
+                            history_array.add(vA_pinConfigs[i].historico_analogico[idx]);
+                        }
+                    }
+                }
+                
+                // Adiciona histórico para pinos digitais (se habilitado) - ENTRADA ou SAÍDA
+                if (vA_pinConfigs[i].tipo == 1 && vSt_mainConfig.vB_showDigitalHistory) { // PIN_TYPE_DIGITAL
+                    JsonArray history_array = pin_obj["historico"].to<JsonArray>();
+                    
+                    // Monta o histórico na ordem correta (mais antigo para mais novo)
+                    uint8_t count = vA_pinConfigs[i].historico_count;
+                    if (count > 0) {
+                        uint8_t startIndex = (vA_pinConfigs[i].historico_index + 8 - count) % 8;
+                        for (uint8_t h = 0; h < count; h++) {
+                            uint8_t idx = (startIndex + h) % 8;
+                            history_array.add(vA_pinConfigs[i].historico_digital[idx]);
+                        }
+                    }
+                }
             }
         }
     }
@@ -1012,6 +1143,19 @@ void fV_handleNVSList(AsyncWebServerRequest *request) {
         dashauth["key"] = "dash_auth";
         dashauth["value"] = prefs.getBool("dash_auth", false) ? "true" : "false";
         dashauth["type"] = "Bool";
+        
+        // 10. Histórico
+        JsonObject showahist = preferences.add<JsonObject>();
+        showahist["namespace"] = "smcrconf";
+        showahist["key"] = "show_ahist";
+        showahist["value"] = prefs.getBool("show_ahist", true) ? "true" : "false";
+        showahist["type"] = "Bool";
+        
+        JsonObject showdhist = preferences.add<JsonObject>();
+        showdhist["namespace"] = "smcrconf";
+        showdhist["key"] = "show_dhist";
+        showdhist["value"] = prefs.getBool("show_dhist", false) ? "true" : "false";
+        showdhist["type"] = "Bool";
         
         prefs.end();
     }
@@ -1540,6 +1684,142 @@ void fV_handlePinsClearApi(AsyncWebServerRequest *request) {
     fV_setupConfiguredPins();
     
     request->send(200, "application/json", "{\"success\": true, \"message\": \"Running config de pinos limpa\"}");
+}
+
+//========================================
+// Handlers da API de Ações
+//========================================
+
+// API: Listar todas as ações configuradas
+void fV_handleActionsListApi(AsyncWebServerRequest *request) {
+    fV_printSerialDebug(LOG_WEB, "[API] Listando ações configuradas");
+    
+    JsonDocument doc;
+    JsonArray actionsArray = doc["actions"].to<JsonArray>();
+    
+    for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
+        if (vA_actionConfigs[i].acao != 0) {
+            JsonObject actionObj = actionsArray.add<JsonObject>();
+            actionObj["pino_origem"] = vA_actionConfigs[i].pino_origem;
+            actionObj["numero_acao"] = vA_actionConfigs[i].numero_acao;
+            actionObj["pino_destino"] = vA_actionConfigs[i].pino_destino;
+            actionObj["acao"] = vA_actionConfigs[i].acao;
+            actionObj["tempo_on"] = vA_actionConfigs[i].tempo_on;
+            actionObj["tempo_off"] = vA_actionConfigs[i].tempo_off;
+            actionObj["pino_remoto"] = vA_actionConfigs[i].pino_remoto;
+            actionObj["envia_modulo"] = vA_actionConfigs[i].envia_modulo;
+            actionObj["telegram"] = vA_actionConfigs[i].telegram;
+            actionObj["assistente"] = vA_actionConfigs[i].assistente;
+            actionObj["mqtt"] = vA_actionConfigs[i].mqtt;
+            actionObj["classe_mqtt"] = vA_actionConfigs[i].classe_mqtt;
+            actionObj["icone_mqtt"] = vA_actionConfigs[i].icone_mqtt;
+        }
+    }
+    
+    doc["total"] = vU8_activeActionsCount;
+    
+    String response;
+    serializeJson(doc, response);
+    
+    request->send(200, "application/json", response);
+}
+
+// API: Criar nova ação
+void fV_handleActionCreateApi(AsyncWebServerRequest *request) {
+    fV_printSerialDebug(LOG_WEB, "[API] Criando nova ação");
+    
+    // Validação de parâmetros obrigatórios
+    if (!request->hasArg("pino_origem") || !request->hasArg("numero_acao") || 
+        !request->hasArg("pino_destino") || !request->hasArg("acao")) {
+        request->send(400, "application/json", "{\"error\": \"Parâmetros obrigatórios ausentes\"}");
+        return;
+    }
+    
+    ActionConfig_t newAction;
+    newAction.pino_origem = request->arg("pino_origem").toInt();
+    newAction.numero_acao = request->arg("numero_acao").toInt();
+    newAction.pino_destino = request->arg("pino_destino").toInt();
+    newAction.acao = request->arg("acao").toInt();
+    newAction.tempo_on = request->hasArg("tempo_on") ? request->arg("tempo_on").toInt() : 0;
+    newAction.tempo_off = request->hasArg("tempo_off") ? request->arg("tempo_off").toInt() : 0;
+    newAction.pino_remoto = request->hasArg("pino_remoto") ? request->arg("pino_remoto").toInt() : 0;
+    newAction.envia_modulo = request->hasArg("envia_modulo") ? request->arg("envia_modulo").toInt() : 0;
+    newAction.telegram = request->hasArg("telegram") && request->arg("telegram") == "true";
+    newAction.assistente = request->hasArg("assistente") && request->arg("assistente") == "true";
+    newAction.mqtt = request->hasArg("mqtt") && request->arg("mqtt") == "true";
+    newAction.classe_mqtt = request->hasArg("classe_mqtt") ? request->arg("classe_mqtt") : "";
+    newAction.icone_mqtt = request->hasArg("icone_mqtt") ? request->arg("icone_mqtt") : "";
+    
+    // Detecta modo de edição (campos hidden)
+    bool isEdit = request->hasArg("edit_pino_origem") && request->hasArg("edit_numero_acao") &&
+                  request->arg("edit_pino_origem") != "" && request->arg("edit_numero_acao") != "";
+    
+    if (isEdit) {
+        // Modo edição: usa os valores originais dos campos hidden
+        uint8_t originalPinOrigem = request->arg("edit_pino_origem").toInt();
+        uint8_t originalNumeroAcao = request->arg("edit_numero_acao").toInt();
+        
+        // Remove a ação antiga
+        fB_removeActionConfig(originalPinOrigem, originalNumeroAcao);
+        fV_printSerialDebug(LOG_WEB, "[API] Editando ação: Origem=%d, Ação#%d", originalPinOrigem, originalNumeroAcao);
+    }
+    
+    int result = fI_addActionConfig(newAction);
+    
+    if (result >= 0) {
+        fB_saveActionConfigs(); // Salva automaticamente
+        fV_printSerialDebug(LOG_WEB, "[API] Ação %s com sucesso (índice %d)", isEdit ? "editada" : "adicionada", result);
+        request->send(200, "application/json", "{\"success\": true, \"message\": \"Ação salva\"}");
+    } else {
+        fV_printSerialDebug(LOG_WEB, "[API] ERRO: Falha ao adicionar ação");
+        request->send(400, "application/json", "{\"error\": \"Limite de ações atingido ou ação já existe\"}");
+    }
+}
+
+// API: Deletar ação
+void fV_handleActionDeleteApi(AsyncWebServerRequest *request) {
+    fV_printSerialDebug(LOG_WEB, "[API] Deletando ação");
+    
+    String url = request->url();
+    int lastSlash = url.lastIndexOf('/');
+    int secondLastSlash = url.lastIndexOf('/', lastSlash - 1);
+    
+    if (lastSlash == -1 || secondLastSlash == -1) {
+        request->send(400, "application/json", "{\"error\": \"URL inválida\"}");
+        return;
+    }
+    
+    uint8_t pinOrigem = url.substring(secondLastSlash + 1, lastSlash).toInt();
+    uint8_t numeroAcao = url.substring(lastSlash + 1).toInt();
+    
+    bool success = fB_removeActionConfig(pinOrigem, numeroAcao);
+    if (!success) {
+        request->send(404, "application/json", "{\"error\": \"Ação não encontrada\"}");
+        return;
+    }
+    
+    fB_saveActionConfigs(); // Salva automaticamente
+    request->send(200, "application/json", "{\"success\": true, \"message\": \"Ação removida\"}");
+}
+
+// API: Salvar configurações de ações na flash
+void fV_handleActionsSaveApi(AsyncWebServerRequest *request) {
+    fV_printSerialDebug(LOG_WEB, "[API] Salvando configurações de ações na flash");
+    
+    bool success = fB_saveActionConfigs();
+    
+    if (success) {
+        request->send(200, "application/json", "{\"success\": true, \"message\": \"Configurações de ações salvas na flash\"}");
+    } else {
+        fV_printSerialDebug(LOG_WEB, "[API] ERRO: Falha ao salvar configurações de ações");
+        request->send(500, "application/json", "{\"success\": false, \"error\": \"Falha ao salvar configurações na flash\"}");
+    }
+}
+
+// Página de cadastro de ações
+void fV_handleActionsPage(AsyncWebServerRequest *request) {
+    fV_printSerialDebug(LOG_WEB, "[WEB] Servindo página de ações");
+    request->send(200, "text/html", WEBPAGE_ACTIONS);
 }
 
 
