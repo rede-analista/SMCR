@@ -6,18 +6,39 @@
 #include "web_reset.h"
 #include "web_pins.h"
 #include "web_mqtt.h"
+#include "web_intermod.h"
 #include "web_files.h"
 #include "web_actions.h"
+#include "web_firmware.h"
+#include "web_preferencias.h"
+#include "web_littlefs.h"
+#include "web_serial.h"
 #include <LittleFS.h>
 #include <Preferences.h>
+// Inclusões para navegação completa no NVS
+#include <nvs.h>
+#include <nvs_flash.h>
+#include <Update.h>
 
 // Forward declarations para handlers de arquivos
 void fV_handleFilesPage(AsyncWebServerRequest *request);
+void fV_handleFirmwarePage(AsyncWebServerRequest *request);
 void fV_handleNVSList(AsyncWebServerRequest *request);
+void fV_handleNVSExport(AsyncWebServerRequest *request);
+void fV_handleNVSImport(AsyncWebServerRequest *request);
 void fV_handleFilesList(AsyncWebServerRequest *request);
 void fV_handleFileDownload(AsyncWebServerRequest *request);
 void fV_handleFileDelete(AsyncWebServerRequest *request);
 void fV_handleFormatFlash(AsyncWebServerRequest *request);
+void fV_handleSerialPage(AsyncWebServerRequest *request);
+void fV_handleSerialLogs(AsyncWebServerRequest *request);
+
+// Buffer circular para logs do Web Serial
+#define SERIAL_LOG_BUFFER_SIZE 100
+static String g_serialLogBuffer[SERIAL_LOG_BUFFER_SIZE];
+static uint16_t g_serialLogIndex = 0;
+static uint32_t g_serialLogCounter = 0;
+static bool g_webServerReady = false;
 
 // Função de inicialização do servidor web
 void fV_setupWebServer() {
@@ -52,6 +73,10 @@ void fV_setupWebServer() {
              AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_dashboard_html);
              response->addHeader("X-Load-Start", String(startTime));
              response->addHeader("X-Load-Time", timeStr);
+             // Evitar cache para garantir atualização do layout/título
+             response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+             response->addHeader("Pragma", "no-cache");
+             response->addHeader("Expires", "0");
              request->send(response);
              
              // Log de finalização
@@ -242,6 +267,17 @@ void fV_setupWebServer() {
         fV_handleMqttPage(request);
     });
     
+    // Rota para página de Inter-Módulos
+    SERVIDOR_WEB_ASYNC->on("/intermod", HTTP_GET, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleInterModPage(request);
+    });
+    
     // Rota para página de reset
     SERVIDOR_WEB_ASYNC->on("/reset", HTTP_GET, [](AsyncWebServerRequest *request) {
         // Verifica autenticação se habilitada
@@ -253,15 +289,43 @@ void fV_setupWebServer() {
         fV_handleResetPage(request);
     });
     
-    // Rota para página de arquivos
-    SERVIDOR_WEB_ASYNC->on("/arquivos", HTTP_GET, [](AsyncWebServerRequest *request) {
+    // Rotas para arquivos - rotas específicas PRIMEIRO (antes da genérica /arquivos)
+    // Rota para página de firmware OTA
+    SERVIDOR_WEB_ASYNC->on("/arquivos/firmware", HTTP_GET, [](AsyncWebServerRequest *request) {
         // Verifica autenticação se habilitada
         if (vSt_mainConfig.vB_authEnabled) {
             if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
                 return request->requestAuthentication();
             }
         }
-        fV_handleFilesPage(request);
+        fV_handleFirmwarePage(request);
+    });
+    
+    // Rota para página de preferências NVS
+    SERVIDOR_WEB_ASYNC->on("/arquivos/preferencias", HTTP_GET, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handlePreferenciasPage(request);
+    });
+    
+    // Rota para página de LittleFS
+    SERVIDOR_WEB_ASYNC->on("/arquivos/littlefs", HTTP_GET, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleLittleFSPage(request);
+    });
+    
+    // Rota para página de arquivos (mantida para compatibilidade - redireciona para firmware)
+    SERVIDOR_WEB_ASYNC->on("/arquivos", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->redirect("/arquivos/firmware");
     });
     
     // Rota para página de ações
@@ -273,6 +337,90 @@ void fV_setupWebServer() {
             }
         }
         fV_handleActionsPage(request);
+    });
+
+    // Rota para página de atualização de firmware
+    SERVIDOR_WEB_ASYNC->on("/firmware", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleFirmwarePage(request);
+    });
+
+    // API: Upload de firmware (OTA)
+    SERVIDOR_WEB_ASYNC->on("/api/firmware/upload", HTTP_POST,
+        [](AsyncWebServerRequest *request) {
+            // Handler final: envia status baseado em Update.hasError()
+            if (vSt_mainConfig.vB_authEnabled) {
+                if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                    return request->requestAuthentication();
+                }
+            }
+
+            bool ok = !Update.hasError();
+            int code = ok ? 200 : 500;
+            String payload = ok ? "{\"success\": true, \"message\": \"Firmware atualizado. Reiniciando...\"}"
+                                : "{\"success\": false, \"message\": \"Falha no update\"}";
+            AsyncWebServerResponse *response = request->beginResponse(code, "application/json", payload);
+            response->addHeader("Connection", "close");
+            request->send(response);
+
+            if (ok) {
+                fV_printSerialDebug(LOG_WEB | LOG_FLASH, "[OTA] Update concluido com sucesso. Reiniciando...");
+                // Pequeno atraso para permitir envio completo da resposta HTTP
+                // e dar tempo ao browser para processar o sucesso.
+                delay(800);
+                ESP.restart();
+            } else {
+                fV_printSerialDebug(LOG_WEB | LOG_FLASH, "[OTA] Falha no update");
+            }
+        },
+        [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+            // Upload em partes usando Update
+            if (index == 0) {
+                fV_printSerialDebug(LOG_WEB | LOG_FLASH, "[OTA] Inicio upload firmware: %s (%u bytes esperados)", filename.c_str(), (unsigned)request->contentLength());
+                // Tenta iniciar o update para tamanho desconhecido
+                if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+                    Update.printError(Serial);
+                }
+            }
+
+            if (!Update.hasError()) {
+                if (Update.write(data, len) != len) {
+                    Update.printError(Serial);
+                }
+            }
+
+            if (final) {
+                if (Update.end(true)) {
+                    fV_printSerialDebug(LOG_WEB | LOG_FLASH, "[OTA] Upload finalizado (%u bytes)", (unsigned)(index + len));
+                } else {
+                    Update.printError(Serial);
+                }
+            }
+        }
+    );
+    
+    // Rota para página de Web Serial
+    SERVIDOR_WEB_ASYNC->on("/serial", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleSerialPage(request);
+    });
+    
+    // API: Obter logs do Web Serial (polling)
+    SERVIDOR_WEB_ASYNC->on("/api/serial/logs", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleSerialLogs(request);
     });
     
     // ==== API de Ações ====
@@ -318,8 +466,143 @@ void fV_setupWebServer() {
     SERVIDOR_WEB_ASYNC->on("/reset/pins", HTTP_POST, fV_handlePinsReset);
     SERVIDOR_WEB_ASYNC->on("/restart", HTTP_POST, fV_handleRestart);
     
+    // API: Salvar configurações MQTT
+    SERVIDOR_WEB_ASYNC->on("/api/mqtt/save", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        bool configChanged = false;
+        
+        if (request->hasArg("mqtt_enabled")) {
+            vSt_mainConfig.vB_mqttEnabled = request->arg("mqtt_enabled") == "true";
+            configChanged = true;
+        }
+        
+        if (request->hasArg("mqtt_server")) {
+            vSt_mainConfig.vS_mqttServer = request->arg("mqtt_server");
+            configChanged = true;
+        }
+        
+        if (request->hasArg("mqtt_port")) {
+            vSt_mainConfig.vU16_mqttPort = request->arg("mqtt_port").toInt();
+            configChanged = true;
+        }
+        
+        if (request->hasArg("mqtt_user")) {
+            vSt_mainConfig.vS_mqttUser = request->arg("mqtt_user");
+            configChanged = true;
+        }
+        
+        if (request->hasArg("mqtt_password")) {
+            vSt_mainConfig.vS_mqttPassword = request->arg("mqtt_password");
+            configChanged = true;
+        }
+        
+        if (request->hasArg("mqtt_topic_base")) {
+            vSt_mainConfig.vS_mqttTopicBase = request->arg("mqtt_topic_base");
+            configChanged = true;
+        }
+        
+        if (request->hasArg("mqtt_publish_interval")) {
+            vSt_mainConfig.vU16_mqttPublishInterval = request->arg("mqtt_publish_interval").toInt();
+            configChanged = true;
+        }
+        
+        if (request->hasArg("mqtt_ha_discovery")) {
+            vSt_mainConfig.vB_mqttHomeAssistantDiscovery = request->arg("mqtt_ha_discovery") == "true";
+            configChanged = true;
+        }
+        if (request->hasArg("mqtt_ha_batch")) {
+            int v = request->arg("mqtt_ha_batch").toInt();
+            if (v < 1) v = 1; if (v > 16) v = 16;
+            vSt_mainConfig.vU8_mqttHaDiscoveryBatchSize = (uint8_t)v;
+            configChanged = true;
+        }
+        if (request->hasArg("mqtt_ha_interval_ms")) {
+            int v = request->arg("mqtt_ha_interval_ms").toInt();
+            if (v < 10) v = 10; if (v > 5000) v = 5000;
+            vSt_mainConfig.vU16_mqttHaDiscoveryIntervalMs = (uint16_t)v;
+            configChanged = true;
+        }
+        
+        if (configChanged) {
+            fV_salvarMainConfig();
+            fV_printSerialDebug(LOG_WEB, "[MQTT] Configurações salvas com sucesso");
+            request->send(200, "application/json", "{\"success\": true, \"message\": \"Configurações MQTT salvas. Reinicie o ESP para aplicar.\"}");
+        } else {
+            request->send(400, "application/json", "{\"success\": false, \"message\": \"Nenhuma configuração foi alterada\"}");
+        }
+    });
+    
+    // API: Obter configurações MQTT atuais (somente dados de configuração - leve e rápido)
+    SERVIDOR_WEB_ASYNC->on("/api/mqtt/config", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        String json = "{";
+        json += "\"mqtt_enabled\":" + String(vSt_mainConfig.vB_mqttEnabled ? "true" : "false") + ",";
+        json += "\"mqtt_server\":\"" + vSt_mainConfig.vS_mqttServer + "\",";
+        json += "\"mqtt_port\":" + String(vSt_mainConfig.vU16_mqttPort) + ",";
+        json += "\"mqtt_user\":\"" + vSt_mainConfig.vS_mqttUser + "\",";
+        json += "\"mqtt_password\":\"" + vSt_mainConfig.vS_mqttPassword + "\",";
+        json += "\"mqtt_topic_base\":\"" + vSt_mainConfig.vS_mqttTopicBase + "\",";
+        json += "\"mqtt_publish_interval\":" + String(vSt_mainConfig.vU16_mqttPublishInterval) + ",";
+        json += "\"mqtt_ha_discovery\":" + String(vSt_mainConfig.vB_mqttHomeAssistantDiscovery ? "true" : "false") + ",";
+        json += "\"mqtt_ha_batch\":" + String(vSt_mainConfig.vU8_mqttHaDiscoveryBatchSize) + ",";
+        json += "\"mqtt_ha_interval_ms\":" + String(vSt_mainConfig.vU16_mqttHaDiscoveryIntervalMs);
+        json += "}";
+        
+        request->send(200, "application/json", json);
+    });
+
+    // API: Status MQTT (separado para não travar carregamento da página)
+    SERVIDOR_WEB_ASYNC->on("/api/mqtt/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+
+        String json = "{";
+        json += "\"mqtt_unique_id\":\"" + fS_getMqttUniqueId() + "\",";
+        json += "\"mqtt_status\":\"" + fS_getMqttStatus() + "\"";
+        json += "}";
+
+        request->send(200, "application/json", json);
+    });
+    
     // API: Listar preferências NVS
     SERVIDOR_WEB_ASYNC->on("/api/nvs/list", HTTP_GET, fV_handleNVSList);
+    // API: Exportar preferências NVS (download JSON)
+    SERVIDOR_WEB_ASYNC->on("/api/nvs/export", HTTP_GET, fV_handleNVSExport);
+    // API: Importar preferências NVS (upload JSON)
+    SERVIDOR_WEB_ASYNC->on("/api/nvs/import", HTTP_POST,
+        [](AsyncWebServerRequest *request) {
+            // Handler final: valida presença do corpo
+            if (request->_tempObject == nullptr) {
+                request->send(400, "application/json", "{\"success\": false, \"message\": \"Arquivo JSON não recebido\"}");
+                return;
+            }
+            fV_handleNVSImport(request);
+        },
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            // Acumula body (JSON) em memória
+            if (index == 0) {
+                request->_tempObject = new String();
+            }
+            String *body = (String*)request->_tempObject;
+            for (size_t i = 0; i < len; i++) {
+                *body += (char)data[i];
+            }
+        }
+    );
     
     // API: Listar arquivos LittleFS
     SERVIDOR_WEB_ASYNC->on("/api/files/list", HTTP_GET, fV_handleFilesList);
@@ -439,6 +722,7 @@ void fV_setupWebServer() {
     
     // Inicia o servidor
     SERVIDOR_WEB_ASYNC->begin();
+    g_webServerReady = true;
     fV_printSerialDebug(LOG_WEB, "Servidor web assincrono iniciado na porta %d", vSt_mainConfig.vU16_webServerPort);
     if (vSt_mainConfig.vB_authEnabled) {
         fV_printSerialDebug(LOG_WEB, "Autenticação habilitada para usuário: %s", vSt_mainConfig.vS_webUsername.c_str());
@@ -459,9 +743,25 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
     bool isInitialConfig = request->hasArg("ssid") && request->hasArg("password");
     bool isAdvancedConfig = request->hasArg("ntp_server1") || request->hasArg("qtd_pinos");
     
+    auto sanitizeHostname = [](const String &in) -> String {
+        String out;
+        out.reserve(in.length());
+        for (size_t i = 0; i < in.length(); ++i) {
+            char c = in.charAt(i);
+            // Converte letras minúsculas para maiúsculas
+            if (c >= 'a' && c <= 'z') c = c - ('a' - 'A');
+            // Mantém apenas A-Z e 0-9 (remove espaços, acentos UTF-8 e especiais)
+            if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+                out += c;
+            }
+            // Demais bytes (ex.: parte de UTF-8) são descartados
+        }
+        return out;
+    };
+
     if (isInitialConfig) {
         // Configuração inicial (modo AP)
-        if (request->hasArg("hostname")) vSt_mainConfig.vS_hostname = request->arg("hostname");
+        if (request->hasArg("hostname")) vSt_mainConfig.vS_hostname = sanitizeHostname(request->arg("hostname"));
         if (request->hasArg("ssid")) vSt_mainConfig.vS_wifiSsid = request->arg("ssid");
         if (request->hasArg("password")) vSt_mainConfig.vS_wifiPass = request->arg("password");
         
@@ -472,7 +772,7 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
         fV_printSerialDebug(LOG_WEB, "[CONFIG] Processando configurações avançadas...");
         
         if (request->hasArg("hostname")) {
-            vSt_mainConfig.vS_hostname = request->arg("hostname");
+            vSt_mainConfig.vS_hostname = sanitizeHostname(request->arg("hostname"));
             fV_printSerialDebug(LOG_WEB, "[CONFIG] hostname = %s", vSt_mainConfig.vS_hostname.c_str());
         }
         if (request->hasArg("wifi_ssid")) {
@@ -767,7 +1067,7 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
     // 3. Sincronizacao (Agrupados em "sync")
     JsonObject sync_obj = vL_jsonDoc["sync"].to<JsonObject>();
     sync_obj["ntp_status"] = vL_ntp_ok ? "Sincronizado" : "Desabilitado";
-    sync_obj["mqtt_status"] = "Desabilitado"; 
+    sync_obj["mqtt_status"] = fS_getMqttStatus(); 
     
     // Usa o tempo formatado se o NTP estiver OK, caso contrario, Uptime formatado
     sync_obj["last_update"] = vL_ntp_ok ? fS_getFormattedTime() : fS_formatUptime(millis()); 
@@ -926,6 +1226,21 @@ void fV_handleMqttPage(AsyncWebServerRequest *request) {
     String endTimeStr = fS_getFormattedTime();
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento /mqtt - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
 }
+// Handler para página de Inter-Módulos
+void fV_handleInterModPage(AsyncWebServerRequest *request) {
+    unsigned long startTime = millis();
+    String timeStr = fS_getFormattedTime();
+    fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /intermod - %s (millis: %lu)", timeStr.c_str(), startTime);
+    
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", WEB_HTML_INTERMOD);
+    response->addHeader("X-Load-Start", String(startTime));
+    response->addHeader("X-Load-Time", timeStr);
+    request->send(response);
+    
+    unsigned long endTime = millis();
+    String endTimeStr = fS_getFormattedTime();
+    fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento /intermod - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
+}
 
 // Handler para página de reset
 void fV_handleResetPage(AsyncWebServerRequest *request) {
@@ -962,209 +1277,516 @@ void fV_handleFilesPage(AsyncWebServerRequest *request) {
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento /arquivos - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
 }
 
-// Handler: API - Listar preferências NVS
-void fV_handleNVSList(AsyncWebServerRequest *request) {
-    fV_printSerialDebug(LOG_WEB, "[API] Listando preferências NVS");
+// Handler para página de firmware (OTA)
+void fV_handleFirmwarePage(AsyncWebServerRequest *request) {
+    unsigned long startTime = millis();
+    String timeStr = fS_getFormattedTime();
+    fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /firmware - %s (millis: %lu)", timeStr.c_str(), startTime);
+
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_firmware_html);
+    response->addHeader("X-Load-Start", String(startTime));
+    response->addHeader("X-Load-Time", timeStr);
+    // Evitar cache desta página para refletir status/título atualizado
+    response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    response->addHeader("Pragma", "no-cache");
+    response->addHeader("Expires", "0");
+    request->send(response);
+
+    unsigned long endTime = millis();
+    String endTimeStr = fS_getFormattedTime();
+    fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento /firmware - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
+}
+
+// Handler para página de preferências NVS
+void fV_handlePreferenciasPage(AsyncWebServerRequest *request) {
+    unsigned long startTime = millis();
+    String timeStr = fS_getFormattedTime();
+    fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /preferencias - %s (millis: %lu)", timeStr.c_str(), startTime);
+
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_preferencias_html);
+    response->addHeader("X-Load-Start", String(startTime));
+    response->addHeader("X-Load-Time", timeStr);
+    response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    response->addHeader("Pragma", "no-cache");
+    response->addHeader("Expires", "0");
+    request->send(response);
+
+    unsigned long endTime = millis();
+    String endTimeStr = fS_getFormattedTime();
+    fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento /preferencias - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
+}
+
+// Handler para página de LittleFS
+void fV_handleLittleFSPage(AsyncWebServerRequest *request) {
+    unsigned long startTime = millis();
+    String timeStr = fS_getFormattedTime();
+    fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /littlefs - %s (millis: %lu)", timeStr.c_str(), startTime);
+
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_littlefs_html);
+    response->addHeader("X-Load-Start", String(startTime));
+    response->addHeader("X-Load-Time", timeStr);
+    response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    response->addHeader("Pragma", "no-cache");
+    response->addHeader("Expires", "0");
+    request->send(response);
+
+    unsigned long endTime = millis();
+    String endTimeStr = fS_getFormattedTime();
+    fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento /littlefs - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
+}
+
+// Handler: API - Obter logs do Web Serial
+void fV_handleSerialLogs(AsyncWebServerRequest *request) {
+    uint32_t since = 0;
+    if (request->hasParam("since")) {
+        since = request->getParam("since")->value().toInt();
+    }
     
     JsonDocument doc;
-    JsonArray preferences = doc["preferences"].to<JsonArray>();
+    JsonArray logs = doc["logs"].to<JsonArray>();
+    doc["counter"] = g_serialLogCounter;
     
-    Preferences prefs;
-    
-    // Lê configurações principais do namespace smcrconf (29 parâmetros)
-    if (prefs.begin("smcrconf", true)) {
-        // 1. Debug/Log
-        JsonObject sdbgen = preferences.add<JsonObject>();
-        sdbgen["namespace"] = "smcrconf";
-        sdbgen["key"] = "sdbgen";
-        sdbgen["value"] = prefs.getBool("sdbgen", true) ? "true" : "false";
-        sdbgen["type"] = "Bool";
+    // Se since == 0, retorna todas as linhas do buffer
+    // Se since > 0, retorna apenas linhas novas
+    if (since == 0) {
+        // Retorna todo o buffer (até 100 linhas)
+        for (uint16_t i = 0; i < SERIAL_LOG_BUFFER_SIZE; i++) {
+            uint16_t idx = (g_serialLogIndex + i) % SERIAL_LOG_BUFFER_SIZE;
+            if (!g_serialLogBuffer[idx].isEmpty()) {
+                logs.add(g_serialLogBuffer[idx]);
+            }
+        }
+    } else {
+        // Retorna apenas novas (desde o contador informado)
+        uint32_t diffCount = g_serialLogCounter - since;
+        if (diffCount > SERIAL_LOG_BUFFER_SIZE) diffCount = SERIAL_LOG_BUFFER_SIZE;
         
-        JsonObject logflags = preferences.add<JsonObject>();
-        logflags["namespace"] = "smcrconf";
-        logflags["key"] = "logflags";
-        logflags["value"] = String(prefs.getUInt("logflags", 0xFFFFFFFF));
-        logflags["type"] = "UInt";
-        
-        // 2. Rede WiFi STA
-        JsonObject hostname = preferences.add<JsonObject>();
-        hostname["namespace"] = "smcrconf";
-        hostname["key"] = "hostname";
-        hostname["value"] = prefs.getString("hostname", "N/A");
-        hostname["type"] = "String";
-        
-        JsonObject wssid = preferences.add<JsonObject>();
-        wssid["namespace"] = "smcrconf";
-        wssid["key"] = "w_ssid";
-        wssid["value"] = prefs.getString("w_ssid", "N/A");
-        wssid["type"] = "String";
-        
-        JsonObject wpass = preferences.add<JsonObject>();
-        wpass["namespace"] = "smcrconf";
-        wpass["key"] = "w_pass";
-        wpass["value"] = "[OCULTO]";
-        wpass["type"] = "String";
-        
-        JsonObject wattmp = preferences.add<JsonObject>();
-        wattmp["namespace"] = "smcrconf";
-        wattmp["key"] = "w_attmp";
-        wattmp["value"] = String(prefs.getUInt("w_attmp", 15));
-        wattmp["type"] = "UInt";
-        
-        // 3. AP Fallback
-        JsonObject assid = preferences.add<JsonObject>();
-        assid["namespace"] = "smcrconf";
-        assid["key"] = "a_ssid";
-        assid["value"] = prefs.getString("a_ssid", "N/A");
-        assid["type"] = "String";
-        
-        JsonObject apass = preferences.add<JsonObject>();
-        apass["namespace"] = "smcrconf";
-        apass["key"] = "a_pass";
-        apass["value"] = "[OCULTO]";
-        apass["type"] = "String";
-        
-        JsonObject afallb = preferences.add<JsonObject>();
-        afallb["namespace"] = "smcrconf";
-        afallb["key"] = "a_fallb";
-        afallb["value"] = prefs.getBool("a_fallb", true) ? "true" : "false";
-        afallb["type"] = "Bool";
-        
-        // 4. Rede - Geral
-        JsonObject wchkint = preferences.add<JsonObject>();
-        wchkint["namespace"] = "smcrconf";
-        wchkint["key"] = "w_chkint";
-        wchkint["value"] = String(prefs.getULong("w_chkint", 15000));
-        wchkint["type"] = "ULong";
-        
-        // 5. NTP
-        JsonObject ntp1 = preferences.add<JsonObject>();
-        ntp1["namespace"] = "smcrconf";
-        ntp1["key"] = "ntp1";
-        ntp1["value"] = prefs.getString("ntp1", "N/A");
-        ntp1["type"] = "String";
-        
-        JsonObject gmtofs = preferences.add<JsonObject>();
-        gmtofs["namespace"] = "smcrconf";
-        gmtofs["key"] = "gmtofs";
-        gmtofs["value"] = String(prefs.getInt("gmtofs", -10800));
-        gmtofs["type"] = "Int";
-        
-        JsonObject dltofs = preferences.add<JsonObject>();
-        dltofs["namespace"] = "smcrconf";
-        dltofs["key"] = "dltofs";
-        dltofs["value"] = String(prefs.getInt("dltofs", 0));
-        dltofs["type"] = "Int";
-        
-        // 6. Interface Web
-        JsonObject stpinos = preferences.add<JsonObject>();
-        stpinos["namespace"] = "smcrconf";
-        stpinos["key"] = "st_pinos";
-        stpinos["value"] = prefs.getBool("st_pinos", true) ? "true" : "false";
-        stpinos["type"] = "Bool";
-        
-        JsonObject intermod = preferences.add<JsonObject>();
-        intermod["namespace"] = "smcrconf";
-        intermod["key"] = "inter_mod";
-        intermod["value"] = prefs.getBool("inter_mod", true) ? "true" : "false";
-        intermod["type"] = "Bool";
-        
-        JsonObject coralert = preferences.add<JsonObject>();
-        coralert["namespace"] = "smcrconf";
-        coralert["key"] = "cor_alert";
-        coralert["value"] = prefs.getString("cor_alert", "#ff0000");
-        coralert["type"] = "String";
-        
-        JsonObject corok = preferences.add<JsonObject>();
-        corok["namespace"] = "smcrconf";
-        corok["key"] = "cor_ok";
-        corok["value"] = prefs.getString("cor_ok", "#00ff00");
-        corok["type"] = "String";
-        
-        JsonObject refresh = preferences.add<JsonObject>();
-        refresh["namespace"] = "smcrconf";
-        refresh["key"] = "refresh";
-        refresh["value"] = String(prefs.getUInt("refresh", 15));
-        refresh["type"] = "UInt";
-        
-        // 7. Watchdog
-        JsonObject wdten = preferences.add<JsonObject>();
-        wdten["namespace"] = "smcrconf";
-        wdten["key"] = "wdt_en";
-        wdten["value"] = prefs.getBool("wdt_en", false) ? "true" : "false";
-        wdten["type"] = "Bool";
-        
-        JsonObject clkmhz = preferences.add<JsonObject>();
-        clkmhz["namespace"] = "smcrconf";
-        clkmhz["key"] = "clk_mhz";
-        clkmhz["value"] = String(prefs.getUInt("clk_mhz", 240));
-        clkmhz["type"] = "UInt";
-        
-        JsonObject wdttime = preferences.add<JsonObject>();
-        wdttime["namespace"] = "smcrconf";
-        wdttime["key"] = "wdt_time";
-        wdttime["value"] = String(prefs.getULong("wdt_time", 8000000));
-        wdttime["type"] = "ULong";
-        
-        // 8. Pinos
-        JsonObject qtdpinos = preferences.add<JsonObject>();
-        qtdpinos["namespace"] = "smcrconf";
-        qtdpinos["key"] = "qtd_pinos";
-        qtdpinos["value"] = String(prefs.getUChar("qtd_pinos", 16));
-        qtdpinos["type"] = "UChar";
-        
-        // 9. Servidor Web & Auth
-        JsonObject webport = preferences.add<JsonObject>();
-        webport["namespace"] = "smcrconf";
-        webport["key"] = "web_port";
-        webport["value"] = String(prefs.getUInt("web_port", 8080));
-        webport["type"] = "UInt";
-        
-        JsonObject authen = preferences.add<JsonObject>();
-        authen["namespace"] = "smcrconf";
-        authen["key"] = "auth_en";
-        authen["value"] = prefs.getBool("auth_en", false) ? "true" : "false";
-        authen["type"] = "Bool";
-        
-        JsonObject webuser = preferences.add<JsonObject>();
-        webuser["namespace"] = "smcrconf";
-        webuser["key"] = "web_user";
-        webuser["value"] = prefs.getString("web_user", "admin");
-        webuser["type"] = "String";
-        
-        JsonObject webpass = preferences.add<JsonObject>();
-        webpass["namespace"] = "smcrconf";
-        webpass["key"] = "web_pass";
-        webpass["value"] = "[OCULTO]";
-        webpass["type"] = "String";
-        
-        JsonObject dashauth = preferences.add<JsonObject>();
-        dashauth["namespace"] = "smcrconf";
-        dashauth["key"] = "dash_auth";
-        dashauth["value"] = prefs.getBool("dash_auth", false) ? "true" : "false";
-        dashauth["type"] = "Bool";
-        
-        // 10. Histórico
-        JsonObject showahist = preferences.add<JsonObject>();
-        showahist["namespace"] = "smcrconf";
-        showahist["key"] = "show_ahist";
-        showahist["value"] = prefs.getBool("show_ahist", true) ? "true" : "false";
-        showahist["type"] = "Bool";
-        
-        JsonObject showdhist = preferences.add<JsonObject>();
-        showdhist["namespace"] = "smcrconf";
-        showdhist["key"] = "show_dhist";
-        showdhist["value"] = prefs.getBool("show_dhist", false) ? "true" : "false";
-        showdhist["type"] = "Bool";
-        
-        prefs.end();
+        for (uint32_t i = 0; i < diffCount; i++) {
+            uint16_t idx = (g_serialLogIndex - diffCount + i + SERIAL_LOG_BUFFER_SIZE) % SERIAL_LOG_BUFFER_SIZE;
+            if (!g_serialLogBuffer[idx].isEmpty()) {
+                logs.add(g_serialLogBuffer[idx]);
+            }
+        }
     }
     
     String response;
     serializeJson(doc, response);
     request->send(200, "application/json", response);
-    
-    fV_printSerialDebug(LOG_WEB, "[API] Lista NVS enviada");
+}
+
+// Handler para página Web Serial
+void fV_handleSerialPage(AsyncWebServerRequest *request) {
+    unsigned long startTime = millis();
+    String timeStr = fS_getFormattedTime();
+    fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /serial - %s (millis: %lu)", timeStr.c_str(), startTime);
+
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_serial_html);
+    response->addHeader("X-Load-Start", String(startTime));
+    response->addHeader("X-Load-Time", timeStr);
+    response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    response->addHeader("Pragma", "no-cache");
+    response->addHeader("Expires", "0");
+    request->send(response);
+
+    unsigned long endTime = millis();
+    String endTimeStr = fS_getFormattedTime();
+    fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento /serial - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
+}
+
+// Handler: API - Listar preferências NVS
+void fV_handleNVSList(AsyncWebServerRequest *request) {
+    fV_printSerialDebug(LOG_WEB, "[API] Listando preferências NVS (todas namespaces)");
+
+    JsonDocument doc;
+    JsonArray preferences = doc["preferences"].to<JsonArray>();
+
+    // Itera sobre TODAS as entradas do NVS (todas as namespaces) na partição padrão "nvs"
+    nvs_iterator_t it = nvs_entry_find("nvs", NULL, NVS_TYPE_ANY);
+    size_t count = 0;
+    while (it != NULL) {
+        nvs_entry_info_t info;
+        nvs_entry_info(it, &info); // preenche info com namespace, key e type
+
+        // Abre a namespace em modo leitura
+        nvs_handle_t handle;
+        esp_err_t err = nvs_open(info.namespace_name, NVS_READONLY, &handle);
+        if (err == ESP_OK) {
+            String typeStr = "";
+            String valueStr = "";
+
+            // Defende dados sensíveis
+            auto isSensitive = [](const char* key) -> bool {
+                String k = String(key);
+                k.toLowerCase();
+                return (k.indexOf("pass") >= 0) || (k.indexOf("senha") >= 0) || (k.indexOf("token") >= 0) || (k.indexOf("secret") >= 0);
+            };
+
+            switch (info.type) {
+                case NVS_TYPE_U8: {
+                    typeStr = "U8";
+                    uint8_t v; if (nvs_get_u8(handle, info.key, &v) == ESP_OK) valueStr = String(v); else valueStr = "<erro>";
+                    break;
+                }
+                case NVS_TYPE_I8: {
+                    typeStr = "I8";
+                    int8_t v; if (nvs_get_i8(handle, info.key, &v) == ESP_OK) valueStr = String(v); else valueStr = "<erro>";
+                    break;
+                }
+                case NVS_TYPE_U16: {
+                    typeStr = "U16";
+                    uint16_t v; if (nvs_get_u16(handle, info.key, &v) == ESP_OK) valueStr = String(v); else valueStr = "<erro>";
+                    break;
+                }
+                case NVS_TYPE_I16: {
+                    typeStr = "I16";
+                    int16_t v; if (nvs_get_i16(handle, info.key, &v) == ESP_OK) valueStr = String(v); else valueStr = "<erro>";
+                    break;
+                }
+                case NVS_TYPE_U32: {
+                    typeStr = "U32";
+                    uint32_t v; if (nvs_get_u32(handle, info.key, &v) == ESP_OK) valueStr = String(v); else valueStr = "<erro>";
+                    break;
+                }
+                case NVS_TYPE_I32: {
+                    typeStr = "I32";
+                    int32_t v; if (nvs_get_i32(handle, info.key, &v) == ESP_OK) valueStr = String(v); else valueStr = "<erro>";
+                    break;
+                }
+                case NVS_TYPE_U64: {
+                    typeStr = "U64";
+                    uint64_t v; if (nvs_get_u64(handle, info.key, &v) == ESP_OK) valueStr = String((unsigned long long)v); else valueStr = "<erro>";
+                    break;
+                }
+                case NVS_TYPE_I64: {
+                    typeStr = "I64";
+                    int64_t v; if (nvs_get_i64(handle, info.key, &v) == ESP_OK) valueStr = String((long long)v); else valueStr = "<erro>";
+                    break;
+                }
+                case NVS_TYPE_STR: {
+                    typeStr = "String";
+                    size_t len = 0;
+                    if (nvs_get_str(handle, info.key, NULL, &len) == ESP_OK && len > 0) {
+                        std::unique_ptr<char[]> buf(new char[len]);
+                        if (nvs_get_str(handle, info.key, buf.get(), &len) == ESP_OK) {
+                            if (isSensitive(info.key)) valueStr = "[OCULTO]"; else valueStr = String(buf.get());
+                        } else valueStr = "<erro>";
+                    } else {
+                        valueStr = "";
+                    }
+                    break;
+                }
+                case NVS_TYPE_BLOB: {
+                    typeStr = "BLOB";
+                    size_t len = 0;
+                    if (nvs_get_blob(handle, info.key, NULL, &len) == ESP_OK) {
+                        valueStr = String("[BLOB ") + String(len) + String(" bytes]");
+                    } else valueStr = "<erro>";
+                    break;
+                }
+                default: {
+                    typeStr = "UNKNOWN";
+                    valueStr = "";
+                    break;
+                }
+            }
+
+            nvs_close(handle);
+
+            JsonObject obj = preferences.add<JsonObject>();
+            // Colocamos namespace no próprio campo 'key' para facilitar exibição na UI atual
+            String fullKey = String(info.namespace_name) + ":" + String(info.key);
+            obj["key"] = fullKey;
+            obj["type"] = typeStr;
+            obj["value"] = valueStr;
+            obj["namespace"] = String(info.namespace_name);
+
+            count++;
+        }
+
+        it = nvs_entry_next(it);
+    }
+    if (it) nvs_release_iterator(it);
+
+    doc["count"] = (uint32_t)count;
+
+    String response;
+    serializeJson(doc, response);
+    request->send(200, "application/json", response);
+
+    fV_printSerialDebug(LOG_WEB, "[API] Lista NVS enviada (%u entradas)", (unsigned)count);
+}
+
+// Handler: API - Exportar preferências NVS como arquivo JSON (attachment)
+void fV_handleNVSExport(AsyncWebServerRequest *request) {
+    fV_printSerialDebug(LOG_WEB, "[API] Exportando preferências NVS (JSON)");
+
+    // Parâmetros opcionais: format=(json|text) e include_secrets=1
+    String formatParam = request->hasParam("format") ? request->getParam("format")->value() : "json";
+    bool includeSecrets = request->hasParam("include_secrets") && request->getParam("include_secrets")->value() != "0";
+
+    // Função de máscara de segredos
+    auto isSensitive = [](const char* key) -> bool {
+        String k = String(key);
+        k.toLowerCase();
+        return (k.indexOf("pass") >= 0) || (k.indexOf("senha") >= 0) || (k.indexOf("token") >= 0) || (k.indexOf("secret") >= 0);
+    };
+
+    size_t count = 0;
+
+    if (formatParam == "text") {
+        // Formato texto: uma linha por entrada: namespace:key [type]=value
+        String textOut;
+        textOut.reserve(2048);
+
+        nvs_iterator_t it = nvs_entry_find("nvs", NULL, NVS_TYPE_ANY);
+        while (it != NULL) {
+            nvs_entry_info_t info;
+            nvs_entry_info(it, &info);
+
+            nvs_handle_t handle;
+            if (nvs_open(info.namespace_name, NVS_READONLY, &handle) == ESP_OK) {
+                String typeStr = "";
+                String valueStr = "";
+
+                switch (info.type) {
+                    case NVS_TYPE_U8: { typeStr = "U8"; uint8_t v; valueStr = (nvs_get_u8(handle, info.key, &v) == ESP_OK) ? String(v) : "<erro>"; break; }
+                    case NVS_TYPE_I8: { typeStr = "I8"; int8_t v; valueStr = (nvs_get_i8(handle, info.key, &v) == ESP_OK) ? String(v) : "<erro>"; break; }
+                    case NVS_TYPE_U16:{ typeStr = "U16"; uint16_t v; valueStr = (nvs_get_u16(handle, info.key, &v) == ESP_OK) ? String(v) : "<erro>"; break; }
+                    case NVS_TYPE_I16:{ typeStr = "I16"; int16_t v; valueStr = (nvs_get_i16(handle, info.key, &v) == ESP_OK) ? String(v) : "<erro>"; break; }
+                    case NVS_TYPE_U32:{ typeStr = "U32"; uint32_t v; valueStr = (nvs_get_u32(handle, info.key, &v) == ESP_OK) ? String(v) : "<erro>"; break; }
+                    case NVS_TYPE_I32:{ typeStr = "I32"; int32_t v; valueStr = (nvs_get_i32(handle, info.key, &v) == ESP_OK) ? String(v) : "<erro>"; break; }
+                    case NVS_TYPE_U64:{ typeStr = "U64"; uint64_t v; valueStr = (nvs_get_u64(handle, info.key, &v) == ESP_OK) ? String((unsigned long long)v) : "<erro>"; break; }
+                    case NVS_TYPE_I64:{ typeStr = "I64"; int64_t v; valueStr = (nvs_get_i64(handle, info.key, &v) == ESP_OK) ? String((long long)v) : "<erro>"; break; }
+                    case NVS_TYPE_STR: {
+                        typeStr = "String";
+                        size_t len = 0;
+                        if (nvs_get_str(handle, info.key, NULL, &len) == ESP_OK && len > 0) {
+                            std::unique_ptr<char[]> buf(new char[len]);
+                            if (nvs_get_str(handle, info.key, buf.get(), &len) == ESP_OK) {
+                                valueStr = (isSensitive(info.key) && !includeSecrets) ? "[OCULTO]" : String(buf.get());
+                            } else valueStr = "<erro>";
+                        } else {
+                            valueStr = "";
+                        }
+                        break;
+                    }
+                    case NVS_TYPE_BLOB: {
+                        typeStr = "BLOB";
+                        size_t len = 0;
+                        if (nvs_get_blob(handle, info.key, NULL, &len) == ESP_OK) {
+                            valueStr = String("[BLOB ") + String(len) + String(" bytes]");
+                        } else valueStr = "<erro>";
+                        break;
+                    }
+                    default: { typeStr = "UNKNOWN"; valueStr = ""; break; }
+                }
+                nvs_close(handle);
+
+                textOut += String(info.namespace_name) + ":" + String(info.key) + " [" + typeStr + "]=" + valueStr + "\n";
+                count++;
+            }
+
+            it = nvs_entry_next(it);
+        }
+        if (it) nvs_release_iterator(it);
+
+        String fname = "nvs_export_" + vSt_mainConfig.vS_hostname + "_" + String(millis()) + ".txt";
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", textOut);
+        response->addHeader("Content-Disposition", String("attachment; filename=\"") + fname + String("\""));
+        request->send(response);
+        fV_printSerialDebug(LOG_WEB, "[API] Export NVS (texto) enviado (%u entradas)", (unsigned)count);
+        return;
+    }
+
+    // Formato JSON (padrão)
+    JsonDocument doc;
+    JsonArray preferences = doc["preferences"].to<JsonArray>();
+
+    nvs_iterator_t it = nvs_entry_find("nvs", NULL, NVS_TYPE_ANY);
+    while (it != NULL) {
+        nvs_entry_info_t info;
+        nvs_entry_info(it, &info);
+
+        nvs_handle_t handle;
+        esp_err_t err = nvs_open(info.namespace_name, NVS_READONLY, &handle);
+        if (err == ESP_OK) {
+            String typeStr = "";
+            String valueStr = "";
+
+            switch (info.type) {
+                case NVS_TYPE_U8: { typeStr = "U8"; uint8_t v; valueStr = (nvs_get_u8(handle, info.key, &v) == ESP_OK) ? String(v) : "<erro>"; break; }
+                case NVS_TYPE_I8: { typeStr = "I8"; int8_t v; valueStr = (nvs_get_i8(handle, info.key, &v) == ESP_OK) ? String(v) : "<erro>"; break; }
+                case NVS_TYPE_U16:{ typeStr = "U16"; uint16_t v; valueStr = (nvs_get_u16(handle, info.key, &v) == ESP_OK) ? String(v) : "<erro>"; break; }
+                case NVS_TYPE_I16:{ typeStr = "I16"; int16_t v; valueStr = (nvs_get_i16(handle, info.key, &v) == ESP_OK) ? String(v) : "<erro>"; break; }
+                case NVS_TYPE_U32:{ typeStr = "U32"; uint32_t v; valueStr = (nvs_get_u32(handle, info.key, &v) == ESP_OK) ? String(v) : "<erro>"; break; }
+                case NVS_TYPE_I32:{ typeStr = "I32"; int32_t v; valueStr = (nvs_get_i32(handle, info.key, &v) == ESP_OK) ? String(v) : "<erro>"; break; }
+                case NVS_TYPE_U64:{ typeStr = "U64"; uint64_t v; valueStr = (nvs_get_u64(handle, info.key, &v) == ESP_OK) ? String((unsigned long long)v) : "<erro>"; break; }
+                case NVS_TYPE_I64:{ typeStr = "I64"; int64_t v; valueStr = (nvs_get_i64(handle, info.key, &v) == ESP_OK) ? String((long long)v) : "<erro>"; break; }
+                case NVS_TYPE_STR: {
+                    typeStr = "String";
+                    size_t len = 0;
+                    if (nvs_get_str(handle, info.key, NULL, &len) == ESP_OK && len > 0) {
+                        std::unique_ptr<char[]> buf(new char[len]);
+                        if (nvs_get_str(handle, info.key, buf.get(), &len) == ESP_OK) {
+                            valueStr = (isSensitive(info.key) && !includeSecrets) ? "[OCULTO]" : String(buf.get());
+                        } else valueStr = "<erro>";
+                    } else {
+                        valueStr = "";
+                    }
+                    break;
+                }
+                case NVS_TYPE_BLOB: {
+                    typeStr = "BLOB";
+                    size_t len = 0;
+                    if (nvs_get_blob(handle, info.key, NULL, &len) == ESP_OK) {
+                        valueStr = String("[BLOB ") + String(len) + String(" bytes]");
+                    } else valueStr = "<erro>";
+                    break;
+                }
+                default: { typeStr = "UNKNOWN"; valueStr = ""; break; }
+            }
+
+            nvs_close(handle);
+
+            JsonObject obj = preferences.add<JsonObject>();
+            obj["namespace"] = String(info.namespace_name);
+            obj["key"] = String(info.key);
+            obj["type"] = typeStr;
+            obj["value"] = valueStr;
+
+            count++;
+        }
+
+        it = nvs_entry_next(it);
+    }
+    if (it) nvs_release_iterator(it);
+
+    doc["count"] = (uint32_t)count;
+
+    String payload;
+    serializeJson(doc, payload);
+
+    String fname = "nvs_export_" + vSt_mainConfig.vS_hostname + "_" + String(millis()) + ".json";
+    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", payload);
+    response->addHeader("Content-Disposition", String("attachment; filename=\"") + fname + String("\""));
+    request->send(response);
+
+    fV_printSerialDebug(LOG_WEB, "[API] Export NVS (JSON) enviado (%u entradas)", (unsigned)count);
+}
+
+// Handler: API - Importar preferências NVS a partir de JSON
+void fV_handleNVSImport(AsyncWebServerRequest *request) {
+    fV_printSerialDebug(LOG_WEB, "[API] Importando preferências NVS (JSON)");
+
+    // Recupera o corpo acumulado
+    String body = *((String*)request->_tempObject);
+    // Libera o ponteiro temporário
+    delete (String*)request->_tempObject;
+    request->_tempObject = nullptr;
+
+    if (body.length() == 0) {
+        request->send(400, "application/json", "{\"success\": false, \"message\": \"JSON vazio\"}");
+        return;
+    }
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, body);
+    if (err) {
+        fV_printSerialDebug(LOG_WEB, "[API] Import NVS - erro JSON: %s", err.c_str());
+        request->send(400, "application/json", "{\"success\": false, \"message\": \"JSON inválido\"}");
+        return;
+    }
+
+    if (!doc["preferences"].is<JsonArray>()) {
+        request->send(400, "application/json", "{\"success\": false, \"message\": \"Estrutura inválida: falta 'preferences'\"}");
+        return;
+    }
+
+    JsonArray arr = doc["preferences"].as<JsonArray>();
+    size_t okCount = 0, skipCount = 0, errCount = 0, clearedNsCount = 0;
+
+    // Verifica se deve apagar namespaces antes de importar
+    bool clearBefore = request->hasParam("clear") && request->getParam("clear")->value() != "0";
+    if (clearBefore) {
+        // Monta lista única de namespaces presentes no JSON e apaga todos os pares de cada um
+        String seen; // formato |ns1|ns2| para evitar duplicados com busca por substring
+        for (JsonObject obj : arr) {
+            String ns = obj["namespace"] | "";
+            if (ns.isEmpty()) continue;
+            String token = String("|") + ns + String("|");
+            if (seen.indexOf(token) >= 0) continue; // já processado
+
+            nvs_handle_t h;
+            if (nvs_open(ns.c_str(), NVS_READWRITE, &h) == ESP_OK) {
+                if (nvs_erase_all(h) == ESP_OK && nvs_commit(h) == ESP_OK) {
+                    clearedNsCount++;
+                } else {
+                    errCount++;
+                }
+                nvs_close(h);
+            } else {
+                errCount++;
+            }
+            seen += token;
+        }
+        fV_printSerialDebug(LOG_WEB, "[API] Import NVS - namespaces apagados: %u", (unsigned)clearedNsCount);
+    }
+
+    // Auxiliar para detectar segredos mascarados
+    auto isMasked = [](const String &v) -> bool {
+        return v == "[OCULTO]";
+    };
+
+    for (JsonObject obj : arr) {
+        String ns = obj["namespace"] | "";
+        String key = obj["key"] | "";
+        String type = obj["type"] | "";
+        // value pode vir como string ou número; convertemos para String primeiro
+        String value;
+        if (obj["value"].is<const char*>()) value = String(obj["value"].as<const char*>());
+        else if (obj["value"].is<long long>()) value = String((long long)obj["value"].as<long long>());
+        else if (obj["value"].is<unsigned long long>()) value = String((unsigned long long)obj["value"].as<unsigned long long>());
+        else if (obj["value"].is<int>()) value = String(obj["value"].as<int>());
+        else if (obj["value"].is<unsigned int>()) value = String(obj["value"].as<unsigned int>());
+        else value = String("");
+
+        if (ns.isEmpty() || key.isEmpty() || type.isEmpty()) { skipCount++; continue; }
+        if (isMasked(value)) { skipCount++; continue; }
+        if (type == "BLOB" || type == "UNKNOWN") { skipCount++; continue; }
+
+        nvs_handle_t handle;
+        esp_err_t e = nvs_open(ns.c_str(), NVS_READWRITE, &handle);
+        if (e != ESP_OK) { errCount++; continue; }
+
+        bool wrote = false;
+        // Converte inteiros 64 bits de forma segura
+        auto toU64 = [](const String &s) -> uint64_t { return strtoull(s.c_str(), NULL, 10); };
+        auto toI64 = [](const String &s) -> int64_t { return strtoll(s.c_str(), NULL, 10); };
+
+        if (type == "U8") { uint8_t v = (uint8_t) value.toInt(); wrote = (nvs_set_u8(handle, key.c_str(), v) == ESP_OK); }
+        else if (type == "I8") { int8_t v = (int8_t) value.toInt(); wrote = (nvs_set_i8(handle, key.c_str(), v) == ESP_OK); }
+        else if (type == "U16") { uint16_t v = (uint16_t) value.toInt(); wrote = (nvs_set_u16(handle, key.c_str(), v) == ESP_OK); }
+        else if (type == "I16") { int16_t v = (int16_t) value.toInt(); wrote = (nvs_set_i16(handle, key.c_str(), v) == ESP_OK); }
+        else if (type == "U32") { uint32_t v = (uint32_t) value.toInt(); wrote = (nvs_set_u32(handle, key.c_str(), v) == ESP_OK); }
+        else if (type == "I32") { int32_t v = (int32_t) value.toInt(); wrote = (nvs_set_i32(handle, key.c_str(), v) == ESP_OK); }
+        else if (type == "U64") { uint64_t v = toU64(value); wrote = (nvs_set_u64(handle, key.c_str(), v) == ESP_OK); }
+        else if (type == "I64") { int64_t v = toI64(value); wrote = (nvs_set_i64(handle, key.c_str(), v) == ESP_OK); }
+        else if (type == "String") { wrote = (nvs_set_str(handle, key.c_str(), value.c_str()) == ESP_OK); }
+        else { /* tipo não suportado */ }
+
+        if (wrote) {
+            if (nvs_commit(handle) == ESP_OK) okCount++; else errCount++;
+        } else {
+            errCount++;
+        }
+        nvs_close(handle);
+    }
+
+    char res[128];
+    snprintf(res, sizeof(res), "{\"success\": true, \"message\": \"Import concluido\", \"ok\": %u, \"skipped\": %u, \"errors\": %u, \"cleared\": %u}", (unsigned)okCount, (unsigned)skipCount, (unsigned)errCount, (unsigned)clearedNsCount);
+    request->send(200, "application/json", String(res));
+
+    fV_printSerialDebug(LOG_WEB, "[API] Import NVS: ok=%u, skip=%u, err=%u, cleared=%u", (unsigned)okCount, (unsigned)skipCount, (unsigned)errCount, (unsigned)clearedNsCount);
 }
 
 // Handler: API - Listar arquivos LittleFS
@@ -1823,6 +2445,15 @@ void fV_handleActionsSaveApi(AsyncWebServerRequest *request) {
         fV_printSerialDebug(LOG_WEB, "[API] ERRO: Falha ao salvar configurações de ações");
         request->send(500, "application/json", "{\"success\": false, \"error\": \"Falha ao salvar configurações na flash\"}");
     }
+}
+
+// Adiciona linha ao buffer circular de logs do Web Serial
+void fV_addSerialLogLine(const String &line) {
+    if (!g_webServerReady) return;
+    
+    g_serialLogBuffer[g_serialLogIndex] = line;
+    g_serialLogIndex = (g_serialLogIndex + 1) % SERIAL_LOG_BUFFER_SIZE;
+    g_serialLogCounter++;
 }
 
 // Página de cadastro de ações

@@ -104,6 +104,88 @@ esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 \
 **Full Changelog**: https://github.com/rede-analista/SMCR/compare/v1.0.0...v2.0.0
 ```
 
+---
+
+## 📌 Modelo de Release v2.1.0 (Atual)
+
+Use este modelo para a versão 2.1.0 contendo MQTT Discovery em lotes, NVS Export/Import e correções no menu Arquivos.
+
+### 1. Commit dos Arquivos
+```bash
+git add firmware/
+git commit -m "release: v2.1.0 (MQTT discovery em lotes, NVS export/import, correções UI)"
+git push origin main
+```
+
+### 2. Criar Tag de Versão
+```bash
+git tag v2.1.0 -m "SMCR v2.1.0 - MQTT HA discovery em lotes + NVS export/import + fixes"
+git push origin v2.1.0
+```
+
+### 3. Criar Release no GitHub
+
+1. Acesse: https://github.com/rede-analista/SMCR/releases
+2. Clique em "Create a new release"
+3. Tag: `v2.1.0`
+4. Title: `SMCR v2.1.0 - MQTT HA em Lotes + NVS Export/Import`
+
+#### Descrição da Release (cole no GitHub):
+```markdown
+# 🚀 SMCR v2.1.0 - MQTT HA em Lotes + NVS Export/Import
+
+## ✨ Destaques
+
+### 🧩 MQTT + Home Assistant (não bloqueante)
+- Discovery do HA em lotes, com tamanho e intervalo configuráveis na UI.
+- Tópicos numéricos (0/1, 0–4095) e reconexão não bloqueante.
+- `LOG_MQTT` separado para depuração (checkbox na página).
+
+### 🗃️ NVS: Exportar/Importar + Lista Completa
+- Página Arquivos agora lista TODAS as namespaces e chaves (segredos mascarados).
+- Exportar NVS (JSON/Text) com opção de incluir segredos.
+- Importar NVS com `clear=1` para apagar namespaces antes de restaurar.
+- Correção de crash ao abrir Arquivos (iteração NVS ajustada para partição "nvs").
+
+### 🖥️ UI/UX e Robustez
+- Dashboard exibe `SMCR - [HOSTNAME]` e no-cache aplicado para evitar layout antigo.
+- Sanitização de hostname: somente A-Z/0-9, uppercase, sem espaços/acentos.
+- Página MQTT mais leve: endpoints separados (`/api/mqtt/config` e `/api/mqtt/status`) e timeouts.
+
+## 📦 Arquivos
+- `SMCR_v2.1.0_firmware.bin`
+- `SMCR_v2.1.0_bootloader.bin`
+- `SMCR_v2.1.0_partitions.bin`
+- Scripts de gravação (`flash_firmware.sh` / `.bat`)
+
+## 🔧 Gravação Rápida
+```bash
+esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 write_flash 0x10000 SMCR_v2.1.0_firmware.bin
+```
+
+## 📚 Documentação
+- Implementação: `manual/implementacoes/NVS_EXPORT_IMPORT.md`
+- MQTT HA Batching: `manual/implementacoes/MQTT_DISCOVERY_BATCHING.md`
+
+---
+```
+
+### 4. Anexar Arquivos (v2.1.0)
+- `SMCR_v2.1.0_firmware.bin`
+- `SMCR_v2.1.0_bootloader.bin`
+- `SMCR_v2.1.0_partitions.bin`
+- `flash_firmware.sh`
+- `flash_firmware.bat`
+
+### 5. Publicar Release
+- Marque "Set as the latest release"
+- Clique em "Publish release"
+
+### 🔁 Script de Build
+```bash
+./build_release.sh 2.1.0
+```
+
 ### **4. Anexar Arquivos**
 Na seção **"Attach binaries"**, adicione:
 - `SMCR_v2.0.0_firmware.bin`

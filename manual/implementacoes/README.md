@@ -13,6 +13,10 @@ Esta pasta contém a documentação detalhada de todas as implementações, corr
 - **[NIVEL_ACIONAMENTO_IMPLEMENTATION.md](NIVEL_ACIONAMENTO_IMPLEMENTATION.md)** - Sistema de configuração de níveis de acionamento para pinos
 - **[STATUS_COLORS_IMPLEMENTATION.md](STATUS_COLORS_IMPLEMENTATION.md)** - Sistema de cores dinâmicas para status dos pinos
 - **[RESET_CONFIG_PRESERVING_NETWORK.md](RESET_CONFIG_PRESERVING_NETWORK.md)** - Reset de configurações preservando conectividade de rede
+- **[MQTT_DISCOVERY_BATCHING.md](MQTT_DISCOVERY_BATCHING.md)** - Descoberta do Home Assistant publicada em lotes (não bloqueante)
+- **[NVS_EXPORT_IMPORT.md](NVS_EXPORT_IMPORT.md)** - Exportação/Importação do NVS com máscara de segredos e limpeza opcional
+- **[MDNS_IMPLEMENTATION.md](MDNS_IMPLEMENTATION.md)** - Serviço mDNS para acesso via hostname (ex: esp32modularx.local)
+- **[PERFORMANCE_INDICATORS.md](PERFORMANCE_INDICATORS.md)** - Indicadores de tempo de carregamento em todas as páginas web
 
 ### 🎨 Melhorias de Interface
 - **[NAVIGATION_MENU_IMPLEMENTATION.md](NAVIGATION_MENU_IMPLEMENTATION.md)** - Menu de navegação unificado entre páginas
@@ -55,6 +59,10 @@ Cada documento segue esta estrutura:
 | 22/11/2025 | MQTT Layout Standardization | 🎨 UX | ✅ Implementado |
 | 22/11/2025 | Missing Reset Endpoints Fix | 🐛 Correção | ✅ Implementado |
 | 22/11/2025 | Loading Indicators Implementation | 🎨 UX | ✅ Implementado |
+| 26/11/2025 | MQTT Discovery Batching | ⭐ Feature | ✅ Implementado |
+| 26/11/2025 | NVS Export/Import & Crash Fix | ⭐ Feature / 🐛 Correção | ✅ Implementado |
+| 27/11/2025 | mDNS Implementation | ⭐ Feature | ✅ Implementado |
+| 27/11/2025 | Performance Indicators | 🎨 UX | ✅ Implementado |
 
 ## 🔄 Processo Recomendado
 

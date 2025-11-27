@@ -29,7 +29,7 @@ bool fB_lerBool(const char* vC_key, bool vB_defaultValue);
 enum LogFlags {
     LOG_NONE        = 0,         // Desliga todos os logs
     LOG_INIT        = (1 << 0),  // 1 - Log de inicialização
-    LOG_NETWORK     = (1 << 1),  // 2 - Log de rede (Wi-Fi, MQTT, etc.)
+    LOG_NETWORK     = (1 << 1),  // 2 - Log de rede (Wi-Fi)
     LOG_PINS        = (1 << 2),  // 4 - Log de pinos e GPIO
     LOG_FLASH       = (1 << 3),  // 8 - Log de operações de flash (Preferences, LittleFS)
     LOG_WEB         = (1 << 4),  // 16 - Log da interface web (requisições, respostas)
@@ -37,10 +37,11 @@ enum LogFlags {
     LOG_ACTIONS     = (1 << 6),  // 64 - Log de execução de ações
     LOG_INTERMOD    = (1 << 7),  // 128 - Log de comunicação entre módulos
     LOG_WATCHDOG    = (1 << 8),  // 256 - Log do Watchdog Timer
+    LOG_MQTT        = (1 << 9),  // 512 - Log de MQTT (conexão, publicação, subscrição)
     
     // Log Total: uma soma de todas as flags relevantes
     LOG_FULL        = LOG_INIT | LOG_NETWORK | LOG_PINS | LOG_FLASH | LOG_WEB | 
-                      LOG_SENSOR | LOG_ACTIONS | LOG_INTERMOD | LOG_WATCHDOG
+                      LOG_SENSOR | LOG_ACTIONS | LOG_INTERMOD | LOG_WATCHDOG | LOG_MQTT
 };
 
 // --- Estrutura da "running-config" (Configuração em Memória) ---
@@ -94,6 +95,19 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
     // 10. Configurações de Histórico no Dashboard
     bool vB_showAnalogHistory;      // Exibe histórico de 8 leituras para pinos analógicos
     bool vB_showDigitalHistory;     // Exibe histórico de 8 estados para pinos digitais
+
+    // 11. Configurações de MQTT
+    bool vB_mqttEnabled;            // Habilita/desabilita integração MQTT
+    String vS_mqttServer;           // Endereço do broker MQTT (IP ou hostname)
+    uint16_t vU16_mqttPort;         // Porta do broker MQTT (padrão 1883)
+    String vS_mqttUser;             // Usuário para autenticação MQTT (opcional)
+    String vS_mqttPassword;         // Senha para autenticação MQTT (opcional)
+    String vS_mqttTopicBase;        // Tópico base para publicações (ex: "smcr")
+    uint16_t vU16_mqttPublishInterval; // Intervalo de publicação de status em segundos (padrão 60)
+    bool vB_mqttHomeAssistantDiscovery; // Habilita auto-discovery do Home Assistant
+    // Controle de auto-discovery (lotes)
+    uint8_t vU8_mqttHaDiscoveryBatchSize;   // Tamanho do lote de discovery
+    uint16_t vU16_mqttHaDiscoveryIntervalMs; // Intervalo entre lotes (ms)
 
 };
 
@@ -183,6 +197,7 @@ extern AsyncWebServer* SERVIDOR_WEB_ASYNC;
 
 /* Funções de Wi-Fi e Rede (rede.cpp) */
 void fV_setupWifi();
+void fV_setupMdns();          // Inicializa o mDNS
 void fV_checkWifiConnection(void); 
 void fV_connectWifiSta(void); // Auxiliar: Tenta conectar como station
 void fV_startWifiAp(void);    // Auxiliar: Inicia o Access Point
@@ -197,6 +212,7 @@ void fV_handleStatusJson(AsyncWebServerRequest *request); // Handler para API JS
 void fV_handleConfigPage(AsyncWebServerRequest *request); // Handler para página de configurações
 void fV_handleResetPage(AsyncWebServerRequest *request); // Handler para página de reset
 void fV_handleMqttPage(AsyncWebServerRequest *request); // Handler para página de MQTT/Serviços
+void fV_handleInterModPage(AsyncWebServerRequest *request); // Handler para página de Inter-Módulos
 void fV_handleSoftReset(AsyncWebServerRequest *request); // Handler para reinicialização simples
 void fV_handleFactoryReset(AsyncWebServerRequest *request); // Handler para reset de fábrica
 void fV_handleNetworkReset(AsyncWebServerRequest *request); // Handler para reset de rede
@@ -211,7 +227,10 @@ void fV_handlePinUpdateApi(AsyncWebServerRequest *request); // Handler para API 
 void fV_handlePinDeleteApi(AsyncWebServerRequest *request); // Handler para API de deleção de pinos
 void fV_handlePinsSaveApi(AsyncWebServerRequest *request); // Handler para API de salvamento de pinos
 void fV_handlePinsReloadApi(AsyncWebServerRequest *request); // Handler para API de reload de pinos
-void fV_handleFilesPage(AsyncWebServerRequest *request);    // Handler para página de arquivos
+void fV_handleFilesPage(AsyncWebServerRequest *request);    // Handler para página de arquivos (deprecated - usa firmware)
+void fV_handleFirmwarePage(AsyncWebServerRequest *request);  // Handler para página de firmware OTA
+void fV_handlePreferenciasPage(AsyncWebServerRequest *request); // Handler para página de preferências NVS
+void fV_handleLittleFSPage(AsyncWebServerRequest *request);  // Handler para página LittleFS
 void fV_handleNVSList(AsyncWebServerRequest *request);      // Handler para API de listagem NVS
 void fV_handleFilesList(AsyncWebServerRequest *request);    // Handler para API de listagem de arquivos
 void fV_handleFileDownload(AsyncWebServerRequest *request); // Handler para API de download de arquivos
@@ -257,5 +276,15 @@ bool fB_updateActionConfig(uint8_t pinOrigem, uint8_t numeroAcao, const ActionCo
 bool fB_isPinUsedByActions(uint8_t pinNumber); // Verifica se pino está em uso por ações
 void fV_executeActionsTask(void); // Task periódica para execução de ações
 void fV_executeAction(uint8_t actionIndex); // Executa uma ação específica
+
+/* Funções do Gerenciador de MQTT (mqtt_manager.cpp) */
+void fV_initMqtt(void);               // Inicializa sistema MQTT
+void fV_setupMqtt(void);              // Configura conexão MQTT (não bloqueante)
+void fV_mqttLoop(void);               // Loop MQTT (reconexão automática não bloqueante)
+void fV_publishMqttDiscovery(void);   // Publica configurações de auto-discovery do Home Assistant
+void fV_publishPinStatus(uint8_t pinIndex); // Publica status de um pino específico
+void fV_publishAllPinsStatus(void);   // Publica status de todos os pinos
+String fS_getMqttStatus(void);        // Retorna status da conexão MQTT
+String fS_getMqttUniqueId(void);      // Retorna ID único do módulo para MQTT
 
 #endif // GLOBALS_H

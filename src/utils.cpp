@@ -61,4 +61,9 @@ void fV_printSerialDebug(uint32_t vU32_messageFlag, const char *vC_format, ...) 
 
   Serial.print(vS_prefix);
   Serial.println(vC_locBuffer);
+  
+  // Broadcast para buffer do Web Serial
+  extern void fV_addSerialLogLine(const String &line);
+  String fullLine = vS_prefix + String(vC_locBuffer);
+  fV_addSerialLogLine(fullLine);
 }

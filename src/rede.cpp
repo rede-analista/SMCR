@@ -5,6 +5,33 @@
 static unsigned long vL_lastCheckTime = 0; 
 
 //=======================================
+// FV_SETUP_MDNS: Inicializa o mDNS
+//=======================================
+void fV_setupMdns() {
+    if (!vB_wifiIsConnected) {
+        fV_printSerialDebug(LOG_NETWORK, "mDNS nao iniciado: WiFi nao conectado");
+        return;
+    }
+
+    // Inicia o mDNS com o hostname configurado
+    if (MDNS.begin(vSt_mainConfig.vS_hostname.c_str())) {
+        fV_printSerialDebug(LOG_NETWORK, "mDNS iniciado com sucesso!");
+        fV_printSerialDebug(LOG_NETWORK, "Acesse o dispositivo em: http://%s.local:%d/", 
+                           vSt_mainConfig.vS_hostname.c_str(), 
+                           vSt_mainConfig.vU16_webServerPort);
+        
+        // Adiciona serviço HTTP para descoberta
+        MDNS.addService("http", "tcp", vSt_mainConfig.vU16_webServerPort);
+        
+        // Adiciona informações adicionais do serviço
+        MDNS.addServiceTxt("http", "tcp", "version", "1.0");
+        MDNS.addServiceTxt("http", "tcp", "device", "SMCR");
+    } else {
+        fV_printSerialDebug(LOG_NETWORK, "Erro ao iniciar mDNS!");
+    }
+}
+
+//=======================================
 // FV_SETUP_WIFI: Orquestra a conexão e o fallback
 //=======================================
 void fV_setupWifi() {
@@ -31,6 +58,9 @@ void fV_setupWifi() {
         fV_printSerialDebug(LOG_NETWORK, "Conectado com sucesso ao Wi-Fi!");
         fV_printSerialDebug(LOG_NETWORK, "Hostname: %s", vSt_mainConfig.vS_hostname.c_str());
         fV_printSerialDebug(LOG_NETWORK, "Endereco IP: %s", WiFi.localIP().toString().c_str());
+        
+        // Inicia o mDNS após conexão bem-sucedida
+        fV_setupMdns();
     }
 }
 
@@ -93,6 +123,8 @@ void fV_checkWifiConnection(void) {
         vB_wifiIsConnected = vL_currentStatus;
         if (vB_wifiIsConnected) {
             fV_printSerialDebug(LOG_NETWORK, "Evento: Conectado ao Wi-Fi. IP: %s", WiFi.localIP().toString().c_str());
+            // Reinicia o mDNS após reconexão
+            fV_setupMdns();
         } else {
             fV_printSerialDebug(LOG_NETWORK, "Evento: Desconectado do Wi-Fi.");
             // Garante que a reconexão comece imediatamente

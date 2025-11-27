@@ -162,17 +162,36 @@ const char web_dashboard_html[] PROGMEM = R"rawliteral(
         <div class="loading-text">Carregando status...</div>
     </div>
     <div class="container">
-        <h1>SMCR - Central de Controle</h1>
+        <h1>SMCR - [<span id="title-hostname">-</span>]</h1>
         
-        <div class="menu">
-            <a href="/">Status</a>
-            <a href="/configuracao">Configuracoes Gerais</a>
-            <a href="/pinos">Pinos/Reles</a>
-            <a href="/acoes">Acoes</a>
-            <a href="/mqtt">MQTT/Servicos</a>
-            <a href="/arquivos">Arquivos</a>
-            <a href="/reset">Reset</a>
-        </div>
+        <nav class="navbar" style="background:#f8f9fa;border-bottom:1px solid #e9ecef;padding:10px 14px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <a href="/" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Status</a>
+            <a href="/configuracao" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Configurações</a>
+            <a href="/pinos" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Pinos</a>
+            <a href="/acoes" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Ações</a>
+            <details style="position:relative;">
+                <summary style="list-style:none;cursor:pointer;padding:8px 12px;border-radius:6px;color:#333;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Serviços</summary>
+                <div style="position:absolute;background:#fff;border:1px solid #e9ecef;box-shadow:0 8px 20px rgba(0,0,0,0.1);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:10;">
+                    <a href="/mqtt" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">MQTT</a>
+                    <a href="/intermod" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Inter-Módulos</a>
+                </div>
+            </details>
+            <details style="position:relative;">
+                <summary style="list-style:none;cursor:pointer;padding:8px 12px;border-radius:6px;color:#333;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Arquivos</summary>
+                <div style="position:absolute;background:#fff;border:1px solid #e9ecef;box-shadow:0 8px 20px rgba(0,0,0,0.1);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:10;">
+                    <a href="/arquivos/firmware" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Firmware</a>
+                    <a href="/arquivos/preferencias" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Preferências</a>
+                    <a href="/arquivos/littlefs" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">LittleFS</a>
+                </div>
+            </details>
+            <details style="position:relative;">
+                <summary style="list-style:none;cursor:pointer;padding:8px 12px;border-radius:6px;color:#333;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Util</summary>
+                <div style="position:absolute;background:#fff;border:1px solid #e9ecef;box-shadow:0 8px 20px rgba(0,0,0,0.1);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:10;">
+                    <a href="/serial" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Web Serial</a>
+                    <a href="/reset" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Reset</a>
+                </div>
+            </details>
+        </nav>
 
         <div class="section">
             <div class="section-title">Pinos Cadastrados</div>
@@ -204,7 +223,7 @@ const char web_dashboard_html[] PROGMEM = R"rawliteral(
             <div class="section-title" style="font-size: 16px;">Sincronizacao</div>
             <table class="info-table">
                 <tr><td>NTP Status:</td><td id="ntp-status" class="status-warning">-</td></tr>
-                <tr><td>MQTT Status:</td><td class="status-error">Desabilitado</td></tr>
+                <tr><td>MQTT Status:</td><td id="mqtt-status" class="status-warning">-</td></tr>
             </table>
         </div>
     </div>
@@ -271,7 +290,12 @@ const char web_dashboard_html[] PROGMEM = R"rawliteral(
                     document.getElementById('user-ip').textContent = data.system.client_ip || '-';
 
                     // Sistema
-                    document.getElementById('hostname').textContent = data.system.hostname || '-';
+                    const hostName = data.system.hostname || '-';
+                    document.getElementById('hostname').textContent = hostName;
+                    // Atualiza título da página e cabeçalho com hostname entre colchetes
+                    const titleHost = document.getElementById('title-hostname');
+                    if (titleHost) titleHost.textContent = hostName;
+                    document.title = `SMCR - [${hostName}]`;
                     document.getElementById('current-time').textContent = data.system.current_time || '-';
                     document.getElementById('uptime').textContent = data.system.uptime || '-';
                     document.getElementById('free-heap').textContent = formatBytes(data.system.free_heap || 0);
@@ -284,6 +308,22 @@ const char web_dashboard_html[] PROGMEM = R"rawliteral(
                     } else {
                         ntpStatus.textContent = data.sync ? data.sync.ntp_status : 'Aguardando';
                         ntpStatus.className = 'status-warning';
+                    }
+                    
+                    // MQTT Status
+                    const mqttStatus = document.getElementById('mqtt-status');
+                    if (data.sync && data.sync.mqtt_status) {
+                        mqttStatus.textContent = data.sync.mqtt_status;
+                        if (data.sync.mqtt_status === 'Conectado') {
+                            mqttStatus.className = 'status-ok';
+                        } else if (data.sync.mqtt_status === 'Desabilitado') {
+                            mqttStatus.className = 'status-error';
+                        } else {
+                            mqttStatus.className = 'status-warning';
+                        }
+                    } else {
+                        mqttStatus.textContent = 'Desabilitado';
+                        mqttStatus.className = 'status-error';
                     }
 
                     // Pinos

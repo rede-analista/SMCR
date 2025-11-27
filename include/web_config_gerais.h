@@ -11,7 +11,7 @@ const char web_config_gerais_html[] PROGMEM = R"rawliteral(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMCR - Configuracoes Gerais</title>
+    <title>SMCR - Configuracoes</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -186,20 +186,38 @@ const char web_config_gerais_html[] PROGMEM = R"rawliteral(
     </div>
 
     <div class="container">
-        <h1>SMCR - Configuracoes Gerais</h1>
+        <h1>SMCR - Configuracoes</h1>
         
-        <div class="menu">
-            <a href="/">Status</a>
-            <a href="/configuracao">Configuracoes Gerais</a>
-            <a href="/pinos">Pinos/Reles</a>
-            <a href="/acoes">Acoes</a>
-            <a href="/mqtt">MQTT/Servicos</a>
-            <a href="/arquivos">Arquivos</a>
-            <a href="/reset">Reset</a>
-        </div>
-
+        <nav class="navbar" style="background:#f8f9fa;border-bottom:1px solid #e9ecef;padding:10px 14px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <a href="/" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Status</a>
+            <a href="/configuracao" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Configurações</a>
+            <a href="/pinos" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Pinos</a>
+            <a href="/acoes" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Ações</a>
+            <details style="position:relative;">
+                <summary style="list-style:none;cursor:pointer;padding:8px 12px;border-radius:6px;color:#333;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Serviços</summary>
+                <div style="position:absolute;background:#fff;border:1px solid #e9ecef;box-shadow:0 8px 20px rgba(0,0,0,0.1);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:10;">
+                    <a href="/mqtt" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">MQTT</a>
+                    <a href="/intermod" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Inter-Módulos</a>
+                </div>
+            </details>
+            <details style="position:relative;">
+                <summary style="list-style:none;cursor:pointer;padding:8px 12px;border-radius:6px;color:#333;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Arquivos</summary>
+                <div style="position:absolute;background:#fff;border:1px solid #e9ecef;box-shadow:0 8px 20px rgba(0,0,0,0.1);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:10;">
+                    <a href="/arquivos/firmware" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Firmware</a>
+                    <a href="/arquivos/preferencias" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Preferências</a>
+                    <a href="/arquivos/littlefs" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">LittleFS</a>
+                </div>
+            </details>
+            <details style="position:relative;">
+                <summary style="list-style:none;cursor:pointer;padding:8px 12px;border-radius:6px;color:#333;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Util</summary>
+                <div style="position:absolute;background:#fff;border:1px solid #e9ecef;box-shadow:0 8px 20px rgba(0,0,0,0.1);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:10;">
+                    <a href="/serial" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Web Serial</a>
+                    <a href="/reset" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Reset</a>
+                </div>
+            </details>
+        </nav>
         <div class="action-menu">
-            <a href="#" onclick="saveConfig()" class="btn btn-success">Aplicar</a>
+            <a href="#" onclick="saveConfig()" class="btn btn-success">Aplicar e Reiniciar</a>
         </div>
 
         <form id="configForm">
@@ -262,6 +280,7 @@ const char web_config_gerais_html[] PROGMEM = R"rawliteral(
                             <label><input type="checkbox" id="log_actions" value="64"> Acoes</label>
                             <label><input type="checkbox" id="log_intermod" value="128"> Inter-Modulos</label>
                             <label><input type="checkbox" id="log_watchdog" value="256"> Watchdog</label>
+                            <label><input type="checkbox" id="log_mqtt" value="512"> MQTT</label>
                         </div>
                     </td></tr>
                     <tr><td>Watchdog Habilitado:</td><td><select name="watchdog_enabled" id="watchdog_enabled"><option value="1">Habilitado</option><option value="0">Desabilitado</option></select></td></tr>
@@ -322,6 +341,16 @@ const char web_config_gerais_html[] PROGMEM = R"rawliteral(
             const colorInput = document.getElementById(inputId);
             const colorSpan = document.getElementById(spanId);
             colorSpan.textContent = getColorName(colorInput.value);
+        }
+
+        // Sanitização de Hostname: remove acentos, espaços e caracteres especiais; converte para MAIÚSCULO
+        function sanitizeHostname(value) {
+            if (!value) return '';
+            // Remove diacríticos (acentos)
+            let s = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            // Remove tudo que não for A-Z ou 0-9 e converte para maiúsculas
+            s = s.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+            return s;
         }
 
         // Controle do loading
@@ -393,7 +422,8 @@ const char web_config_gerais_html[] PROGMEM = R"rawliteral(
                 { id: 'log_sensor', value: 32 },
                 { id: 'log_actions', value: 64 },
                 { id: 'log_intermod', value: 128 },
-                { id: 'log_watchdog', value: 256 }
+                { id: 'log_watchdog', value: 256 },
+                { id: 'log_mqtt', value: 512 }
             ];
             
             checkboxes.forEach(cb => {
@@ -412,7 +442,8 @@ const char web_config_gerais_html[] PROGMEM = R"rawliteral(
                 { id: 'log_sensor', value: 32 },
                 { id: 'log_actions', value: 64 },
                 { id: 'log_intermod', value: 128 },
-                { id: 'log_watchdog', value: 256 }
+                { id: 'log_watchdog', value: 256 },
+                { id: 'log_mqtt', value: 512 }
             ];
             
             checkboxes.forEach(cb => {
@@ -427,6 +458,10 @@ const char web_config_gerais_html[] PROGMEM = R"rawliteral(
         function saveConfig() {
             if (confirm('Aplicar configurações gerais? O ESP será reiniciado.')) {
                 showLoading('Aplicando configurações e reiniciando...');
+                
+                // Sanitiza hostname antes de montar o form
+                const hostnameInput = document.getElementById('hostname');
+                hostnameInput.value = sanitizeHostname(hostnameInput.value);
                 
                 const formData = new FormData(document.getElementById('configForm'));
                 
@@ -528,6 +563,18 @@ const char web_config_gerais_html[] PROGMEM = R"rawliteral(
         
         // Adicionar listeners para atualizar nomes das cores em tempo real
         document.addEventListener('DOMContentLoaded', function() {
+            // Sanitização live do hostname conforme digita
+            const hostnameInput = document.getElementById('hostname');
+            if (hostnameInput) {
+                hostnameInput.addEventListener('input', function() {
+                    const start = this.selectionStart;
+                    const end = this.selectionEnd;
+                    const sanitized = sanitizeHostname(this.value);
+                    this.value = sanitized;
+                    // Mantém posição de cursor aproximada
+                    this.setSelectionRange(start, end);
+                });
+            }
             document.getElementById('cor_com_alerta').addEventListener('input', function() {
                 updateColorName('cor_com_alerta', 'cor_com_alerta_name');
             });

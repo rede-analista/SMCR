@@ -625,6 +625,11 @@ void fV_readPinsTask(void) {
                             vA_pinConfigs[i].historico_count,
                             8);
                     }
+                    
+                    // *** PUBLICAR STATUS NO MQTT SE HABILITADO ***
+                    if (vSt_mainConfig.vB_mqttEnabled) {
+                        fV_publishPinStatus(i);
+                    }
                 }
             } else if (modo == PIN_MODE_OUTPUT) {
                 // Para outputs, lê o estado atual e adiciona ao histórico digital
@@ -652,6 +657,11 @@ void fV_readPinsTask(void) {
                         value ? "HIGH" : "LOW",
                         vA_pinConfigs[i].historico_count,
                         8);
+                    
+                    // *** PUBLICAR STATUS NO MQTT SE HABILITADO ***
+                    if (vSt_mainConfig.vB_mqttEnabled) {
+                        fV_publishPinStatus(i);
+                    }
                 } else {
                     vA_pinConfigs[i].status_atual = value;
                 }
@@ -688,6 +698,11 @@ void fV_readPinsTask(void) {
                         value,
                         vA_pinConfigs[i].historico_count,
                         8);
+                }
+                
+                // *** PUBLICAR STATUS NO MQTT SE HABILITADO ***
+                if (vSt_mainConfig.vB_mqttEnabled) {
+                    fV_publishPinStatus(i);
                 }
             }
         }

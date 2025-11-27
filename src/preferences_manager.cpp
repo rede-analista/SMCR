@@ -96,6 +96,18 @@ const char* KEY_DASHBOARD_AUTH = "dash_auth";
 const char* KEY_SHOW_ANALOG_HISTORY = "show_ahist";
 const char* KEY_SHOW_DIGITAL_HISTORY = "show_dhist";
 
+// Chaves de MQTT
+const char* KEY_MQTT_ENABLED = "mqtt_en";
+const char* KEY_MQTT_SERVER = "mqtt_srv";
+const char* KEY_MQTT_PORT = "mqtt_port";
+const char* KEY_MQTT_USER = "mqtt_user";
+const char* KEY_MQTT_PASSWORD = "mqtt_pass";
+const char* KEY_MQTT_TOPIC_BASE = "mqtt_topic";
+const char* KEY_MQTT_PUBLISH_INTERVAL = "mqtt_pint";
+const char* KEY_MQTT_HA_DISCOVERY = "mqtt_had";
+const char* KEY_MQTT_HA_BATCH = "mqtt_hab";
+const char* KEY_MQTT_HA_INTMS = "mqtt_haim";
+
 void fV_carregarMainConfig(void) {
 
     preferences.begin(NVS_NAMESPACE_MAIN_CONFIG, true); // Abre para leitura
@@ -148,6 +160,18 @@ void fV_carregarMainConfig(void) {
     // 10. Configurações de Histórico no Dashboard
     vSt_mainConfig.vB_showAnalogHistory = preferences.getBool(KEY_SHOW_ANALOG_HISTORY, false); // Padrão habilitado
     vSt_mainConfig.vB_showDigitalHistory = preferences.getBool(KEY_SHOW_DIGITAL_HISTORY, false); // Padrão desabilitado
+
+    // 11. Configurações de MQTT
+    vSt_mainConfig.vB_mqttEnabled = preferences.getBool(KEY_MQTT_ENABLED, false); // Padrão desabilitado
+    vSt_mainConfig.vS_mqttServer = preferences.getString(KEY_MQTT_SERVER, "");
+    vSt_mainConfig.vU16_mqttPort = preferences.getUInt(KEY_MQTT_PORT, 1883);
+    vSt_mainConfig.vS_mqttUser = preferences.getString(KEY_MQTT_USER, "");
+    vSt_mainConfig.vS_mqttPassword = preferences.getString(KEY_MQTT_PASSWORD, "");
+    vSt_mainConfig.vS_mqttTopicBase = preferences.getString(KEY_MQTT_TOPIC_BASE, "smcr");
+    vSt_mainConfig.vU16_mqttPublishInterval = preferences.getUInt(KEY_MQTT_PUBLISH_INTERVAL, 60); // 60 segundos
+    vSt_mainConfig.vB_mqttHomeAssistantDiscovery = preferences.getBool(KEY_MQTT_HA_DISCOVERY, true); // Habilitado por padrão
+    vSt_mainConfig.vU8_mqttHaDiscoveryBatchSize = preferences.getUChar(KEY_MQTT_HA_BATCH, 4);
+    vSt_mainConfig.vU16_mqttHaDiscoveryIntervalMs = preferences.getUInt(KEY_MQTT_HA_INTMS, 100);
 
     preferences.end();
 
@@ -213,6 +237,18 @@ void fV_salvarMainConfig(void) {
     // 10. Configurações de Histórico no Dashboard
     preferences.putBool(KEY_SHOW_ANALOG_HISTORY, vSt_mainConfig.vB_showAnalogHistory);
     preferences.putBool(KEY_SHOW_DIGITAL_HISTORY, vSt_mainConfig.vB_showDigitalHistory);
+
+    // 11. Configurações de MQTT
+    preferences.putBool(KEY_MQTT_ENABLED, vSt_mainConfig.vB_mqttEnabled);
+    preferences.putString(KEY_MQTT_SERVER, vSt_mainConfig.vS_mqttServer);
+    preferences.putUInt(KEY_MQTT_PORT, vSt_mainConfig.vU16_mqttPort);
+    preferences.putString(KEY_MQTT_USER, vSt_mainConfig.vS_mqttUser);
+    preferences.putString(KEY_MQTT_PASSWORD, vSt_mainConfig.vS_mqttPassword);
+    preferences.putString(KEY_MQTT_TOPIC_BASE, vSt_mainConfig.vS_mqttTopicBase);
+    preferences.putUInt(KEY_MQTT_PUBLISH_INTERVAL, vSt_mainConfig.vU16_mqttPublishInterval);
+    preferences.putBool(KEY_MQTT_HA_DISCOVERY, vSt_mainConfig.vB_mqttHomeAssistantDiscovery);
+    preferences.putUChar(KEY_MQTT_HA_BATCH, vSt_mainConfig.vU8_mqttHaDiscoveryBatchSize);
+    preferences.putUInt(KEY_MQTT_HA_INTMS, vSt_mainConfig.vU16_mqttHaDiscoveryIntervalMs);
 
     preferences.end();
 

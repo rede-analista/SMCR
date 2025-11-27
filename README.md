@@ -78,11 +78,29 @@ Conecte-se na rede e pelo navegador você deve acessar o endereço "http://192.1
 
   - Após configurar o wifi o módulo irá reiniciar e conectar na rede wifi que você acabou de informar, a partir deste ponto você deve acessar o módulo pelo IP que foi atribuído ao módulo pelo seu roteador (ou servidor DHCP).<br>
 
-  - A programação configura o recurso de mDNS, você pode tentar descobrir o IP do módulo com o comando "ping esp32modularx.local". Caso não tenha resultado você deverá conectar no seu roteador para identificar qual andereço IP o módulo recebeu.<br>
-    - Por exemplo:
-    - http://esp32modularx.local:8080  (esp32modularx é o nome default do módulo)
+  - **mDNS Habilitado**: O sistema configura automaticamente o mDNS ao conectar no WiFi. Você pode acessar o módulo usando o hostname configurado:
+    - Navegador: `http://esp32modularx.local:8080/` (esp32modularx é o nome padrão)
+    - Terminal: `ping esp32modularx.local` ou `avahi-browse -a` (Linux)
+    - O mDNS é reiniciado automaticamente após reconexões WiFi
+    - Caso não funcione, verifique se seu roteador suporta mDNS/Bonjour ou conecte no roteador para identificar o IP atribuído
 
   - É recomendado realizar o recurso de reserva de IP do seu roteador para que o módulo sempre recebe o mesmo endereço IP. Isso é importante pois caso você configure comunicação entre módulos e o IP de uma das placas for alterado, a comunicação entre módulos pode não funcionar.
+
+## ⚡ Recursos de Interface
+
+### Indicador de Performance
+Todas as páginas web do sistema exibem um **indicador de tempo de carregamento** no canto inferior direito:
+- Mostra o tempo preciso que a página levou para carregar (em milissegundos)
+- Aparece automaticamente após o carregamento completo
+- Útil para monitorar a performance do ESP32 em tempo real
+- Também registra o tempo no console do navegador para debugging
+
+### Interface Moderna
+- Design responsivo e mobile-friendly
+- Menu de navegação unificado em todas as páginas
+- Dropdowns nativos HTML5 (sem JavaScript)
+- Zero dependências externas (sem CDN ou internet necessária)
+- Botões com visual moderno e efeitos hover
 
 ## 📚 Documentação
 
@@ -95,6 +113,43 @@ Conecte-se na rede e pelo navegador você deve acessar o endereço "http://192.1
 - **[Reset do Sistema](manual/reset.md)** - Procedimentos de reset
 - **[Gravar Firmware](manual/gravafirmware.md)** - Como atualizar o firmware
 - **[Prints de Telas](manual/telas/prints.md)** - Screenshots da interface
+
+### MQTT e Home Assistant
+- Integração MQTT com auto-discovery do Home Assistant.
+- Estrutura de tópicos:
+  - Estados de pinos: `smcr/<ID_UNICO>/pin/<NUM_PINO>/state`
+  - Comandos de pinos: `smcr/<ID_UNICO>/pin/<NUM_PINO>/set`
+  - Discovery HA: `homeassistant/sensor/<ID_UNICO>_pin<NUM_PINO>/config`
+- ID único do módulo: baseado no MAC, formato `smcr_XXXXXXXXXXXX`.
+- Página Web “MQTT/Serviços”: permite configurar broker, intervalo de publicação, auto-discovery e agora também “Discovery - Tamanho do Lote” e “Discovery - Intervalo (ms)”.
+- Endpoints:
+  - `GET /api/mqtt/config` → apenas dados de configuração (leve)
+  - `GET /api/mqtt/status` → `mqtt_unique_id` e `mqtt_status`
+  - `POST /api/mqtt/save` → salva e reinicia via UI
+- Exemplos de teste via terminal:
+```bash
+mosquitto_sub -h <broker> -u <user> -P <senha> -t 'smcr/#' -v
+mosquitto_sub -h <broker> -u <user> -P <senha> -t 'homeassistant/#' -v
+```
+
+### NVS: Exportar/Importar
+- Página "Arquivos": agora lista todas as chaves do NVS (todas as namespaces) com segredos mascarados por padrão.
+- Exportar NVS:
+  - JSON: `GET /api/nvs/export` (arquivo `nvs_export_<HOSTNAME>_<millis>.json`)
+  - Texto: `GET /api/nvs/export?format=text`
+  - Incluir segredos: `include_secrets=1`
+- Importar NVS (mesmo formato do export JSON):
+  - `POST /api/nvs/import` (merge)
+  - `POST /api/nvs/import?clear=1` (apaga namespaces presentes no arquivo antes de importar)
+- Retorno do import: `{ ok, skipped, errors, cleared }`.
+
+### Atualizar Firmware (OTA)
+- Página "Firmware": acesse `http://<host>:<porta>/firmware`.
+- Selecione o arquivo `.bin` gerado pelo build do SMCR e clique em "Enviar e Atualizar".
+- O dispositivo aplica o update e reinicia automaticamente. Não desligue durante o processo.
+- Observações:
+  - Use binários construídos para a mesma placa/partições do projeto.
+  - Após reiniciar, o dashboard volta a responder no mesmo endereço.
 
 ### Documentação Técnica
 - **[Implementações](manual/implementacoes/)** - Documentação detalhada de todas as implementações técnicas, correções de bugs e novas funcionalidades

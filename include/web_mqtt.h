@@ -141,24 +141,42 @@ const char web_mqtt_html[] PROGMEM = R"rawliteral(
     <div class="container">
         <h1>SMCR - Configurações MQTT</h1>
         
-        <div class="menu">
-            <a href="/">Status</a>
-            <a href="/configuracao">Configuracoes Gerais</a>
-            <a href="/pinos">Pinos/Reles</a>
-            <a href="/acoes">Acoes</a>
-            <a href="/mqtt">MQTT/Servicos</a>
-            <a href="/arquivos">Arquivos</a>
-            <a href="/reset">Reset</a>
-        </div>
+        <nav class="navbar" style="background:#f8f9fa;border-bottom:1px solid #e9ecef;padding:10px 14px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <a href="/" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Status</a>
+            <a href="/configuracao" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Configurações</a>
+            <a href="/pinos" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Pinos</a>
+            <a href="/acoes" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Ações</a>
+            <details style="position:relative;">
+                <summary style="list-style:none;cursor:pointer;padding:8px 12px;border-radius:6px;color:#333;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Serviços</summary>
+                <div style="position:absolute;background:#fff;border:1px solid #e9ecef;box-shadow:0 8px 20px rgba(0,0,0,0.1);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:10;">
+                    <a href="/mqtt" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">MQTT</a>
+                    <a href="/intermod" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Inter-Módulos</a>
+                </div>
+            </details>
+            <details style="position:relative;">
+                <summary style="list-style:none;cursor:pointer;padding:8px 12px;border-radius:6px;color:#333;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Arquivos</summary>
+                <div style="position:absolute;background:#fff;border:1px solid #e9ecef;box-shadow:0 8px 20px rgba(0,0,0,0.1);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:10;">
+                    <a href="/arquivos/firmware" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Firmware</a>
+                    <a href="/arquivos/preferencias" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Preferências</a>
+                    <a href="/arquivos/littlefs" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">LittleFS</a>
+                </div>
+            </details>
+            <details style="position:relative;">
+                <summary style="list-style:none;cursor:pointer;padding:8px 12px;border-radius:6px;color:#333;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Util</summary>
+                <div style="position:absolute;background:#fff;border:1px solid #e9ecef;box-shadow:0 8px 20px rgba(0,0,0,0.1);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:10;">
+                    <a href="/serial" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Web Serial</a>
+                    <a href="/reset" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Reset</a>
+                </div>
+            </details>
+        </nav>
 
         <div class="actions">
-            <button type="button" class="btn-apply" onclick="applyMqttConfig()">Aplicar</button>
+            <button type="button" class="btn-apply" onclick="applyMqttConfig()">Aplicar e Reiniciar</button>
         </div>
 
-        <div class="alert alert-warning">
-            <strong>⚠️ Funcionalidade em desenvolvimento</strong><br>
-            Esta página será implementada em versões futuras para permitir configuração de serviços MQTT.
-        </div>
+
+
+        <div id="statusMessage" style="display: none; margin: 20px 0; padding: 15px; border-radius: 4px;"></div>
 
         <form id="mqttForm">
             <h3 style="color: #333; margin: 20px 0 15px 0; border-bottom: 1px solid #ddd; padding-bottom: 8px;">Configurações MQTT</h3>
@@ -166,7 +184,7 @@ const char web_mqtt_html[] PROGMEM = R"rawliteral(
                 <tr>
                     <td>Habilitar MQTT:</td>
                     <td>
-                        <select name="mqtt_enabled" disabled>
+                        <select name="mqtt_enabled" id="mqtt_enabled">
                             <option value="false">Desabilitado</option>
                             <option value="true">Habilitado</option>
                         </select>
@@ -174,28 +192,54 @@ const char web_mqtt_html[] PROGMEM = R"rawliteral(
                 </tr>
                 <tr>
                     <td>Servidor MQTT:</td>
-                    <td><input type="text" name="mqtt_server" placeholder="broker.mqtt.com" disabled></td>
+                    <td><input type="text" name="mqtt_server" id="mqtt_server" placeholder="broker.mqtt.com ou IP do servidor"></td>
                 </tr>
                 <tr>
                     <td>Porta:</td>
-                    <td><input type="number" name="mqtt_port" value="1883" min="1" max="65535" disabled></td>
+                    <td><input type="number" name="mqtt_port" id="mqtt_port" value="1883" min="1" max="65535"></td>
                 </tr>
                 <tr>
                     <td>Usuário (opcional):</td>
-                    <td><input type="text" name="mqtt_user" placeholder="Deixe em branco se não usar autenticação" disabled></td>
+                    <td><input type="text" name="mqtt_user" id="mqtt_user" placeholder="Deixe em branco se não usar autenticação"></td>
                 </tr>
                 <tr>
                     <td>Senha (opcional):</td>
-                    <td><input type="password" name="mqtt_pass" placeholder="Deixe em branco se não usar autenticação" disabled></td>
+                    <td><input type="password" name="mqtt_password" id="mqtt_password" placeholder="Deixe em branco se não usar autenticação"></td>
                 </tr>
                 <tr>
                     <td>Tópico Base:</td>
-                    <td><input type="text" name="mqtt_topic" placeholder="smcr/modulo1" disabled></td>
+                    <td><input type="text" name="mqtt_topic_base" id="mqtt_topic_base" placeholder="smcr" value="smcr"></td>
+                </tr>
+                <tr>
+                    <td>Intervalo de Publicação (segundos):</td>
+                    <td><input type="number" name="mqtt_publish_interval" id="mqtt_publish_interval" value="60" min="5" max="3600"></td>
+                </tr>
+                <tr>
+                    <td>Auto-Discovery Home Assistant:</td>
+                    <td>
+                        <select name="mqtt_ha_discovery" id="mqtt_ha_discovery">
+                            <option value="false">Desabilitado</option>
+                            <option value="true">Habilitado</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Discovery - Tamanho do Lote:</td>
+                    <td><input type="number" name="mqtt_ha_batch" id="mqtt_ha_batch" value="4" min="1" max="16"></td>
+                </tr>
+                <tr>
+                    <td>Discovery - Intervalo (ms):</td>
+                    <td><input type="number" name="mqtt_ha_interval_ms" id="mqtt_ha_interval_ms" value="100" min="10" max="5000"></td>
                 </tr>
             </table>
+            <div style="background: #e7f3ff; padding: 15px; border-left: 4px solid #2196F3; margin: 20px 0;">
+                <p style="margin: 5px 0; font-size: 14px;"><strong>ID Único do Módulo:</strong> <span id="mqtt_unique_id">Carregando...</span></p>
+                <p style="margin: 5px 0; font-size: 14px;"><strong>Status MQTT:</strong> <span id="mqtt_status">Carregando...</span></p>
+            </div>
             <p style="font-size: 12px; color: #666; margin-top: 10px;">
                 <strong>Tópico Base:</strong> usado para publicação de status e recebimento de comandos.<br>
-                Exemplo: com tópico "smcr/modulo1", será usado "smcr/modulo1/status" para publicar status.
+                Exemplo: com tópico "smcr" e ID único "smcr_123abc", será usado "smcr/smcr_123abc/pin/X/state" para publicar status.<br><br>
+                <strong>Home Assistant Auto-Discovery:</strong> quando habilitado, o módulo publicará automaticamente as configurações de descoberta no formato do Home Assistant, permitindo que seus pinos apareçam automaticamente na interface.
             </p>
         </form>
     </div>
@@ -211,50 +255,125 @@ const char web_mqtt_html[] PROGMEM = R"rawliteral(
             document.getElementById('loadingOverlay').style.display = 'none';
         }
         
-        // Esconder loading quando página carregar completamente
+        // Carregar configurações MQTT ao inicializar
         window.addEventListener('load', function() {
-            hideLoading();
+            loadMqttConfig();
         });
 
-        function applyMqttConfig() {
-            if (confirm('Aplicar configuracoes MQTT? O ESP sera reiniciado.')) {
-                showLoading('Aplicando configuracoes MQTT e reiniciando...');
-                
-                // Simular salvamento (MQTT ainda não implementado)
-                setTimeout(() => {
-                    showStatus('Configuracoes MQTT aplicadas! Reiniciando ESP...', 'success');
+        function loadMqttConfig() {
+            showLoading('Carregando configurações MQTT...');
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            fetch('/api/mqtt/config', { signal: controller.signal })
+                .then(response => response.json())
+                .then(data => {
+                    clearTimeout(timeoutId);
                     
-                    // Reiniciar ESP após 2 segundos
+                    // Preencher formulário (apenas dados de configuração)
+                    document.getElementById('mqtt_enabled').value = data.mqtt_enabled ? 'true' : 'false';
+                    document.getElementById('mqtt_server').value = data.mqtt_server || '';
+                    document.getElementById('mqtt_port').value = data.mqtt_port || 1883;
+                    document.getElementById('mqtt_user').value = data.mqtt_user || '';
+                    document.getElementById('mqtt_password').value = data.mqtt_password || '';
+                    document.getElementById('mqtt_topic_base').value = data.mqtt_topic_base || 'smcr';
+                    document.getElementById('mqtt_publish_interval').value = data.mqtt_publish_interval || 60;
+                    document.getElementById('mqtt_ha_discovery').value = data.mqtt_ha_discovery ? 'true' : 'false';
+                    document.getElementById('mqtt_ha_batch').value = data.mqtt_ha_batch || 4;
+                    document.getElementById('mqtt_ha_interval_ms').value = data.mqtt_ha_interval_ms || 100;
+                    
+                    hideLoading();
+                    // Buscar status em chamada separada e não bloquear a página
+                    loadMqttStatus();
+                })
+                .catch(error => {
+                    clearTimeout(timeoutId);
+                    console.error('Erro ao carregar configurações:', error);
+                    if (error.name === 'AbortError') {
+                        showStatus('Tempo limite excedido ao carregar configurações MQTT', 'error');
+                    } else {
+                        showStatus('Erro ao carregar configurações MQTT', 'error');
+                    }
+                    hideLoading();
+                });
+        }
+
+        function loadMqttStatus() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+            
+            fetch('/api/mqtt/status', { signal: controller.signal })
+                .then(resp => resp.json())
+                .then(status => {
+                    clearTimeout(timeoutId);
+                    document.getElementById('mqtt_unique_id').textContent = status.mqtt_unique_id || 'N/A';
+                    document.getElementById('mqtt_status').textContent = status.mqtt_status || 'Desconhecido';
+                })
+                .catch(err => {
+                    clearTimeout(timeoutId);
+                    console.warn('Falha ao obter status MQTT:', err);
+                    // Mantém valores padrão e não bloqueia a UI
+                });
+        }
+
+        function applyMqttConfig() {
+            if (!confirm('Salvar configurações MQTT e reiniciar o ESP32?')) {
+                return;
+            }
+            
+            showLoading('Salvando e reiniciando ESP32...');
+            
+            const formData = new URLSearchParams();
+            formData.append('mqtt_enabled', document.getElementById('mqtt_enabled').value);
+            formData.append('mqtt_server', document.getElementById('mqtt_server').value);
+            formData.append('mqtt_port', document.getElementById('mqtt_port').value);
+            formData.append('mqtt_user', document.getElementById('mqtt_user').value);
+            formData.append('mqtt_password', document.getElementById('mqtt_password').value);
+            formData.append('mqtt_topic_base', document.getElementById('mqtt_topic_base').value);
+            formData.append('mqtt_publish_interval', document.getElementById('mqtt_publish_interval').value);
+            formData.append('mqtt_ha_discovery', document.getElementById('mqtt_ha_discovery').value);
+            formData.append('mqtt_ha_batch', document.getElementById('mqtt_ha_batch').value);
+            formData.append('mqtt_ha_interval_ms', document.getElementById('mqtt_ha_interval_ms').value);
+            
+            fetch('/api/mqtt/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showStatus('Configurações salvas! Reiniciando ESP32...', 'success');
                     setTimeout(() => {
                         fetch('/restart', { method: 'POST' })
                             .then(() => {
-                                showStatus('ESP reiniciado com sucesso!', 'success');
-                                // Recarregar página após reinicialização
-                                setTimeout(() => {
-                                    window.location.reload();
-                                }, 3000);
+                                showStatus('ESP32 reiniciado! Aguarde 10 segundos...', 'success');
+                                setTimeout(() => { window.location.reload(); }, 10000);
                             })
                             .catch(() => {
-                                showStatus('ESP reiniciado. Recarregue a página manualmente.', 'success');
+                                showStatus('ESP32 reiniciado. Recarregue a página manualmente.', 'success');
                             });
                     }, 2000);
-                }, 1000);
-            }
+                } else {
+                    hideLoading();
+                    showStatus(data.message || 'Erro ao salvar configurações', 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Erro ao salvar configurações:', error);
+                showStatus('Erro ao salvar configurações', 'error');
+            });
         }
 
         function showStatus(message, type) {
-            // Criar elemento de status se não existir
-            let statusDiv = document.getElementById('status-message');
-            if (!statusDiv) {
-                statusDiv = document.createElement('div');
-                statusDiv.id = 'status-message';
-                statusDiv.style.cssText = 'margin: 20px 0; padding: 10px; border-radius: 4px; text-align: center;';
-                document.querySelector('.container').appendChild(statusDiv);
-            }
-            
+            const statusDiv = document.getElementById('statusMessage');
             statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
             
-            // Aplicar estilos baseados no tipo
             if (type === 'success') {
                 statusDiv.style.background = '#d4edda';
                 statusDiv.style.color = '#155724';
@@ -265,17 +384,17 @@ const char web_mqtt_html[] PROGMEM = R"rawliteral(
                 statusDiv.style.border = '1px solid #f5c6cb';
             }
             
-            statusDiv.style.display = 'block';
-            
-            setTimeout(() => {
-                statusDiv.style.display = 'none';
-            }, 5000);
+            // Auto-ocultar após 5 segundos (exceto se estiver reiniciando)
+            if (!message.includes('Reiniciando') && !message.includes('reiniciado')) {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
         }
 
         // === SISTEMA DE MONITORAMENTO DE PERFORMANCE ===
         const pageStartTime = performance.now();
         
-        // Função para mostrar indicador de performance
         function showPerformanceIndicator() {
             const loadTime = performance.now() - pageStartTime;
             const indicator = document.createElement('div');
@@ -286,11 +405,7 @@ const char web_mqtt_html[] PROGMEM = R"rawliteral(
             console.log(`[PERFORMANCE] MQTT carregado em ${loadTime.toFixed(2)}ms`);
         }
 
-        // Mostrar indicador após carregamento
-        window.addEventListener('load', function() {
-            hideLoading();
-            setTimeout(showPerformanceIndicator, 100);
-        });
+        setTimeout(showPerformanceIndicator, 100);
     </script>
 </body>
 </html>

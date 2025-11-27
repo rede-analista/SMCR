@@ -22,6 +22,12 @@ This is an ESP32-based modular sensor/actuator system with web configuration int
 - **Dual Mode**: Attempts WiFi STA connection, falls back to AP mode for configuration
 - **State Tracking**: `vB_wifiIsConnected` global flag with event-driven updates
 - **Auto-Recovery**: Non-blocking reconnection attempts every 15 seconds in `loop()`
+- **mDNS Service**: `fV_setupMdns()` initializes mDNS with configured hostname
+  - Automatically started after successful WiFi connection
+  - Adds HTTP service advertisement on configured port
+  - Includes device metadata (version, device type)
+  - Auto-reinitializes on WiFi reconnection
+  - Access device via `http://<hostname>.local:<port>/`
 - **Uptime Formatting**: `fS_formatUptime()` provides human-readable uptime strings
 
 ### Time Synchronization (`ntp_func.cpp`)
@@ -57,6 +63,11 @@ platformio device monitor         # Serial monitor
 - **STA Mode**: Serves dashboard from `web_dashboard.h` with real-time status cards
 - **API Endpoint**: `/status/json` provides live data (IP, uptime, heap, NTP status)
 - **Polling**: Dashboard updates every 15 seconds via JavaScript fetch
+- **Performance Monitoring**: All 10 web pages include load time indicator
+  - Shows page load time in milliseconds (bottom-right corner)
+  - Non-intrusive display with dark semi-transparent background
+  - Logs performance data to browser console
+  - Pattern: `const pageStartTime = performance.now()` → display after window.onload
 
 ### Configuration Management
 - **Load sequence**: `fV_carregarMainConfig()` → validate defaults → populate runtime struct
@@ -75,10 +86,32 @@ platformio device monitor         # Serial monitor
 - **Module pattern**: Each `.cpp` file handles specific domain (network, web, preferences, utilities)
 - **Web content**: HTML stored as `PROGMEM` strings in `web_pages.h`
 
+### Web Pages Structure
+All 10 web pages follow consistent patterns:
+1. **Dashboard** (`web_dashboard.h`) - Status overview with auto-refresh
+2. **Configurações** (`web_config_gerais.h`) - General settings
+3. **Pinos** (`web_pins.h`) - GPIO pin configuration
+4. **Ações** (`web_actions.h`) - Action automation rules
+5. **MQTT** (`web_mqtt.h`) - MQTT broker settings
+6. **Inter-Módulos** (`web_intermod.h`) - Module communication (placeholder)
+7. **Firmware** (`web_firmware.h`) - OTA firmware upload
+8. **Preferências** (`web_preferencias.h`) - NVS export/import
+9. **LittleFS** (`web_littlefs.h`) - File system management
+10. **Web Serial** (`web_serial.h`) - Live serial monitor
+11. **Reset** (`web_reset.h`) - System reset options
+12. **AP Mode** (`web_modoap.h`) - Initial WiFi setup
+
+Each page includes:
+- Unified navigation menu with dropdowns (Status | Configurações | Pinos | Ações | [Serviços▾] | [Arquivos▾] | [Util▾])
+- Performance indicator (load time display)
+- Inline CSS for zero external dependencies
+- Mobile-responsive layout with flexbox
+
 ### Memory Management
 - **Async operations**: Uses `ESPAsyncWebServer` - avoid blocking operations in handlers
 - **Global state**: Minimal globals, main config centralized in `vSt_mainConfig` struct
 - **Resource cleanup**: Proper deletion of `AsyncWebServer` instance on reconfiguration
+- **Flash usage**: Critical at 97.2% (1274125/1310720 bytes) - minimize additions
 
 ## Integration Points
 

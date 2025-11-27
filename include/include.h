@@ -9,6 +9,7 @@
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
 #include <cmath>
 #include <variant>
 #include <string.h>

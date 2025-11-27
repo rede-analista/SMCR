@@ -13,6 +13,9 @@ const unsigned long vU32_pinReadInterval = 500; // Leitura a cada 500ms
 unsigned long vU32_lastActionExecTime = 0;
 const unsigned long vU32_actionExecInterval = 100; // Execução de ações a cada 100ms
 
+unsigned long vU32_lastMqttLoopTime = 0;
+const unsigned long vU32_mqttLoopInterval = 450; // Loop MQTT a cada 50ms (não bloqueante)
+
 // Definição do objeto Preferences.
 Preferences preferences;
 
@@ -62,11 +65,18 @@ void setup() {
   // 7. INICIALIZA SISTEMA DE AÇÕES
   fV_initActionSystem();
   
-  // 8. LEITURA INICIAL DOS PINOS: Garante que todos os pinos tenham estado atualizado ANTES da primeira ação
+  // 8. INICIALIZA SISTEMA MQTT (após WiFi e sistema de pinos)
+  fV_initMqtt();
+  if (vSt_mainConfig.vB_mqttEnabled && vB_wifiIsConnected) {
+    fV_printSerialDebug(LOG_INIT, "Tentando conexão inicial MQTT...");
+    fV_setupMqtt();
+  }
+  
+  // 9. LEITURA INICIAL DOS PINOS: Garante que todos os pinos tenham estado atualizado ANTES da primeira ação
   fV_printSerialDebug(LOG_INIT, "Realizando leitura inicial de pinos...");
   fV_readPinsTask();
   
-  // 9. EXECUÇÃO INICIAL DE AÇÕES: Aplica ações baseadas no estado atual dos pinos
+  // 10. EXECUÇÃO INICIAL DE AÇÕES: Aplica ações baseadas no estado atual dos pinos
   fV_printSerialDebug(LOG_INIT, "Executando sincronização inicial de ações...");
   fV_executeActionsTask();
 
@@ -90,6 +100,12 @@ void loop() {
   if (vU32_currentTime - vU32_lastActionExecTime >= vU32_actionExecInterval) {
     vU32_lastActionExecTime = vU32_currentTime;
     fV_executeActionsTask();
+  }
+  
+  // 4. LOOP MQTT: Mantém conexão MQTT ativa e processa mensagens (não bloqueante)
+  if (vU32_currentTime - vU32_lastMqttLoopTime >= vU32_mqttLoopInterval) {
+    vU32_lastMqttLoopTime = vU32_currentTime;
+    fV_mqttLoop();
   }
   
 }
