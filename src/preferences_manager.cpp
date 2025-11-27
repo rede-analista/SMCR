@@ -5,14 +5,14 @@
 // --- Implementação das funções genéricas para salvar/ler (mantidas) ---
 
 void fV_salvarString(const char* vC_key, const String& vS_value) {
-  preferences.begin("smcr_generic_configs", false); // Namespace genérico para chaves avulsas
+  preferences.begin("smcrgenc", false); // Namespace genérico (até 8 letras)
   preferences.putString(vC_key, vS_value);
   preferences.end();
   Serial.printf("DEBUG: Salvou String (generico): %s = %s\n", vC_key, vS_value.c_str());
 }
 
 String fS_lerString(const char* vC_key, const String& vS_defaultValue) {
-  preferences.begin("smcr_generic_configs", true);
+  preferences.begin("smcrgenc", true);
   String vS_value = preferences.getString(vC_key, vS_defaultValue);
   preferences.end();
   Serial.printf("DEBUG: Leu String (generico): %s = %s (Default: %s)\n", vC_key, vS_value.c_str(), vS_defaultValue.c_str());
@@ -20,14 +20,14 @@ String fS_lerString(const char* vC_key, const String& vS_defaultValue) {
 }
 
 void fV_salvarInt(const char* vC_key, int vI_value) {
-  preferences.begin("smcr_generic_configs", false);
+  preferences.begin("smcrgenc", false);
   preferences.putInt(vC_key, vI_value);
   preferences.end();
   Serial.printf("DEBUG: Salvou Int (generico): %s = %d\n", vC_key, vI_value);
 }
 
 int fI_lerInt(const char* vC_key, int vI_defaultValue) {
-  preferences.begin("smcr_generic_configs", true);
+  preferences.begin("smcrgenc", true);
   int vI_value = preferences.getInt(vC_key, vI_defaultValue);
   preferences.end();
   Serial.printf("DEBUG: Leu Int (generico): %s = %d (Default: %d)\n", vC_key, vI_value, vI_defaultValue);
@@ -35,14 +35,14 @@ int fI_lerInt(const char* vC_key, int vI_defaultValue) {
 }
 
 void fV_salvarBool(const char* vC_key, bool vB_value) {
-  preferences.begin("smcr_generic_configs", false);
+  preferences.begin("smcrgenc", false);
   preferences.putBool(vC_key, vB_value);
   preferences.end();
   Serial.printf("DEBUG: Salvou Bool (generico): %s = %s\n", vC_key, vB_value ? "true" : "false");
 }
 
 bool fB_lerBool(const char* vC_key, bool vB_defaultValue) {
-  preferences.begin("smcr_generic_configs", true);
+  preferences.begin("smcrgenc", true);
   bool vB_value = preferences.getBool(vC_key, vB_defaultValue);
   preferences.end();
   Serial.printf("DEBUG: Leu Bool (generico): %s = %s (Default: %s)\n", vC_key, vB_value ? "true" : "false", vB_defaultValue ? "true" : "false");
@@ -53,7 +53,7 @@ bool fB_lerBool(const char* vC_key, bool vB_defaultValue) {
 // --- Implementação das funções para Carregar/Salvar a MainConfig_t ---
 // Namespace e chaves para a MainConfig_t
 const char* NVS_NAMESPACE_MAIN_CONFIG = "smcrconf";
-const char* NVS_NAMESPACE_GENERIC = "smcrgenc"; 
+const char* NVS_NAMESPACE_GENERIC = "smcrgenc";
 const char* KEY_SERIAL_DEBUG_ENABLED = "sdbgen";
 const char* KEY_LOG_FLAGS = "logflags";
 
@@ -137,7 +137,7 @@ void fV_carregarMainConfig(void) {
 
     // 6. Configurações da Interface Web
     vSt_mainConfig.vB_statusPinosEnabled = preferences.getBool(KEY_STATUS_PINOS, true);
-    vSt_mainConfig.vB_interModulosEnabled = preferences.getBool(KEY_INTER_MODULOS, true);
+    vSt_mainConfig.vB_interModulosEnabled = preferences.getBool(KEY_INTER_MODULOS, false);
     vSt_mainConfig.vS_corStatusComAlerta = preferences.getString(KEY_COR_COM_ALERTA, "#ff0000");
     vSt_mainConfig.vS_corStatusSemAlerta = preferences.getString(KEY_COR_SEM_ALERTA, "#00ff00");
     vSt_mainConfig.vU16_tempoRefresh = preferences.getUInt(KEY_TEMPO_REFRESH, 15);
@@ -158,8 +158,8 @@ void fV_carregarMainConfig(void) {
     vSt_mainConfig.vB_dashboardAuthRequired = preferences.getBool(KEY_DASHBOARD_AUTH, false); // Dashboard sem auth por padrão
 
     // 10. Configurações de Histórico no Dashboard
-    vSt_mainConfig.vB_showAnalogHistory = preferences.getBool(KEY_SHOW_ANALOG_HISTORY, false); // Padrão habilitado
-    vSt_mainConfig.vB_showDigitalHistory = preferences.getBool(KEY_SHOW_DIGITAL_HISTORY, false); // Padrão desabilitado
+    vSt_mainConfig.vB_showAnalogHistory = preferences.getBool(KEY_SHOW_ANALOG_HISTORY, true); // Padrão habilitado
+    vSt_mainConfig.vB_showDigitalHistory = preferences.getBool(KEY_SHOW_DIGITAL_HISTORY, true); // Padrão desabilitado
 
     // 11. Configurações de MQTT
     vSt_mainConfig.vB_mqttEnabled = preferences.getBool(KEY_MQTT_ENABLED, false); // Padrão desabilitado
@@ -262,15 +262,25 @@ void fV_clearPreferences(void) {
 
     fV_printSerialDebug(LOG_FLASH, "Abrindo Preferences para LIMPEZA GERAL (Reset de Fabrica)...");
 
-    // 1. Limpa o namespace principal (MainConfig_t)
+  // 1. Limpa o namespace principal (MainConfig_t)
     preferences.begin(NVS_NAMESPACE_MAIN_CONFIG, false);
     preferences.clear();
     preferences.end();
     
-    // 2. Limpa o namespace genérico (chaves avulsas)
+  // 2. Limpa o namespace genérico (chaves avulsas)
     preferences.begin(NVS_NAMESPACE_GENERIC, false);
     preferences.clear();
     preferences.end();
+
+  // 3. Limpa namespaces legados não mais utilizados pelo app
+  //    smcr-config (antigo principal) e smcr_generic_configs (antigo genérico)
+  preferences.begin("smcr-config", false);
+  preferences.clear();
+  preferences.end();
+
+  preferences.begin("smcr_generic_configs", false);
+  preferences.clear();
+  preferences.end();
 
     fV_printSerialDebug(LOG_FLASH, "Limpeza de fabrica concluida. Configs de rede e sistema apagadas.");
 }

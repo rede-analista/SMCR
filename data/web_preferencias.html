@@ -1,18 +1,9 @@
-// Página de Arquivos LittleFS
-
-#ifndef WEB_LITTLEFS_H
-
-#define WEB_LITTLEFS_H
-
-#include <Arduino.h>
-
-const char web_littlefs_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMCR - Arquivos LittleFS</title>
+    <title>SMCR - Preferências NVS</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -156,7 +147,7 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
     </div>
 
     <div class="container">
-        <h1>SMCR - Arquivos LittleFS</h1>
+        <h1>SMCR - Preferências NVS</h1>
         
         <nav class="navbar" style="background:#f8f9fa;border-bottom:1px solid #e9ecef;padding:10px 14px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
             <a href="/" style="text-decoration:none;color:#333;padding:8px 12px;border-radius:6px;border:1px solid #dee2e6;background:#fff;transition:background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#fff'">Status</a>
@@ -187,30 +178,50 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
             </details>
         </nav>
 
-        <!-- Arquivos LittleFS -->
+        <!-- Preferências NVS -->
         <div class="section">
-            <div class="section-title">📁 Arquivos LittleFS</div>
+            <div class="section-title">📋 Preferências NVS (Non-Volatile Storage)</div>
             <div class="info-box">
-                <strong>ℹ️ Informação:</strong> Arquivos armazenados no sistema de arquivos da flash.
+                <strong>ℹ️ Informação:</strong> Estes são os parâmetros salvos na memória não-volátil do ESP32.
             </div>
-            <button onclick="loadFilesList()" class="btn btn-primary">🔄 Recarregar Lista</button>
-            <button onclick="formatFlash()" class="btn btn-warning" style="margin-left: 10px;">⚠️ Formatar Flash</button>
-            <div id="files-list" class="file-list" style="background: #f8f9fa;border: 1px solid #dee2e6;border-radius: 4px;padding: 15px;margin: 10px 0;">
-                <p style="text-align: center; color: #666;">Carregando arquivos...</p>
-            </div>
-        </div>
+            <button onclick="loadNVSPreferences()" class="btn btn-primary">🔄 Recarregar Preferências</button>
+            <label style="margin-left:10px; font-size:13px;">
+                <input type="checkbox" id="include-secrets"> Incluir segredos (senha/token)
+            </label>
+            <div style="margin-top:10px;"></div>
+            <button onclick="exportNVSJson()" class="btn btn-success">⬇️ Exportar NVS (JSON)</button>
 
-        <!-- Upload de Arquivos -->
-        <div class="section">
-            <div class="section-title">📤 Upload de Arquivos</div>
-            <div class="upload-area">
-                <h3>Enviar arquivo para o ESP32</h3>
-                <p>Selecione um arquivo para fazer upload para a flash</p>
-                <form id="upload-form" enctype="multipart/form-data">
-                    <input type="file" id="file-input" name="file" required>
+            <div class="upload-area" style="margin-top:20px;">
+                <h3>Importar NVS de arquivo JSON</h3>
+                <p>Selecione um arquivo de exportação do NVS para restaurar valores</p>
+                <form id="nvs-import-form">
+                    <input type="file" id="nvs-import-input" accept="application/json,.json" required>
                     <br>
-                    <button type="submit" class="btn btn-success">📤 Fazer Upload</button>
+                    <label style="display:inline-block; margin:8px 10px; font-size:13px;">
+                        <input type="checkbox" id="clear-before"> Apagar namespaces antes de importar
+                    </label>
+                    <br>
+                    <button type="submit" class="btn btn-warning">⤴️ Importar NVS (JSON)</button>
                 </form>
+                <div style="font-size:12px; color:#666; margin-top:8px;">Observação: entradas com valor "[OCULTO]" serão ignoradas. BLOBs não são restaurados.</div>
+            </div>
+            <div id="nvs-content">
+                <table class="config-table" id="nvs-table">
+                    <thead>
+                        <tr>
+                            <th>Parâmetro</th>
+                            <th>Valor</th>
+                            <th>Tipo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="nvs-tbody">
+                        <tr><td colspan="3" style="text-align: center; color: #666;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+                <div style="margin-top:10px; font-size:12px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                    <label style="cursor:pointer;"><input type="checkbox" id="toggle-system" onchange="loadNVSPreferences()"> Mostrar namespaces do sistema (wifi/phy/dhcp)</label>
+                    <span id="nvs-summary" style="color:#555;">-</span>
+                </div>
             </div>
         </div>
 
@@ -229,147 +240,95 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
         
         window.addEventListener('load', function() {
             hideLoading();
-            loadFilesList();
+            loadNVSPreferences();
         });
 
-        function loadFilesList() {
-            fetch('/api/files/list')
+        function loadNVSPreferences() {
+            showLoading('Carregando preferências NVS...');
+            const includeSystem = document.getElementById('toggle-system').checked;
+            const url = includeSystem ? '/api/nvs/list?includeSystem=1' : '/api/nvs/list';
+            fetch(url)
                 .then(response => response.json())
                 .then(data => {
-                    const filesList = document.getElementById('files-list');
-                    filesList.innerHTML = '';
-                    
-                    if (data.files && data.files.length > 0) {
-                        data.files.forEach(file => {
-                            const fileDiv = document.createElement('div');
-                            fileDiv.style.cssText = 'padding:10px;margin:5px 0;background:white;border:1px solid #ddd;border-radius:4px;display:flex;justify-content:space-between;align-items:center;';
-                            fileDiv.innerHTML = `
-                                <div>
-                                    <strong>${file.name}</strong>
-                                    <span style="margin-left: 10px; color: #666; font-size: 12px;">${formatBytes(file.size)}</span>
-                                </div>
-                                <div>
-                                    <button onclick="downloadFile('${file.name}')" class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;">📥 Download</button>
-                                    <button onclick="deleteFile('${file.name}')" class="btn btn-warning" style="padding: 5px 10px; font-size: 12px;">🗑️ Deletar</button>
-                                </div>
+                    hideLoading();
+                    const tbody = document.getElementById('nvs-tbody');
+                    tbody.innerHTML = '';
+                    const prefs = data.preferences || [];
+                    if (prefs.length > 0) {
+                        prefs.forEach(pref => {
+                            const row = tbody.insertRow();
+                            row.innerHTML = `
+                                <td><strong>${pref.key}</strong></td>
+                                <td>${escapeHtml(pref.value)}</td>
+                                <td><span style="background: #e3f2fd; padding: 2px 6px; border-radius: 3px; font-size: 11px;">${pref.type}</span></td>
                             `;
-                            filesList.appendChild(fileDiv);
                         });
-                        
-                        const infoDiv = document.createElement('div');
-                        infoDiv.style.cssText = 'margin-top: 15px; padding: 10px; background: white; border-radius: 4px; font-size: 12px;';
-                        infoDiv.innerHTML = `
-                            <strong>Espaço:</strong> 
-                            Usado: ${formatBytes(data.usedBytes)} | 
-                            Total: ${formatBytes(data.totalBytes)} | 
-                            Livre: ${formatBytes(data.freeBytes)}
-                        `;
-                        filesList.appendChild(infoDiv);
                     } else {
-                        filesList.innerHTML = '<p style="text-align: center; color: #666;">Nenhum arquivo encontrado</p>';
+                        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #666;">Nenhuma preferência encontrada</td></tr>';
                     }
+                    // Atualiza resumo
+                    const summary = document.getElementById('nvs-summary');
+                    const filtro = includeSystem ? 'TODOS namespaces' : 'Apenas SMCR';
+                    summary.textContent = `Exibindo ${prefs.length} entradas (${filtro})`;
                 })
                 .catch(error => {
-                    showStatus('Erro ao carregar lista de arquivos', 'error');
+                    hideLoading();
+                    showStatus('Erro ao carregar preferências NVS', 'error');
                     console.error('Erro:', error);
                 });
         }
 
-        function downloadFile(filename) {
-            window.location.href = `/api/files/download?filename=${encodeURIComponent(filename)}`;
-        }
-
-        function deleteFile(filename) {
-            if (confirm(`Tem certeza que deseja deletar o arquivo "${filename}"?`)) {
-                const formData = new FormData();
-                formData.append('filename', filename);
-                
-                fetch('/api/files/delete', { 
-                    method: 'POST',
-                    body: formData
-                })
-                    .then(response => response.json())
-                    .then(result => {
-                        if (result.success) {
-                            showStatus('Arquivo deletado com sucesso!', 'success');
-                            loadFilesList();
-                        } else {
-                            showStatus(result.message || 'Erro ao deletar arquivo', 'error');
-                        }
-                    })
-                    .catch(error => {
-                        showStatus('Erro de comunicação', 'error');
-                        console.error('Erro:', error);
-                    });
-            }
-        }
-
-        function formatFlash() {
-            if (confirm('⚠️ ATENÇÃO: Esta ação irá APAGAR TODOS OS ARQUIVOS da flash LittleFS!\n\nIsso inclui:\n- Configurações de pinos\n- Arquivos enviados\n- Todos os dados armazenados\n\nEsta ação é IRREVERSÍVEL!\n\nDeseja realmente continuar?')) {
-                if (confirm('Confirmação final: Tem ABSOLUTA CERTEZA que deseja formatar a flash e perder todos os dados?')) {
-                    showLoading('Formatando flash...');
-                    
-                    fetch('/api/files/format', { method: 'POST' })
-                        .then(response => response.json())
-                        .then(result => {
-                            hideLoading();
-                            if (result.success) {
-                                showStatus('Flash formatada com sucesso! Todos os arquivos foram removidos.', 'success');
-                                loadFilesList();
-                            } else {
-                                showStatus(result.message || 'Erro ao formatar flash', 'error');
-                            }
-                        })
-                        .catch(error => {
-                            hideLoading();
-                            showStatus('Erro de comunicação', 'error');
-                            console.error('Erro:', error);
-                        });
-                }
-            }
-        }
-
-        document.getElementById('upload-form').addEventListener('submit', function(e) {
+        // Importar NVS a partir de JSON
+        document.getElementById('nvs-import-form').addEventListener('submit', function(e) {
             e.preventDefault();
-            
-            const formData = new FormData(this);
-            const fileInput = document.getElementById('file-input');
-            
+            const fileInput = document.getElementById('nvs-import-input');
             if (!fileInput.files.length) {
-                showStatus('Selecione um arquivo', 'error');
+                showStatus('Selecione um arquivo JSON de exportação do NVS', 'error');
                 return;
             }
-            
-            showLoading('Fazendo upload...');
-            
-            fetch('/api/files/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(result => {
-                hideLoading();
-                if (result.success) {
-                    showStatus('Upload realizado com sucesso!', 'success');
-                    fileInput.value = '';
-                    loadFilesList();
-                } else {
-                    showStatus('Erro no upload: ' + (result.message || 'Erro desconhecido'), 'error');
+            const file = fileInput.files[0];
+            if (!file.name.toLowerCase().endsWith('.json')) {
+                if (!confirm('O arquivo não parece ser JSON. Deseja continuar mesmo assim?')) {
+                    return;
                 }
-            })
-            .catch(error => {
+            }
+            showLoading('Importando NVS...');
+            const reader = new FileReader();
+            reader.onload = function() {
+                // Monta querystring com clear=1 se selecionado
+                const clear = document.getElementById('clear-before').checked;
+                if (clear && !confirm('Confirma apagar todas as chaves dos namespaces presentes no arquivo ANTES de importar? Esta ação é irreversível.')) {
+                    hideLoading();
+                    return;
+                }
+                const qs = clear ? '?clear=1' : '';
+                fetch('/api/nvs/import' + qs, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: reader.result
+                })
+                .then(r => r.json())
+                .then(result => {
+                    hideLoading();
+                    if (result && result.success !== false) {
+                        showStatus(`Importação concluída: OK=${result.ok||0}, Ignorados=${result.skipped||0}, Erros=${result.errors||0}, Namespaces apagados=${result.cleared||0}.`, 'success');
+                        loadNVSPreferences();
+                    } else {
+                        showStatus(result.message || 'Falha na importação do NVS', 'error');
+                    }
+                })
+                .catch(err => {
+                    hideLoading();
+                    showStatus('Erro de comunicação no import NVS', 'error');
+                    console.error(err);
+                });
+            };
+            reader.onerror = function() {
                 hideLoading();
-                showStatus('Erro de comunicação', 'error');
-            });
+                showStatus('Não foi possível ler o arquivo selecionado', 'error');
+            };
+            reader.readAsText(file);
         });
-
-        function formatBytes(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-        }
 
         function escapeHtml(text) {
             const div = document.createElement('div');
@@ -388,6 +347,15 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
             }, 5000);
         }
 
+        function exportNVSJson() {
+            const includeSecrets = document.getElementById('include-secrets').checked;
+            if (includeSecrets && !confirm('Atenção: isso incluirá senhas/tokens em TEXTO CLARO no arquivo exportado. Deseja continuar?')) {
+                return;
+            }
+            const qs = includeSecrets ? '?include_secrets=1' : '';
+            window.location.href = '/api/nvs/export' + qs;
+        }
+
         // === SISTEMA DE MONITORAMENTO DE PERFORMANCE ===
         const pageStartTime = performance.now();
         
@@ -399,7 +367,7 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
             indicator.innerHTML = `Tempo de Carregamento: ${loadTime.toFixed(2)}ms`;
             document.body.appendChild(indicator);
             
-            console.log(`[PERFORMANCE] LittleFS carregado em ${loadTime.toFixed(2)}ms`);
+            console.log(`[PERFORMANCE] Preferências carregadas em ${loadTime.toFixed(2)}ms`);
         }
         
         // Mostrar indicador após carregamento
@@ -409,6 +377,3 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
     </script>
 </body>
 </html>
-)rawliteral";
-
-#endif

@@ -24,9 +24,11 @@ MainConfig_t vSt_mainConfig;
 AsyncWebServer* SERVIDOR_WEB_ASYNC = nullptr;
 
 void setup() {
-
-  //fV_clearPreferences(); // Limpa todas as preferências (Reset de Fábrica) --- IGNORE ---
-
+  // 0. Inicializa LittleFS
+  if (!LittleFS.begin(true)) {
+    Serial.println("ERRO: Falha ao montar LittleFS");
+  }
+  
   // 1. Carregar a MainConfig_t (sua startup-config) da Flash para a RAM (running-config)
   fV_carregarMainConfig();
 

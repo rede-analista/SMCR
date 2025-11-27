@@ -33,6 +33,17 @@ void fV_handleFormatFlash(AsyncWebServerRequest *request);
 void fV_handleSerialPage(AsyncWebServerRequest *request);
 void fV_handleSerialLogs(AsyncWebServerRequest *request);
 
+// Helper: serve página de LittleFS com fallback para PROGMEM
+void servePageWithFallback(AsyncWebServerRequest *request, const char* fsPath, const char* progmemContent) {
+    if (LittleFS.exists(fsPath)) {
+        fV_printSerialDebug(LOG_WEB, "Servindo %s de LittleFS", fsPath);
+        request->send(LittleFS, fsPath, "text/html");
+    } else {
+        fV_printSerialDebug(LOG_WEB, "Arquivo %s nao encontrado, usando PROGMEM fallback", fsPath);
+        request->send(200, "text/html", progmemContent);
+    }
+}
+
 // Buffer circular para logs do Web Serial
 #define SERIAL_LOG_BUFFER_SIZE 100
 static String g_serialLogBuffer[SERIAL_LOG_BUFFER_SIZE];
@@ -69,15 +80,8 @@ void fV_setupWebServer() {
              String timeStr = fS_getFormattedTime();
              fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento / (dashboard) - %s (millis: %lu)", timeStr.c_str(), startTime);
              
-             // Envia dashboard com headers de performance
-             AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_dashboard_html);
-             response->addHeader("X-Load-Start", String(startTime));
-             response->addHeader("X-Load-Time", timeStr);
-             // Evitar cache para garantir atualização do layout/título
-             response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-             response->addHeader("Pragma", "no-cache");
-             response->addHeader("Expires", "0");
-             request->send(response);
+             // Envia dashboard com LittleFS-first + fallback
+             servePageWithFallback(request, "/web_dashboard.html", web_dashboard_html);
              
              // Log de finalização
              unsigned long endTime = millis();
@@ -135,11 +139,8 @@ void fV_setupWebServer() {
         String timeStr = fS_getFormattedTime();
         fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /pins - %s (millis: %lu)", timeStr.c_str(), startTime);
         
-        // Envia página com callback de performance
-        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_pins_html);
-        response->addHeader("X-Load-Start", String(startTime));
-        response->addHeader("X-Load-Time", timeStr);
-        request->send(response);
+        // Envia página de pinos com LittleFS-first + fallback
+        servePageWithFallback(request, "/web_pins.html", web_pins_html);
         
         // Log de finalização
         unsigned long endTime = millis();
@@ -999,6 +1000,8 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
     
     // Retorna o heap livre em bytes. O JS fara a conversao para KB/MB.
     system_obj["free_heap"] = ESP.getFreeHeap(); 
+    // Versão do firmware
+    system_obj["fw_version"] = FIRMWARE_VERSION;
     
     // Adiciona informações sobre pinos
     system_obj["max_pins"] = vSt_mainConfig.vU8_quantidadePinos;
@@ -1091,26 +1094,7 @@ void fV_handleConfigPage(AsyncWebServerRequest *request) {
     String timeStr = fS_getFormattedTime();
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /configuracao - %s (millis: %lu)", timeStr.c_str(), startTime);
     
-    // Para páginas grandes, usar chunked encoding para evitar carregamento parcial
-    AsyncWebServerResponse *response = request->beginChunkedResponse("text/html", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-        const char* content = web_config_gerais_html;
-        size_t contentLen = strlen(content);
-        
-        if (index >= contentLen) {
-            return 0; // End of content
-        }
-        
-        size_t remaining = contentLen - index;
-        size_t copyLen = (remaining < maxLen) ? remaining : maxLen;
-        
-        memcpy(buffer, content + index, copyLen);
-        return copyLen;
-    });
-    
-    // Adiciona headers de performance
-    response->addHeader("X-Load-Start", String(startTime));
-    response->addHeader("X-Load-Time", timeStr);
-    request->send(response);
+    servePageWithFallback(request, "/web_config_gerais.html", web_config_gerais_html);
     
     // Log de finalização
     unsigned long endTime = millis();
@@ -1210,18 +1194,12 @@ void fV_handleSaveToFlash(AsyncWebServerRequest *request) {
 
 // Handler para página de MQTT/Serviços
 void fV_handleMqttPage(AsyncWebServerRequest *request) {
-    // Inicia monitoramento de performance
     unsigned long startTime = millis();
     String timeStr = fS_getFormattedTime();
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /mqtt - %s (millis: %lu)", timeStr.c_str(), startTime);
     
-    // Envia página com headers de performance
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_mqtt_html);
-    response->addHeader("X-Load-Start", String(startTime));
-    response->addHeader("X-Load-Time", timeStr);
-    request->send(response);
+    servePageWithFallback(request, "/web_mqtt.html", web_mqtt_html);
     
-    // Log de finalização
     unsigned long endTime = millis();
     String endTimeStr = fS_getFormattedTime();
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento /mqtt - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
@@ -1232,10 +1210,7 @@ void fV_handleInterModPage(AsyncWebServerRequest *request) {
     String timeStr = fS_getFormattedTime();
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /intermod - %s (millis: %lu)", timeStr.c_str(), startTime);
     
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", WEB_HTML_INTERMOD);
-    response->addHeader("X-Load-Start", String(startTime));
-    response->addHeader("X-Load-Time", timeStr);
-    request->send(response);
+    servePageWithFallback(request, "/web_intermod.html", WEB_HTML_INTERMOD);
     
     unsigned long endTime = millis();
     String endTimeStr = fS_getFormattedTime();
@@ -1244,18 +1219,12 @@ void fV_handleInterModPage(AsyncWebServerRequest *request) {
 
 // Handler para página de reset
 void fV_handleResetPage(AsyncWebServerRequest *request) {
-    // Inicia monitoramento de performance
     unsigned long startTime = millis();
     String timeStr = fS_getFormattedTime();
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /reset - %s (millis: %lu)", timeStr.c_str(), startTime);
     
-    // Envia página com headers de performance
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_reset_html);
-    response->addHeader("X-Load-Start", String(startTime));
-    response->addHeader("X-Load-Time", timeStr);
-    request->send(response);
+    servePageWithFallback(request, "/web_reset.html", web_reset_html);
     
-    // Log de finalização
     unsigned long endTime = millis();
     String endTimeStr = fS_getFormattedTime();
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento /reset - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
@@ -1267,10 +1236,7 @@ void fV_handleFilesPage(AsyncWebServerRequest *request) {
     String timeStr = fS_getFormattedTime();
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /arquivos - %s (millis: %lu)", timeStr.c_str(), startTime);
     
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_files_html);
-    response->addHeader("X-Load-Start", String(startTime));
-    response->addHeader("X-Load-Time", timeStr);
-    request->send(response);
+    servePageWithFallback(request, "/web_files.html", web_files_html);
     
     unsigned long endTime = millis();
     String endTimeStr = fS_getFormattedTime();
@@ -1283,14 +1249,7 @@ void fV_handleFirmwarePage(AsyncWebServerRequest *request) {
     String timeStr = fS_getFormattedTime();
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /firmware - %s (millis: %lu)", timeStr.c_str(), startTime);
 
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_firmware_html);
-    response->addHeader("X-Load-Start", String(startTime));
-    response->addHeader("X-Load-Time", timeStr);
-    // Evitar cache desta página para refletir status/título atualizado
-    response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-    response->addHeader("Pragma", "no-cache");
-    response->addHeader("Expires", "0");
-    request->send(response);
+    servePageWithFallback(request, "/web_firmware.html", web_firmware_html);
 
     unsigned long endTime = millis();
     String endTimeStr = fS_getFormattedTime();
@@ -1303,13 +1262,7 @@ void fV_handlePreferenciasPage(AsyncWebServerRequest *request) {
     String timeStr = fS_getFormattedTime();
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /preferencias - %s (millis: %lu)", timeStr.c_str(), startTime);
 
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_preferencias_html);
-    response->addHeader("X-Load-Start", String(startTime));
-    response->addHeader("X-Load-Time", timeStr);
-    response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-    response->addHeader("Pragma", "no-cache");
-    response->addHeader("Expires", "0");
-    request->send(response);
+    servePageWithFallback(request, "/web_preferencias.html", web_preferencias_html);
 
     unsigned long endTime = millis();
     String endTimeStr = fS_getFormattedTime();
@@ -1322,13 +1275,7 @@ void fV_handleLittleFSPage(AsyncWebServerRequest *request) {
     String timeStr = fS_getFormattedTime();
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /littlefs - %s (millis: %lu)", timeStr.c_str(), startTime);
 
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_littlefs_html);
-    response->addHeader("X-Load-Start", String(startTime));
-    response->addHeader("X-Load-Time", timeStr);
-    response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-    response->addHeader("Pragma", "no-cache");
-    response->addHeader("Expires", "0");
-    request->send(response);
+    servePageWithFallback(request, "/web_littlefs.html", web_littlefs_html);
 
     unsigned long endTime = millis();
     String endTimeStr = fS_getFormattedTime();
@@ -1380,13 +1327,7 @@ void fV_handleSerialPage(AsyncWebServerRequest *request) {
     String timeStr = fS_getFormattedTime();
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /serial - %s (millis: %lu)", timeStr.c_str(), startTime);
 
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", web_serial_html);
-    response->addHeader("X-Load-Start", String(startTime));
-    response->addHeader("X-Load-Time", timeStr);
-    response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-    response->addHeader("Pragma", "no-cache");
-    response->addHeader("Expires", "0");
-    request->send(response);
+    servePageWithFallback(request, "/web_serial.html", web_serial_html);
 
     unsigned long endTime = millis();
     String endTimeStr = fS_getFormattedTime();
@@ -1395,10 +1336,15 @@ void fV_handleSerialPage(AsyncWebServerRequest *request) {
 
 // Handler: API - Listar preferências NVS
 void fV_handleNVSList(AsyncWebServerRequest *request) {
-    fV_printSerialDebug(LOG_WEB, "[API] Listando preferências NVS (todas namespaces)");
+    fV_printSerialDebug(LOG_WEB, "[API] Listando preferências NVS (app namespaces)");
 
     JsonDocument doc;
     JsonArray preferences = doc["preferences"].to<JsonArray>();
+
+    // Namespaces do aplicativo; padrão: apenas estes
+    const char* appNamespaces[] = {"smcrconf", "smcrgenc"};
+    const size_t appNsCount = sizeof(appNamespaces) / sizeof(appNamespaces[0]);
+    bool includeSystem = request->hasParam("includeSystem") && request->getParam("includeSystem")->value() == "1";
 
     // Itera sobre TODAS as entradas do NVS (todas as namespaces) na partição padrão "nvs"
     nvs_iterator_t it = nvs_entry_find("nvs", NULL, NVS_TYPE_ANY);
@@ -1406,6 +1352,13 @@ void fV_handleNVSList(AsyncWebServerRequest *request) {
     while (it != NULL) {
         nvs_entry_info_t info;
         nvs_entry_info(it, &info); // preenche info com namespace, key e type
+
+        // Filtra namespaces: inclui apenas os do app, a menos que includeSystem=1
+        bool isAppNs = false;
+        for (size_t i = 0; i < appNsCount; i++) {
+            if (String(info.namespace_name) == appNamespaces[i]) { isAppNs = true; break; }
+        }
+        if (!isAppNs && !includeSystem) { it = nvs_entry_next(it); continue; }
 
         // Abre a namespace em modo leitura
         nvs_handle_t handle;
@@ -1523,6 +1476,10 @@ void fV_handleNVSExport(AsyncWebServerRequest *request) {
     // Parâmetros opcionais: format=(json|text) e include_secrets=1
     String formatParam = request->hasParam("format") ? request->getParam("format")->value() : "json";
     bool includeSecrets = request->hasParam("include_secrets") && request->getParam("include_secrets")->value() != "0";
+    bool includeSystem = request->hasParam("includeSystem") && request->getParam("includeSystem")->value() == "1";
+
+    const char* appNamespaces[] = {"smcrconf", "smcrgenc"};
+    const size_t appNsCount = sizeof(appNamespaces) / sizeof(appNamespaces[0]);
 
     // Função de máscara de segredos
     auto isSensitive = [](const char* key) -> bool {
@@ -1542,6 +1499,12 @@ void fV_handleNVSExport(AsyncWebServerRequest *request) {
         while (it != NULL) {
             nvs_entry_info_t info;
             nvs_entry_info(it, &info);
+
+            bool isAppNs = false;
+            for (size_t i = 0; i < appNsCount; i++) {
+                if (String(info.namespace_name) == appNamespaces[i]) { isAppNs = true; break; }
+            }
+            if (!isAppNs && !includeSystem) { it = nvs_entry_next(it); continue; }
 
             nvs_handle_t handle;
             if (nvs_open(info.namespace_name, NVS_READONLY, &handle) == ESP_OK) {
@@ -1606,6 +1569,12 @@ void fV_handleNVSExport(AsyncWebServerRequest *request) {
     while (it != NULL) {
         nvs_entry_info_t info;
         nvs_entry_info(it, &info);
+
+        bool isAppNs = false;
+        for (size_t i = 0; i < appNsCount; i++) {
+            if (String(info.namespace_name) == appNamespaces[i]) { isAppNs = true; break; }
+        }
+        if (!isAppNs && !includeSystem) { it = nvs_entry_next(it); continue; }
 
         nvs_handle_t handle;
         esp_err_t err = nvs_open(info.namespace_name, NVS_READONLY, &handle);
@@ -1707,6 +1676,9 @@ void fV_handleNVSImport(AsyncWebServerRequest *request) {
 
     // Verifica se deve apagar namespaces antes de importar
     bool clearBefore = request->hasParam("clear") && request->getParam("clear")->value() != "0";
+    bool includeSystem = request->hasParam("includeSystem") && request->getParam("includeSystem")->value() == "1";
+    const char* appNamespaces[] = {"smcrconf", "smcrgenc"};
+    const size_t appNsCount = sizeof(appNamespaces) / sizeof(appNamespaces[0]);
     if (clearBefore) {
         // Monta lista única de namespaces presentes no JSON e apaga todos os pares de cada um
         String seen; // formato |ns1|ns2| para evitar duplicados com busca por substring
@@ -1715,6 +1687,13 @@ void fV_handleNVSImport(AsyncWebServerRequest *request) {
             if (ns.isEmpty()) continue;
             String token = String("|") + ns + String("|");
             if (seen.indexOf(token) >= 0) continue; // já processado
+
+            // Filtra namespaces: apenas app por padrão
+            bool isAppNs = false;
+            for (size_t i = 0; i < appNsCount; i++) {
+                if (ns == appNamespaces[i]) { isAppNs = true; break; }
+            }
+            if (!isAppNs && !includeSystem) { seen += token; continue; }
 
             nvs_handle_t h;
             if (nvs_open(ns.c_str(), NVS_READWRITE, &h) == ESP_OK) {
@@ -1753,6 +1732,13 @@ void fV_handleNVSImport(AsyncWebServerRequest *request) {
         if (ns.isEmpty() || key.isEmpty() || type.isEmpty()) { skipCount++; continue; }
         if (isMasked(value)) { skipCount++; continue; }
         if (type == "BLOB" || type == "UNKNOWN") { skipCount++; continue; }
+
+        // Filtra namespaces na importação: apenas app por padrão
+        bool isAppNs = false;
+        for (size_t i = 0; i < appNsCount; i++) {
+            if (ns == appNamespaces[i]) { isAppNs = true; break; }
+        }
+        if (!isAppNs && !includeSystem) { skipCount++; continue; }
 
         nvs_handle_t handle;
         esp_err_t e = nvs_open(ns.c_str(), NVS_READWRITE, &handle);
@@ -2459,7 +2445,7 @@ void fV_addSerialLogLine(const String &line) {
 // Página de cadastro de ações
 void fV_handleActionsPage(AsyncWebServerRequest *request) {
     fV_printSerialDebug(LOG_WEB, "[WEB] Servindo página de ações");
-    request->send(200, "text/html", WEBPAGE_ACTIONS);
+    servePageWithFallback(request, "/web_actions.html", WEBPAGE_ACTIONS);
 }
 
 

@@ -8,6 +8,9 @@ Inclusão de bibliotecas
 */
 #include "include.h"
 
+// Versão do firmware atual
+#define FIRMWARE_VERSION "2.1.0"
+
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
 extern Preferences preferences;
