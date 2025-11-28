@@ -636,7 +636,7 @@ void fV_readPinsTask(void) {
                     }
                 }
             } else if (modo == PIN_MODE_OUTPUT) {
-                // Para outputs, lê o estado atual e adiciona ao histórico digital
+                // Para outputs, lê o estado atual apenas para sincronizar status_atual
                 int value = digitalRead(pinNumber);
                 
                 // Aplicar XOR também em outputs (se configurado)
@@ -666,8 +666,6 @@ void fV_readPinsTask(void) {
                     if (vSt_mainConfig.vB_mqttEnabled) {
                         fV_publishPinStatus(i);
                     }
-                } else {
-                    vA_pinConfigs[i].status_atual = value;
                 }
             }
             
