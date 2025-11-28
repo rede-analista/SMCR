@@ -188,6 +188,16 @@ Após fazer upload de todos os arquivos:
    - `web_firmware.html`
    - `web_intermod.html`
 
+   ### 4.5 (Opcional) Customizar Favicon
+
+   Para evitar erros de `favicon` no navegador e personalizar o ícone do site:
+
+   1. Gere um arquivo `favicon.ico` (recomendado, 16x16 ou 32x32) ou `favicon.png`.
+   2. Na página **Arquivos (LittleFS)**, envie o arquivo com o nome exato:
+      - `/favicon.ico` ou `/favicon.png`
+   3. Recarregue a página. O servidor serve o favicon diretamente do LittleFS.
+      - Se nenhum ícone existir, o servidor responde `204 No Content`, evitando erro no console.
+
 ---
 
 ## ✅ Etapa 5: Sistema Pronto!

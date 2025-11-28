@@ -9,7 +9,7 @@ Inclusão de bibliotecas
 #include "include.h"
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.1.0"
+#define FIRMWARE_VERSION "2.1.1"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -133,6 +133,9 @@ struct PinConfig_t {
     uint8_t historico_digital[8];    // Array circular para armazenar últimos 8 estados digitais (0 ou 1)
     uint8_t historico_index;         // Índice atual no array circular (0-7)
     uint8_t historico_count;         // Quantidade de valores válidos no histórico (0-8)
+    // MQTT Discovery
+    String classe_mqtt;          // Classe do dispositivo no MQTT/Home Assistant (ex: switch, light, sensor)
+    String icone_mqtt;           // Ícone MDI para o dispositivo (ex: mdi:light-switch, mdi:led-on)
 };
 
 // --- Estrutura para Configuração de Ações ---
@@ -147,9 +150,6 @@ struct ActionConfig_t {
     uint16_t envia_modulo;       // ID do módulo destino (0=nenhum, 1-65533=ID do módulo)
     bool telegram;               // Envia notificação para Telegram
     bool assistente;             // Envia notificação para Assistente
-    bool mqtt;                   // Publica no broker MQTT
-    String classe_mqtt;          // Classe do device MQTT (ex: "binary_sensor", "switch")
-    String icone_mqtt;           // Ícone MDI para MQTT (ex: "mdi:door")
     // Controle interno da ação
     uint16_t contador_on;        // Contador atual de ciclos ON
     uint16_t contador_off;       // Contador atual de ciclos OFF

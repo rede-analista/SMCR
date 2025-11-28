@@ -102,6 +102,12 @@ Todas as páginas web do sistema exibem um **indicador de tempo de carregamento*
 - Zero dependências externas (sem CDN ou internet necessária)
 - Botões com visual moderno e efeitos hover
 
+### Favicon (Ícone do Site)
+- O servidor web atende `/favicon.ico` a partir do LittleFS.
+- Para evitar 404 e customizar o ícone, envie `favicon.ico` (recomendado) ou `favicon.png` via página `Serviços > Arquivos (LittleFS)`.
+- Nome exato dos arquivos: `/favicon.ico` ou `/favicon.png`.
+- Se nenhum arquivo existir, o servidor responde `204 No Content` para evitar erro no console.
+
 ## 📚 Documentação
 
 ### Manual do Usuário
@@ -131,6 +137,34 @@ Todas as páginas web do sistema exibem um **indicador de tempo de carregamento*
 mosquitto_sub -h <broker> -u <user> -P <senha> -t 'smcr/#' -v
 mosquitto_sub -h <broker> -u <user> -P <senha> -t 'homeassistant/#' -v
 ```
+ 
+#### Definição de Classe e Ícone (Discovery)
+Agora configurados diretamente no cadastro de pinos:
+- Classe MQTT (`switch`, `light`, `sensor`, `binary_sensor`, etc.) define o tipo da entidade no Home Assistant.
+- Ícone MDI (`mdi:light-switch`, `mdi:led-on`, etc.) personaliza a exibição.
+- Se não definidos: classe padrão `sensor` e ícone baseado no tipo (digital/analógico).
+- Ações não possuem mais campos de MQTT; elas apenas disparam lógica interna.
+
+### Renomeação Inteligente de Pinos
+- Alterar o número (GPIO) de um pino na página de PINOS atualiza automaticamente todas as ações que referenciam esse pino.
+- Persistência automática: sempre salva pinos; salva ações somente se houve renomeação.
+- Resposta da API inclui detalhes (`renamed`, `old_pin`, `new_pin`, ações atualizadas e `persisted`).
+- Evita recriação manual de cadeias de ações em configurações complexas.
+
+### Multi-Upload de Arquivos (LittleFS)
+- Campo de upload agora aceita múltiplos arquivos.
+- Envio sequencial com indicação de progresso por arquivo.
+- Usa mesma rota `/api/files/upload` para cada arquivo (compatibilidade mantida, sem impacto em memória).
+ - Suporte a barra de progresso agregada e cancelamento em lote.
+
+### Aviso: Operações em Massa de Arquivos
+⚠️ Executar uploads, downloads ou deleções de muitos arquivos em sequência pode causar uso elevado de memória, lentidão ou reinício automático do ESP32. Recomenda-se:
+- Processar em lotes pequenos (5–10 arquivos)
+- Aguardar alguns segundos entre lotes maiores
+- Evitar iniciar novos uploads enquanto uma sequência de deleções ou downloads ainda ocorre
+- Verificar integridade de arquivos críticos (ex: configs de pinos/ações) após reinício inesperado
+
+Veja detalhes e boas práticas em `manual/arquivos.md`.
 
 ### NVS: Exportar/Importar
 - Página "Arquivos": agora lista todas as chaves do NVS (todas as namespaces) com segredos mascarados por padrão.

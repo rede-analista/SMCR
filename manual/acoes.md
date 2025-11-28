@@ -87,17 +87,21 @@ NOTA 2: <strong>Se o módulo for reiniciado antes de salvar as informações na 
   - Se marcadom ativa as notificações desta ação para notificar aos assistentes.<br>
     NOTA 7: Antes de habilitar este item você configurar as informações dos Assistentes.[Veja Configurações Gerais](configgeral.md)<br>
 
-- Parâmetro ENVIA MQTT
-  - se marcado, ativa as notificações desta ação para envior a um MqTT.<br>
-    NOTA 8: Antes de habilitar este item você configurar as informações do MQTT.[Veja Configurações Gerais](configgeral.md)
+> ALTERAÇÃO: A partir da versão 2.1.0 a integração MQTT (classe e ícone) passou a ser configurada diretamente no cadastro de PINOS. As ações não possuem mais campos de MQTT. Cada pino publica seu próprio discovery no Home Assistant usando a classe e ícone definidos no cadastro de pinos.
 
-- Parâmetro CLASSE MQTT
-  - É a informação de qual classe esta ação será informada ao servidor mqtt<br>
-    Deve ser usado uma classe suportado pelo MqTT, mais informações podem ser consultadas em [MQTT](https://www.home-assistant.io/integrations/mqtt/)
+## Atualização Automática ao Renomear Pinos
 
-- Parâmetro ÍCONE MQTT
-  - É a informação de qual ícone esta ação será informada ao servidor mqtt<br>
-    Deve ser usado um ícone suportado pelo MqTT, mais informações podem ser consultadas em [MQTT](https://mdi.bessarabov.com/)
+Quando um pino tem seu número alterado (renomeado) na página de PINOS:
+
+- Todas as ações que usam o pino como `PINO ORIGEM` ou `PINO DESTINO` são automaticamente atualizadas para refletir o novo número.
+- O arquivo de ações (`/actions_config.json`) é salvo apenas se houve renomeação (edições simples não regravam ações).
+- A resposta da API de atualização de pino retorna contadores de ações alteradas.
+
+Isso elimina a necessidade de excluir e recriar ações manualmente ao reorganizar a numeração dos pinos físicos ou virtuais.
+
+Boas práticas:
+- Após renomear, valide rapidamente se todas as ações continuam operando (dashboard / logs `LOG_ACTIONS`).
+- Evite renomear o mesmo pino várias vezes seguidas sem necessidade para reduzir ciclos de escrita.
 
   
  # Não esqueça de salvar as informações antes de reiniciar/desligar o módulo.

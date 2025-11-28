@@ -375,16 +375,6 @@
                             <label for="envia_modulo">ID Módulo Destino</label>
                             <input type="number" id="envia_modulo" name="envia_modulo" min="0" value="0">
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="classe_mqtt">Classe MQTT</label>
-                            <input type="text" id="classe_mqtt" name="classe_mqtt" maxlength="50" placeholder="Ex: switch">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="icone_mqtt">Ícone MQTT</label>
-                            <input type="text" id="icone_mqtt" name="icone_mqtt" maxlength="50" placeholder="Ex: mdi:light-switch">
-                        </div>
                     </div>
                     
                     <div class="form-grid" style="grid-template-columns: repeat(3, 1fr);">
@@ -399,13 +389,6 @@
                             <div class="checkbox-group">
                                 <input type="checkbox" id="assistente" name="assistente">
                                 <label for="assistente">🎤 Notificar Assistente</label>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <div class="checkbox-group">
-                                <input type="checkbox" id="mqtt" name="mqtt">
-                                <label for="mqtt">📡 Integração MQTT</label>
                             </div>
                         </div>
                     </div>
@@ -676,11 +659,8 @@
             document.getElementById('tempo_off').value = action.tempo_off;
             document.getElementById('pino_remoto').value = action.pino_remoto;
             document.getElementById('envia_modulo').value = action.envia_modulo;
-            document.getElementById('classe_mqtt').value = action.classe_mqtt || '';
-            document.getElementById('icone_mqtt').value = action.icone_mqtt || '';
             document.getElementById('telegram').checked = action.telegram;
             document.getElementById('assistente').checked = action.assistente;
-            document.getElementById('mqtt').checked = action.mqtt;
             
             // Desabilitar campos de identificação durante edição
             document.getElementById('pino_origem').disabled = true;

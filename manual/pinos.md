@@ -158,6 +158,18 @@ NOTA 3: Se o módulo for reiniciado antes de salvar as informações na flash to
     - 0 = Sem retenção
     - 1 a 65535 = Com Retenção
 
+- Parâmetro CLASSE MQTT
+  - Define o tipo de entidade publicada via discovery MQTT/Home Assistant para este pino.
+  - Exemplos comuns: `switch`, `light`, `sensor`, `binary_sensor`.
+  - Se vazio, o sistema usa `sensor` como padrão.
+
+- Parâmetro ÍCONE MQTT (MDI)
+  - Ícone exibido no Home Assistant para a entidade do pino.
+  - Use valores do conjunto Material Design Icons, como `mdi:light-switch`, `mdi:led-on`, `mdi:motion-sensor`.
+  - Se vazio, o sistema escolhe um ícone padrão baseado no tipo do pino.
+
+NOTA MQTT: Cada pino com classe/ícone definidos gera sua própria entrada de discovery. As ações não controlam mais publicação MQTT.
+
     - O tempo de retenção não é contado em milisegundos mas sim em tempo de clico do processador, para mais detalhe do tempo de retenção veja [Veja CICLOS HANDSHAKE](intermod.md)
 
 
@@ -172,3 +184,29 @@ NOTA 3: Se o módulo for reiniciado antes de salvar as informações na flash to
 ![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t2.png)
 
 ![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t3.png)
+
+## Renomeação Inteligente de Pinos (>= 2.1.0)
+
+Desde a versão 2.1.0 você pode alterar o número (GPIO) de um pino diretamente no modo edição:
+
+- Ao editar um pino, basta mudar o campo "PINO" e salvar.
+- O sistema atualiza automaticamente TODAS as ações que referenciam este pino como origem ou destino.
+- A persistência é automática: 
+  - Sempre salva o arquivo de pinos (`/pins_config.json`).
+  - Salva o arquivo de ações (`/actions_config.json`) apenas se houve renomeação (evita desgaste excessivo da flash).
+- A resposta da API inclui: `renamed`, `old_pin`, `new_pin`, `updated_source_actions`, `updated_destination_actions`, `persisted`.
+
+Notas:
+1. Se o novo número já existir a operação é recusada (`409`).
+2. Se você apenas altera parâmetros (nome, tipo, modo, níveis) sem mudar o número do pino, somente `pins_config.json` é salvo.
+3. Ações sem alteração de pino não são regravadas, preservando ciclos de escrita.
+
+Benefícios:
+- Evita recriar manualmente ações em cascata.
+- Garante consistência imediata entre cadastros de pinos e ações.
+- Reduz erros humanos ao reorganizar numeração física vs. lógica.
+
+Boas práticas:
+- Planeje a nova numeração antes de renomear vários pinos em sequência.
+- Verifique no dashboard se o comportamento esperado foi mantido.
+- Use pinos virtuais (tipo 65534) quando quiser desacoplar lógica sem consumir GPIO real.

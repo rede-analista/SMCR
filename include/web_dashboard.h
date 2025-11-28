@@ -104,7 +104,7 @@ const char web_dashboard_html[] PROGMEM = R"rawliteral(
             <p style="color: #666; font-size: 14px;">
                 <strong>Arquivos necessários:</strong><br>
                 web_dashboard.html, web_pins.html, web_actions.html, web_config_gerais.html,<br>
-                web_files.html, web_mqtt.html, web_reset.html, web_preferencias.html,<br>
+                web_mqtt.html, web_reset.html, web_preferencias.html,<br>
                 web_firmware.html, web_serial.html, web_intermod.html
             </p>
         </div>

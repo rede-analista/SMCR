@@ -108,7 +108,7 @@ esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 \
 
 ## 📌 Modelo de Release v2.1.0 (Atual)
 
-Use este modelo para a versão 2.1.0 contendo MQTT Discovery em lotes, NVS Export/Import e correções no menu Arquivos.
+Use este modelo para a versão 2.1.0 contendo MQTT Discovery em lotes, NVS Export/Import, correções no menu Arquivos e base para renomeação inteligente de pinos (feature refinada pós-2.1.0).
 
 ### 1. Commit dos Arquivos
 ```bash
@@ -151,6 +151,12 @@ git push origin v2.1.0
 - Dashboard exibe `SMCR - [HOSTNAME]` e no-cache aplicado para evitar layout antigo.
 - Sanitização de hostname: somente A-Z/0-9, uppercase, sem espaços/acentos.
 - Página MQTT mais leve: endpoints separados (`/api/mqtt/config` e `/api/mqtt/status`) e timeouts.
+
+### 🔁 Renomeação Inteligente de Pinos (pós-2.1.0)
+- A atualização do número de um pino na interface não exige remoção/recriação.
+- Ações que usavam o pino como origem/destino são ajustadas automaticamente.
+- Persistência automática: pinos sempre salvos; ações somente se houve renomeação.
+- Evita perda acidental de lógica encadeada ao reorganizar GPIOs.
 
 ## 📦 Arquivos
 - `SMCR_v2.1.0_firmware.bin`

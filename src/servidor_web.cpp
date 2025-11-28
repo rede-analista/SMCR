@@ -7,7 +7,6 @@
 #include "web_pins.h"
 #include "web_mqtt.h"
 #include "web_intermod.h"
-#include "web_files.h"
 #include "web_actions.h"
 #include "web_firmware.h"
 #include "web_preferencias.h"
@@ -21,7 +20,6 @@
 #include <Update.h>
 
 // Forward declarations para handlers de arquivos
-void fV_handleFilesPage(AsyncWebServerRequest *request);
 void fV_handleFirmwarePage(AsyncWebServerRequest *request);
 void fV_handleNVSList(AsyncWebServerRequest *request);
 void fV_handleNVSExport(AsyncWebServerRequest *request);
@@ -457,6 +455,17 @@ void fV_setupWebServer() {
             }
         }
         fV_handleActionsSaveApi(request);
+    
+        // API: Deletar ação específica - usando regex para capturar pin e num
+        SERVIDOR_WEB_ASYNC->on("^\\/api\\/actions\\/([0-9]+)\\/([0-9]+)$", HTTP_DELETE, [](AsyncWebServerRequest *request) {
+            // Verifica autenticação se habilitada
+            if (vSt_mainConfig.vB_authEnabled) {
+                if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                    return request->requestAuthentication();
+                }
+            }
+            fV_handleActionDeleteApi(request);
+        });
     });
     
     // Rotas de reset (POST)
@@ -466,6 +475,18 @@ void fV_setupWebServer() {
     SERVIDOR_WEB_ASYNC->on("/reset/config", HTTP_POST, fV_handleConfigReset);
     SERVIDOR_WEB_ASYNC->on("/reset/pins", HTTP_POST, fV_handlePinsReset);
     SERVIDOR_WEB_ASYNC->on("/restart", HTTP_POST, fV_handleRestart);
+
+    // Favicon: servir a partir do LittleFS para evitar 404
+    SERVIDOR_WEB_ASYNC->on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (LittleFS.exists("/favicon.ico")) {
+            request->send(LittleFS, "/favicon.ico", String("image/x-icon"));
+        } else if (LittleFS.exists("/favicon.png")) {
+            request->send(LittleFS, "/favicon.png", String("image/png"));
+        } else {
+            // Sem favicon: responde 204 No Content para evitar erro
+            request->send(204);
+        }
+    });
     
     // API: Salvar configurações MQTT
     SERVIDOR_WEB_ASYNC->on("/api/mqtt/save", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -916,7 +937,9 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
 
 // Rota Handler: 404 Not Found
 void fV_handleNotFound(AsyncWebServerRequest *request) {
-    // PRIMEIRO: Verifica se é DELETE para /api/actions/{pin}/{num}
+    // Tratativa especial: DELETE /api/actions/{pin}/{num}
+    // ESPAsyncWebServer não suporta rotas dinâmicas com segmentos variáveis diretamente,
+    // então tratamos aqui antes de responder 404.
     String url = request->url();
     if (request->method() == HTTP_DELETE && url.startsWith("/api/actions/")) {
         // Verifica autenticação se habilitada
@@ -925,39 +948,10 @@ void fV_handleNotFound(AsyncWebServerRequest *request) {
                 return request->requestAuthentication();
             }
         }
-        
-        // Tenta parsear a URL
-        int lastSlash = url.lastIndexOf('/');
-        int secondLastSlash = url.lastIndexOf('/', lastSlash - 1);
-        
-        if (lastSlash > secondLastSlash && secondLastSlash > 12) { // 12 = tamanho de "/api/actions/"
-            String pinStr = url.substring(secondLastSlash + 1, lastSlash);
-            String numStr = url.substring(lastSlash + 1);
-            
-            // Valida se são números
-            bool validPin = true;
-            bool validNum = true;
-            
-            for (unsigned int i = 0; i < pinStr.length(); i++) {
-                if (!isDigit(pinStr.charAt(i))) validPin = false;
-            }
-            for (unsigned int i = 0; i < numStr.length(); i++) {
-                if (!isDigit(numStr.charAt(i))) validNum = false;
-            }
-            
-            if (validPin && validNum) {
-                int pin = pinStr.toInt();
-                int num = numStr.toInt();
-                
-                if (num >= 1 && num <= 4 && pin <= 254) {
-                    fV_handleActionDeleteApi(request);
-                    return;
-                }
-            }
-        }
+        // Delegar parsing e validação ao handler dedicado
+        fV_handleActionDeleteApi(request);
+        return;
     }
-    
-    // SEGUNDO: 404 padrão
     // Captura o IP do cliente que fez a requisição
     String vS_clientIP = (request->client() != nullptr) ? request->client()->remoteIP().toString() : "N/A";
 
@@ -1230,18 +1224,6 @@ void fV_handleResetPage(AsyncWebServerRequest *request) {
     fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento /reset - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
 }
 
-// Handler para página de arquivos
-void fV_handleFilesPage(AsyncWebServerRequest *request) {
-    unsigned long startTime = millis();
-    String timeStr = fS_getFormattedTime();
-    fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] INICIO carregamento /arquivos - %s (millis: %lu)", timeStr.c_str(), startTime);
-    
-    servePageWithFallback(request, "/web_files.html", web_files_html);
-    
-    unsigned long endTime = millis();
-    String endTimeStr = fS_getFormattedTime();
-    fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento /arquivos - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
-}
 
 // Handler para página de firmware (OTA)
 void fV_handleFirmwarePage(AsyncWebServerRequest *request) {
@@ -1810,6 +1792,7 @@ void fV_handleFilesList(AsyncWebServerRequest *request) {
     doc["totalBytes"] = LittleFS.totalBytes();
     doc["usedBytes"] = LittleFS.usedBytes();
     doc["freeBytes"] = LittleFS.totalBytes() - LittleFS.usedBytes();
+    doc["fileCount"] = files.size();
     
     String response;
     serializeJson(doc, response);
@@ -2028,6 +2011,8 @@ void fV_handlePinAdd(AsyncWebServerRequest *request) {
     newPin.ignore_contador = 0;
     newPin.nivel_acionamento_min = request->hasArg("nivel_acionamento_min") ? request->arg("nivel_acionamento_min").toInt() : 0;
     newPin.nivel_acionamento_max = request->hasArg("nivel_acionamento_max") ? request->arg("nivel_acionamento_max").toInt() : 0;
+        newPin.classe_mqtt = request->hasArg("classe_mqtt") ? request->arg("classe_mqtt") : "";
+        newPin.icone_mqtt = request->hasArg("icone_mqtt") ? request->arg("icone_mqtt") : "";
     
     // Tenta adicionar o pino
     int result = fI_addPinConfig(newPin);
@@ -2072,6 +2057,8 @@ void fV_handlePinsListApi(AsyncWebServerRequest *request) {
             pinObj["tempo_retencao"] = vA_pinConfigs[i].tempo_retencao;
             pinObj["nivel_acionamento_min"] = vA_pinConfigs[i].nivel_acionamento_min;
             pinObj["nivel_acionamento_max"] = vA_pinConfigs[i].nivel_acionamento_max;
+                        pinObj["classe_mqtt"] = vA_pinConfigs[i].classe_mqtt;
+                        pinObj["icone_mqtt"] = vA_pinConfigs[i].icone_mqtt;
             pinObj["status_atual"] = vA_pinConfigs[i].status_atual;
         }
     }
@@ -2169,28 +2156,78 @@ void fV_handlePinUpdateApi(AsyncWebServerRequest *request) {
         return;
     }
     
-    // Cria nova configuração
+    // Cria nova configuração (inclui campos MQTT)
     PinConfig_t updatedPin;
     updatedPin.nome = doc["nome"] | "";
-    updatedPin.pino = doc["pino"] | pinNumber;
+    updatedPin.pino = doc["pino"] | pinNumber; // Pode ser diferente (rename)
     updatedPin.tipo = doc["tipo"] | 0;
     updatedPin.modo = doc["modo"] | 0;
     updatedPin.xor_logic = doc["xor_logic"] | 0;
     updatedPin.tempo_retencao = doc["tempo_retencao"] | 0;
     updatedPin.nivel_acionamento_min = doc["nivel_acionamento_min"] | 0;
     updatedPin.nivel_acionamento_max = doc["nivel_acionamento_max"] | 0;
-    
-    // Atualiza o pino (apenas running config)
+    updatedPin.classe_mqtt = doc["classe_mqtt"] | "";
+    updatedPin.icone_mqtt = doc["icone_mqtt"] | "";
+
+    uint8_t newPinNumber = updatedPin.pino;
+    bool renamed = (newPinNumber != pinNumber);
+    uint16_t updatedSourceActions = 0;
+    uint16_t updatedDestinationActions = 0;
+
+    // Se for rename, validar que novo número não existe
+    if (renamed) {
+        if (fU8_findPinIndex(newPinNumber) != 255) {
+            fV_printSerialDebug(LOG_WEB, "[API] ERRO: Novo número de pino %d já existente", newPinNumber);
+            request->send(409, "application/json", "{\"error\": \"Novo número de pino já existe\"}");
+            return;
+        }
+        fV_printSerialDebug(LOG_WEB, "[API] Renomeando pino %d -> %d (atualizando ações)", pinNumber, newPinNumber);
+        // Atualiza referências nas ações (origem e destino)
+        for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
+            if (vA_actionConfigs[i].acao == 0) continue; // Ignora ações vazias
+            if (vA_actionConfigs[i].pino_origem == pinNumber) {
+                vA_actionConfigs[i].pino_origem = newPinNumber;
+                updatedSourceActions++;
+            }
+            if (vA_actionConfigs[i].pino_destino == pinNumber) {
+                vA_actionConfigs[i].pino_destino = newPinNumber;
+                updatedDestinationActions++;
+            }
+        }
+    }
+
+    // Atualiza o pino original com nova config (inclui rename)
     bool success = fB_updatePinConfig(pinNumber, updatedPin);
     if (!success) {
         request->send(404, "application/json", "{\"error\": \"Pino não encontrado\"}");
         return;
     }
-    
+
     // Aplica configuração física se necessário
     fV_setupConfiguredPins();
-    
-    request->send(200, "application/json", "{\"success\": true, \"message\": \"Pino atualizado na running config\"}");
+
+    // Monta resposta detalhada
+    JsonDocument resp;
+    resp["success"] = true;
+    resp["message"] = renamed ? "Pino renomeado e atualizado" : "Pino atualizado";
+    resp["renamed"] = renamed;
+    resp["old_pin"] = pinNumber;
+    resp["new_pin"] = updatedPin.pino;
+    resp["updated_source_actions"] = updatedSourceActions;
+    resp["updated_destination_actions"] = updatedDestinationActions;
+    resp["total_actions_updated"] = updatedSourceActions + updatedDestinationActions;
+    // Persistência automática sempre (pinos). Ações apenas se houve rename.
+    bool pinsOk = fB_savePinConfigs();
+    bool actionsOk = true;
+    if (renamed) {
+        actionsOk = fB_saveActionConfigs();
+    }
+    bool persisted = pinsOk && actionsOk;
+    fV_printSerialDebug(LOG_WEB, "[API] Persistência auto: renamed=%d pinsOk=%d actionsOk=%d", renamed, pinsOk, actionsOk);
+    resp["persisted"] = persisted;
+    String out;
+    serializeJson(resp, out);
+    request->send(200, "application/json", out);
 }
 
 // API: Deletar pino
@@ -2327,9 +2364,6 @@ void fV_handleActionsListApi(AsyncWebServerRequest *request) {
             actionObj["envia_modulo"] = vA_actionConfigs[i].envia_modulo;
             actionObj["telegram"] = vA_actionConfigs[i].telegram;
             actionObj["assistente"] = vA_actionConfigs[i].assistente;
-            actionObj["mqtt"] = vA_actionConfigs[i].mqtt;
-            actionObj["classe_mqtt"] = vA_actionConfigs[i].classe_mqtt;
-            actionObj["icone_mqtt"] = vA_actionConfigs[i].icone_mqtt;
         }
     }
     
@@ -2363,9 +2397,6 @@ void fV_handleActionCreateApi(AsyncWebServerRequest *request) {
     newAction.envia_modulo = request->hasArg("envia_modulo") ? request->arg("envia_modulo").toInt() : 0;
     newAction.telegram = request->hasArg("telegram") && request->arg("telegram") == "true";
     newAction.assistente = request->hasArg("assistente") && request->arg("assistente") == "true";
-    newAction.mqtt = request->hasArg("mqtt") && request->arg("mqtt") == "true";
-    newAction.classe_mqtt = request->hasArg("classe_mqtt") ? request->arg("classe_mqtt") : "";
-    newAction.icone_mqtt = request->hasArg("icone_mqtt") ? request->arg("icone_mqtt") : "";
     
     // Detecta modo de edição (campos hidden)
     bool isEdit = request->hasArg("edit_pino_origem") && request->hasArg("edit_numero_acao") &&

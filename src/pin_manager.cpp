@@ -169,6 +169,8 @@ void fV_loadPinConfigs(void) {
         vA_pinConfigs[index].tempo_retencao = pin["tempo_retencao"] | 0;
         vA_pinConfigs[index].nivel_acionamento_min = pin["nivel_acionamento_min"] | 0;
         vA_pinConfigs[index].nivel_acionamento_max = pin["nivel_acionamento_max"] | 0;
+            vA_pinConfigs[index].classe_mqtt = pin["classe_mqtt"] | "";
+            vA_pinConfigs[index].icone_mqtt = pin["icone_mqtt"] | "";
         vA_pinConfigs[index].status_atual = 0;
         vA_pinConfigs[index].ignore_contador = 0;
         vA_pinConfigs[index].ultimo_acionamento_ms = 0;  // Inicializa timestamp de retenção
@@ -215,6 +217,8 @@ bool fB_savePinConfigs(void) {
             pin["tempo_retencao"] = vA_pinConfigs[i].tempo_retencao;
             pin["nivel_acionamento_min"] = vA_pinConfigs[i].nivel_acionamento_min;
             pin["nivel_acionamento_max"] = vA_pinConfigs[i].nivel_acionamento_max;
+                    pin["classe_mqtt"] = vA_pinConfigs[i].classe_mqtt;
+                    pin["icone_mqtt"] = vA_pinConfigs[i].icone_mqtt;
         }
     }
     

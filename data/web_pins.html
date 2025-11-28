@@ -257,7 +257,7 @@
             <form id="pin-form">
                 <table class="config-table">
                     <tr><td>Nome do Pino:</td><td><input type="text" id="pin-name" name="nome" maxlength="32" required></td></tr>
-                    <tr><td>Numero do Pino:</td><td><input type="number" id="pin-number" name="pino" min="0" max="39" required></td></tr>
+                    <tr><td>Numero do Pino:</td><td><input type="number" id="pin-number" name="pino" min="0" max="65533" required></td></tr>
                     <tr><td>Tipo do Pino:</td><td>
                         <select id="pin-type" name="tipo" onchange="updateModeOptions()">
                             <option value="0">Não Utilizado</option>
@@ -311,6 +311,18 @@
                     • <strong>Pinos Analógicos (ADC):</strong> Valor de 0-4095 (12-bit)<br>
                     • <strong>Faixa Min/Max:</strong> Define quando pino analógico está "acionado"<br>
                     • <strong>Pinos Remotos:</strong> Não possuem nível de acionamento local
+
+                                <div class="section-title" style="font-size: 16px;">MQTT / Home Assistant</div>
+                                <table class="config-table">
+                                    <tr><td>Classe MQTT:</td><td>
+                                        <input type="text" id="pin-classe-mqtt" name="classe_mqtt" maxlength="50" placeholder="Ex: switch, light, sensor">
+                                        <small style="display: block; color: #666; font-size: 11px;">Tipo de dispositivo no Home Assistant (switch, light, sensor, binary_sensor, etc.)</small>
+                                    </td></tr>
+                                    <tr><td>Ícone MDI:</td><td>
+                                        <input type="text" id="pin-icone-mqtt" name="icone_mqtt" maxlength="50" placeholder="Ex: mdi:light-switch, mdi:led-on">
+                                        <small style="display: block; color: #666; font-size: 11px;">Ícone Material Design Icons para exibição no HA</small>
+                                    </td></tr>
+                                </table>
                 </div>
 
                 <div style="text-align: center; margin-top: 20px;">
@@ -561,6 +573,8 @@
             document.getElementById('pin-trigger').value = pin.nivel_acionamento_min === 1 ? '1' : '0';
             document.getElementById('pin-min').value = pin.nivel_acionamento_min || 0;
             document.getElementById('pin-max').value = pin.nivel_acionamento_max || 0;
+                        document.getElementById('pin-classe-mqtt').value = pin.classe_mqtt || '';
+                        document.getElementById('pin-icone-mqtt').value = pin.icone_mqtt || '';
             
             // Definir tipo (pode ser migrado)
             document.getElementById('pin-type').value = tipoAtualizado;
@@ -683,42 +697,44 @@
                 console.log('[DEBUG] Modo edição - deletando pino antigo:', originalPin);
                 
                 // Deletar pino antigo primeiro
+                const newPinNumber = document.getElementById('pin-number').value;
+                // Monta payload JSON para atualização via PUT (suporta rename)
+                const payload = {
+                    nome: document.getElementById('pin-name').value,
+                    pino: parseInt(newPinNumber),
+                    tipo: parseInt(document.getElementById('pin-type').value),
+                    modo: parseInt(document.getElementById('pin-mode').value),
+                    xor_logic: parseInt(document.getElementById('pin-xor').value),
+                    tempo_retencao: parseInt(document.getElementById('pin-retention').value),
+                    nivel_acionamento_min: parseInt(document.getElementById('pin-min').value),
+                    nivel_acionamento_max: parseInt(document.getElementById('pin-max').value),
+                    classe_mqtt: document.getElementById('pin-classe-mqtt').value.trim(),
+                    icone_mqtt: document.getElementById('pin-icone-mqtt').value.trim()
+                };
                 fetch(`/api/pins/${originalPin}`, {
-                    method: 'DELETE'
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 })
-                .then(response => {
-                    if (response.status === 409) {
-                        // Conflito: pino está em uso por ações
-                        return response.json().then(data => {
-                            throw new Error(data.message || 'Pino está em uso por ações e não pode ser editado');
-                        });
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (!data.success) {
-                        throw new Error(data.error || 'Falha ao deletar pino antigo');
-                    }
-                    console.log('[DEBUG] Pino antigo deletado com sucesso');
-                    // Agora adicionar o pino com as novas configurações
-                    return fetch('/pins/add', {
-                        method: 'POST',
-                        body: formData
-                    });
-                })
-                .then(response => response.text())
+                .then(r => r.json())
                 .then(result => {
-                    if (result === 'OK') {
-                        showStatus('Pino atualizado com sucesso!', 'success');
+                    if (result.success) {
+                        if (result.renamed) {
+                            const persistInfo = result.persisted ? ' (salvo na flash)' : ' (não salvo na flash)';
+                            showStatus(`Pino renomeado ${result.old_pin} -> ${result.new_pin}. Ações atualizadas: origem=${result.updated_source_actions}, destino=${result.updated_destination_actions}${persistInfo}`, 'success');
+                        } else {
+                            const persistInfo = result.persisted ? ' (salvo na flash)' : ' (falha ao salvar na flash)';
+                            showStatus('Pino atualizado com sucesso' + persistInfo + '!', 'success');
+                        }
                         cancelAddPin();
                         loadPins();
                     } else {
-                        showStatus('Erro ao atualizar pino: ' + result, 'error');
+                        showStatus('Erro ao atualizar pino: ' + (result.error || 'Falha desconhecida'), 'error');
                     }
                 })
-                .catch(error => {
+                .catch(err => {
+                    console.error('[ERROR]', err);
                     showStatus('Erro de comunicação ao atualizar pino.', 'error');
-                    console.error('[ERROR]', error);
                 });
             } else {
                 // Modo adicionar normal

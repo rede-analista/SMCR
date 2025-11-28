@@ -58,9 +58,6 @@ void fV_initActionSystem(void) {
         vA_actionConfigs[i].envia_modulo = 0;
         vA_actionConfigs[i].telegram = false;
         vA_actionConfigs[i].assistente = false;
-        vA_actionConfigs[i].mqtt = false;
-        vA_actionConfigs[i].classe_mqtt = "";
-        vA_actionConfigs[i].icone_mqtt = "";
         vA_actionConfigs[i].contador_on = 0;
         vA_actionConfigs[i].contador_off = 0;
         vA_actionConfigs[i].estado_acao = false;
@@ -186,9 +183,6 @@ void fV_loadActionConfigs(void) {
         vA_actionConfigs[index].envia_modulo = action["envia_modulo"] | 0;
         vA_actionConfigs[index].telegram = action["telegram"] | false;
         vA_actionConfigs[index].assistente = action["assistente"] | false;
-        vA_actionConfigs[index].mqtt = action["mqtt"] | false;
-        vA_actionConfigs[index].classe_mqtt = action["classe_mqtt"] | "";
-        vA_actionConfigs[index].icone_mqtt = action["icone_mqtt"] | "";
         vA_actionConfigs[index].contador_on = 0;
         vA_actionConfigs[index].contador_off = 0;
         vA_actionConfigs[index].estado_acao = false;
@@ -228,9 +222,6 @@ bool fB_saveActionConfigs(void) {
             action["envia_modulo"] = vA_actionConfigs[i].envia_modulo;
             action["telegram"] = vA_actionConfigs[i].telegram;
             action["assistente"] = vA_actionConfigs[i].assistente;
-            action["mqtt"] = vA_actionConfigs[i].mqtt;
-            action["classe_mqtt"] = vA_actionConfigs[i].classe_mqtt;
-            action["icone_mqtt"] = vA_actionConfigs[i].icone_mqtt;
         }
     }
     

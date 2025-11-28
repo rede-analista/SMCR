@@ -294,19 +294,16 @@ void fV_publishMqttDiscoveryStep(void) {
         String pinName = pin->nome.isEmpty() ? String("Pino ") + String(pin->pino) : pin->nome;
         String objectId = uniqueId + "_pin" + String(pin->pino);
 
-        String component = "sensor";
-        String icon = "mdi:numeric";
-        if (pin->tipo == 1) icon = "mdi:electric-switch";     // Digital
-        else if (pin->tipo == 192) icon = "mdi:gauge";         // Analógico
-
-        for (uint8_t j = 0; j < vU8_activeActionsCount; j++) {
-            ActionConfig_t* action = &vA_actionConfigs[j];
-            if (action->pino_origem == pin->pino && action->mqtt) {
-                if (!action->icone_mqtt.isEmpty()) {
-                    icon = action->icone_mqtt;
-                }
-                break;
-            }
+        // Usa classe e ícone configurados no pino, com fallback para padrões por tipo
+        String component = pin->classe_mqtt.isEmpty() ? "sensor" : pin->classe_mqtt;
+        String icon;
+        if (!pin->icone_mqtt.isEmpty()) {
+            icon = pin->icone_mqtt;
+        } else {
+            // Fallback padrão baseado no tipo
+            if (pin->tipo == 1) icon = "mdi:electric-switch";     // Digital
+            else if (pin->tipo == 192) icon = "mdi:gauge";         // Analógico
+            else icon = "mdi:numeric";
         }
 
         String stateTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/pin/" + String(pin->pino) + "/state";
