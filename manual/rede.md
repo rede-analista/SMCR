@@ -203,14 +203,14 @@ IP: DHCP (automático)
 1. **Verifique conectividade**: Módulo deve ter acesso à internet
 2. **Teste servidor NTP**: Use `pool.ntp.br` para servidores brasileiros
 3. **Configurar firewall**: Liberação da porta 123 UDP
-4. **Reset NTP**: Menu Reset → "Reset Configurações NTP"
+
 
 ## ⚠️ Avisos Importantes sobre Configuração de Rede
 
 ### 🔒 Segurança
 - **Senhas fortes**: Use senhas com 8+ caracteres
 - **Rede isolada**: Considere VLAN separada para dispositivos IoT
-- **Autenticação**: Habilite login web em ambientes corporativos
+- **Autenticação**: Habilite login web para maior controle e segurança
 - **Backup**: Anote configurações antes de mudanças críticas
 
 ### 🌐 Conectividade
@@ -223,18 +223,3 @@ IP: DHCP (automático)
 - **Largura de banda**: 2.4GHz suficiente para IoT
 - **Latência**: <100ms para comunicação inter-módulos
 - **Interferência**: Evite canais congestionados
-
-## Sistema de Configuração Dual
-
-### 📋 Configuração Ativa e Persistente
-- Configurações carregadas na memória RAM e salvas automaticamente na flash
-- Aplicadas e persistidas imediatamente ao clicar em "Aplicar"
-- Mantidas mesmo após reinicializações
-- Permite validação e uso sem necessidade de salvar manualmente
-
-### 🔄 Sincronização de Configurações
-```
-Boot → Carregar Configuração Persistente → Configuração Ativa
-Aplicar → Atualizar e salvar Configuração Ativa/Persistente
-Reiniciar → Carregar nova Configuração Persistente → Configuração Ativa
-```

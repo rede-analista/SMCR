@@ -1,11 +1,11 @@
 # Configurações dos pinos
 
-- Você deve configurar os pinos do módulo como entrada ou saída, para isto, na página inicial clique na opção "Configurar Pinos".<br>
+- Você deve configurar os pinos do módulo como entrada ou saída, para isto, na página inicial clique na opção "Pinos"<br>
 
 ![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_pinos_t0.png)
 
 
-- Será aberta a página com as informações de todos os pinos. Nesta página pode chegar a 254(uint8_t) posições para configurações dos pinos, o cadastro de um pino pode ser realizado em qualquer posição.<br>
+- Será aberta a página com as informações de todos os pinos cadastrados. Nesta página pode chegar a 254(uint8_t) posições para configurações dos pinos.<br>
 Por padrão o módulo vem configurado com 15 pinos.<br>
 
 ![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_pinos_tm.png)
@@ -24,9 +24,6 @@ O total de pinos pode ser ajustado no cadastro geral. Em testes realizados o val
 
 NOTA 1: Para não limitar a configuração dos pinos não há uma validação de quais pinos podem ser usados, consulte a informações de pinout do ESP32 para identificar pinos reservados e que não devem ser usados nas configurações nesta página.<br>
 
-NOTA 2: Após configurar e clicar no botão "Aplicar (sem salvar)" as configurações já estarão sendo usadas pelo módulo mas **não estarão salvas na flash**. Isto pode ser usado para testar uma configuração sem alterar a configuração que está salva na flash.<br>
-
-NOTA 3: Se o módulo for reiniciado antes de salvar as informações na flash todas as configurações serão perdidas.<br>
 
 - Parâmetro NOME
   - É uma nomenclatura para facilitar na identificação dos pinos, este nome será usado na caso de notificações dos assistentes.
@@ -34,26 +31,20 @@ NOTA 3: Se o módulo for reiniciado antes de salvar as informações na flash to
 - Parâmetro PINO
   - É a informação do pino físico do chip, aqui será feito a associação do pino físico na placa ESP.<br>
     Esta informação será usada na configuração de Ações(eventos).<br>
-    Pode ser um número que corresponde ao pino físico do chip, por exemplo, este número pode ser 2,4,5,12... ou pode ser um número que não corresponda (ver conceito de pino virtual)) ao pino físico do chip, por exemplo, ...251,253,65534<br>
+    Pode ser um número que corresponde ao pino físico do chip, por exemplo, este número pode ser 2,4,5,12... ou pode ser um número que não corresponda (ver conceito de pino virtual)) ao pino físico do chip, por exemplo, ...201,3003,65534<br>
 
-    NOTA 4: Número de pinos que não são reconhecidos pelo chip são chamados de pinos virtuais.<br>
+    NOTA 2: Número de pinos que não são reconhecidos pelo chip são chamados de pinos virtuais.<br>
 
-    NOTA 5: O Pino 65535 é reservado para controle interno de status de comunicação entre módulos e não deve ser usado para cadastro de pino.
-
-    NOTA 6: O Pino 65534 deve ser usado para indicar um pino virtual (Pino que não existe no chip).<br>
+    NOTA 3: O Pino 65535 é reservado para controle interno de status de comunicação entre módulos e não deve ser usado para cadastro de pino.
 
 - Parâmetro TIPO
   - É o tipo do pino, esta informação pode ser:
-    - 0 = Sem Uso
-    - 1 = Digital
-    - 192 = Analógico
-    - 65534 = Virtual
+    - Digital
+    - Analógico
+    - Remoto
   
-    - Se o valor 65534 for configurado significa que é um pino virtual(ver conceito). O módulo não irá realizar a atualização de status do pino(local) pela task, esta configuração pode ser usada quando for habilitado o recurso de "Inter Módulos" por exemplo.<br>
-
-    - O recurso de Inter Módulos ativa a comunicação entre dois ou mais módulos onde um módulo transmissor irá atualizar o status de um pino(físico ou virtual) no módulo receptor.<br>
+    - Com o recurso de Inter Módulos ativa a comunicação entre dois ou mais módulos onde um módulo transmissor irá atualizar o status de um pino(físico ou virtual) no módulo receptor.<br>
     
-    - O cadastro de um pino como tipo 65534 deve ser usado quando o módulo vai receber o status deste pino de forma remota, o status será recebido de outro módulo para este módulo que terá o pino cadastrado como tipo 65534. Quando for cadastrar um pino como 65534 pode ser usado qualquer númeração de pino entre 1 e 65534 pois um pino do tipo 65534 será considerado um pino virtual(não físico do chip) e servirá para disparar ações no módulo que recebe os dados de status de outros módulos. Este recurso pode ser usado para não inutilizar um pino físico do chip em uma ação que não teŕa leitura de sensor localmente.
 
 **Pino virtual (clique na seta abaixo para mais detalhes)**
 <details>

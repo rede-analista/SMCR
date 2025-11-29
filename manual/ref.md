@@ -1,4 +1,5 @@
 # Conceitos e termos do sistema SMCR.
+
 - SMCR == Sistema de Monitoramento e Controle Remoto.<br>
 - Pino == Porta
 - Pino Origem == Porta Origem == Pino de Entrada == Porta de Entrada == Pino de Sensor (botão, reed switch, etc.).<br>
@@ -159,3 +160,40 @@
      WL_CONNECT_FAILED   = 4
      WL_CONNECTION_LOST  = 5
      WL_DISCONNECTED     = 6
+
+## Tabela de Pinos do ESP32
+
+| Pino GPIO | Entrada Digital | Saída Digital | Entrada Analógica (ADC) | Saída Analógica (DAC) |
+|-----------|-----------------|---------------|------------------------|----------------------|
+| 0         | Sim             | Sim           | ADC2                   | Não                  |
+| 1 (TX)    | Sim             | Sim           | Não                    | Não                  |
+| 2         | Sim             | Sim           | ADC2                   | Não                  |
+| 3 (RX)    | Sim             | Sim           | Não                    | Não                  |
+| 4         | Sim             | Sim           | ADC2                   | Não                  |
+| 5         | Sim             | Sim           | Não                    | Não                  |
+| 12        | Sim             | Sim           | ADC2                   | Não                  |
+| 13        | Sim             | Sim           | ADC2                   | Não                  |
+| 14        | Sim             | Sim           | ADC2                   | Não                  |
+| 15        | Sim             | Sim           | ADC2                   | Não                  |
+| 16        | Sim             | Sim           | Não                    | Não                  |
+| 17        | Sim             | Sim           | Não                    | Não                  |
+| 18        | Sim             | Sim           | Não                    | Não                  |
+| 19        | Sim             | Sim           | Não                    | Não                  |
+| 21        | Sim             | Sim           | Não                    | Não                  |
+| 22        | Sim             | Sim           | Não                    | Não                  |
+| 23        | Sim             | Sim           | Não                    | Não                  |
+| 25        | Sim             | Sim           | ADC2                   | DAC1                 |
+| 26        | Sim             | Sim           | ADC2                   | DAC2                 |
+| 27        | Sim             | Sim           | ADC2                   | Não                  |
+| 32        | Sim             | Sim           | ADC1                   | Não                  |
+| 33        | Sim             | Sim           | ADC1                   | Não                  |
+| 34        | Sim             | Não           | ADC1                   | Não                  |
+| 35        | Sim             | Não           | ADC1                   | Não                  |
+| 36        | Sim             | Não           | ADC1                   | Não                  |
+| 39        | Sim             | Não           | ADC1                   | Não                  |
+
+**Observações:**
+- GPIOs 6 a 11 são reservados para flash interno, não utilizar.
+- GPIOs 34 a 39 são apenas entrada (não suportam saída).
+- ADC2 pode ter restrições quando WiFi está ativo.
+- DAC disponível apenas nos GPIOs 25 e 26.
