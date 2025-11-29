@@ -10,14 +10,11 @@ Por padrão o módulo vem configurado com 15 pinos.<br>
 
 ![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_pinos_tm.png)
 
-- Escolha uma posição e clique para realizar o cadastro.<br>
+- Pode cadastrar um novo pino, alterar um existente ou deletar um pino.<br>
 
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_pinos_t1.png)
+NOTA: Ao deletar um pino todas as ações relacionadas ao pino tambem serão excluídas.
 
-
-- Após inserir as informações clique em "Aplicar (sem salvar)".
-
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_pinos_t2.png)
+- Após inserir as informações clique em "Salvar".
 
 O total de pinos pode ser ajustado no cadastro geral. Em testes realizados o valor máximo atingido com boa performance foi de 48 pinos, porém, o sistema aceita o valor até 254.<br>
 

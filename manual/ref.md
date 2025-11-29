@@ -192,9 +192,9 @@
 | 36        | Sim             | Não           | ADC1                   | Não                  | Não       |
 | 39        | Sim             | Não           | ADC1                   | Não                  | Não       |
 
-**Observações:**
 - GPIOs 6 a 11 são reservados para flash interno, não utilizar.
 - GPIOs 34 a 39 são apenas entrada (não suportam saída).
 - ADC2 pode ter restrições quando WiFi está ativo.
 - DAC disponível apenas nos GPIOs 25 e 26.
-- temPullup: indica se o pino possui resistor de pullup interno disponível.
+- Pullup: indica se o pino possui resistor de pullup interno disponível.
++- **Atenção:** Os pinos 34, 35, 36 e 39 não possuem pullup/pulldown interno, pois são apenas entrada analógica (ADC). Não utilize sensores/botões nesses pinos sem resistor externo.
