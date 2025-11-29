@@ -31,9 +31,6 @@ A interface web pode disponibilizar até 254(uint8_t) posições de configuraç�
   - [Recursos Ações](manual/acoes.md):
     - Configurações relacionadas as ações, pinos origem/destino, tipo de ação, temporizadores, acionamentos, MqTT, acionamento remoto, etc.
 
-  - [Execução de Funções](manual/funcoes.md):
-    - Execução de funções, Visualização serial, reboot, pausar rotinas, tasks, formatação flash, recarregar funções, whatchdog, etc;
-
   - [Recursos Arquivos](manual/arquivos.md):
     - Configurações relacionadas a arquivos, listar, upload, doanload, salvar, deletar, atualizar firmware, etc.
 

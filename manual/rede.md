@@ -1,12 +1,12 @@
 # Funcionamento e Configurações de Rede
 
-O SMCR possui um sistema avançado de configuração de rede com interface empresarial profissional, suportando configurações estáticas, fallback automático e sincronização NTP.
+O SMCR possui um sistema avançado de configuração de rede com interface empresarial profissional, suportando fallback automático e sincronização NTP. Não há suporte para configuração de IP fixo, máscara, gateway ou DNS manual.
 
 No momento inicial (primeiro boot) após a gravação do firmware, o módulo vem com a função "Modo AP" ativada, proporcionando facilidade para conectar e configurar o SSID e senha para que o módulo consiga se conectar na rede WiFi de trabalho.<br>
 
 ## Funcionamento no Modo AP (quando ativado)
 - Ao ligar o módulo ele carrega as informações de rede que estão na flash e tenta se conectar na rede wifi que foi configurada, caso não consiga em 4 tentativas, ele aciona o modo AP, neste caso o módulo vai gerar uma rede wifi própria para que você possa se conectar no módulo e realizar a configuração básica do wifi.<br>
-Se a configuração default não foi alterada o nome da rede própria do módulo será "SMCR_AP_SETUP" e a senha para se conectar nesta rede será "senha12345678".<br>
+Se a configuração default não foi alterada o nome da rede própria do módulo será "SMCR_AP_SETUP" e a senha para se conectar nesta rede será "senha1234".<br>
 
   - Conecte-se na rede wifi.<br>
   - Abra o browser e digite o endereço "http://192.168.4.1:8080".<br>
@@ -31,10 +31,8 @@ O sistema agora possui uma interface moderna e profissional para configurações
 ### Sistema Profissional de Configuração
 
 A interface utiliza o conceito de **Configuração Ativa** vs **Configuração Persistente**:
-- **Configuração Ativa**: Configurações ativas na memória (temporárias)
-- **Configuração Persistente**: Configurações salvas na flash (permanentes)
-- **Aplicar**: Aplica configurações na memória para teste
-- **Salvar na Flash**: Salva configurações testadas permanentemente
+- **Configuração Ativa**: Configurações ativas na memória e já salvas na flash
+- **Aplicar**: Aplica e salva as configurações automaticamente
 - **Salvar e Reiniciar**: Salva e reinicia para aplicar configurações gerais
 
 
@@ -58,7 +56,6 @@ A interface utiliza o conceito de **Configuração Ativa** vs **Configuração P
 - Deve ser único na rede para evitar conflitos
 - Exemplos de acesso:
   - `http://esp32modularx.local:8080`
-  - `http://192.168.50.10:8080`
 
 💡 **Dica**: Use `ping hostname.local` para descobrir o IP do módulo
 
@@ -68,44 +65,16 @@ A interface utiliza o conceito de **Configuração Ativa** vs **Configuração P
 - Evita travamento do módulo por problemas de rede
 - Após as tentativas, o módulo continua funcionando localmente
 
-### 2. Configurações Avançadas de Rede
-
-#### **IP Estático (Opcional)**
-- Endereço IP fixo para o módulo
-- Deixar vazio para DHCP automático
-- Formato: `192.168.1.100`
-- Recomendado para comunicação inter-módulos
-
-#### **Gateway Padrão**
-- Endereço do roteador da rede
-- Necessário apenas se usar IP estático
-- Formato: `192.168.1.1`
-
-#### **Máscara de Sub-rede**
-- Máscara de rede para IP estático
-- Padrão: `255.255.255.0`
-- Configure conforme sua rede local
-
-#### **DNS Primário**
-- Servidor DNS principal para resolução de nomes
-- Padrão: `8.8.8.8` (Google DNS)
-- Importante para conectividade com serviços externos
-
-#### **DNS Secundário**
-- Servidor DNS alternativo
-- Padrão: `8.8.4.4` (Google DNS secundário)
-- Backup caso o DNS primário falhe
-
-### 3. Configurações de Access Point (Fallback)
+### 2. Configurações de Access Point (Fallback)
 
 #### **SSID do Modo AP**
 - Nome da rede WiFi criada pelo módulo em modo fallback
-- Padrão: `esp32modularx Ponto de Acesso`
+- Padrão: `SMCR_AP_SETUP`
 - Ativado automaticamente se a conexão WiFi falhar
 
 #### **Senha do Modo AP**
 - Senha para acessar a rede do módulo em modo AP
-- Padrão: `senha12345678`
+- Padrão: `senha1234`
 - Mínimo 8 caracteres para segurança WPA2
 
 #### **Habilitar Fallback AP**
@@ -191,59 +160,30 @@ A interface utiliza o conceito de **Configuração Ativa** vs **Configuração P
 ### 🔧 Processo Recomendado de Configuração
 
 1. **Configurar Parâmetros**: Preencha os campos necessários na interface
-2. **Aplicar**: Testa as configurações na Configuração Ativa (memória)
+2. **Aplicar**: Aplica e salva as configurações automaticamente
 3. **Validar Funcionamento**: Verifique se a conectividade funciona corretamente
-4. **Salvar na Flash**: Salva as configurações testadas permanentemente
-5. **Salvar e Reiniciar**: Use apenas se necessário (mudanças de IP/rede)
+4. **Salvar e Reiniciar**: Use apenas se necessário (mudanças gerais de rede)
 
 ### ⚡ Comandos de Configuração
 
 #### **Aplicar Configurações**
-- ✅ Aplica configurações na **Configuração Ativa** (temporário)
-- ✅ Permite testar sem salvar permanentemente
+- ✅ Aplica e salva as configurações automaticamente
 - ✅ Ideal para validar conectividade
-- ⚠️ Configurações serão perdidas se reiniciar sem salvar
-
-#### **Salvar na Flash**
-- 💾 Persiste **Configuração Ativa** na **Configuração Persistente**
-- 💾 Configurações mantidas mesmo após reboot
-- 💾 Recomendado após validar funcionamento
 
 #### **Salvar e Reiniciar**
 - 🔄 Salva e reinicia imediatamente
-- 🔄 Necessário para mudanças de rede/IP
+- 🔄 Necessário para mudanças gerais de rede
 - 🔄 Aplica todas as configurações de sistema
 
 ## Cenários de Uso e Exemplos
 
-### 🏠 Configuração Doméstica Simples
+
+### 🏠 Configuração Simples
 ```
 SSID: MinhaRedeWiFi
 Senha: minhasenha123
 Hostname: esp32-sala
 IP: DHCP (automático)
-DNS: Automático
-```
-
-### 🏢 Configuração Corporativa com IP Fixo
-```
-SSID: RedeEmpresa
-Senha: senhaSegura2024
-Hostname: smcr-producao-01
-IP Estático: 192.168.100.50
-Gateway: 192.168.100.1
-DNS Primário: 192.168.100.10
-DNS Secundário: 8.8.8.8
-```
-
-### 🔧 Configuração para Múltiplos Módulos
-```
-SSID: RedeIoT
-Senha: iot@2024!
-Hostname: smcr-modulo-[01-99]
-IP Estático: 192.168.200.10-99
-Gateway: 192.168.200.1
-Fallback AP: Habilitado
 ```
 
 ## Resolução de Problemas de Rede
@@ -257,8 +197,7 @@ Fallback AP: Habilitado
 ### 🚨 Não Consegue Acessar por Hostname
 1. **Teste IP direto**: Use `ping hostname.local` para descobrir IP
 2. **Verifique mDNS**: Alguns roteadores bloqueiam mDNS
-3. **Use IP estático**: Configure IP fixo para acesso confiável
-4. **Verificar porta**: Confirme se está usando porta 8080
+3. **Verificar porta**: Confirme se está usando porta 8080
 
 ### 🚨 Problemas de Sincronização NTP
 1. **Verifique conectividade**: Módulo deve ter acesso à internet
@@ -275,8 +214,7 @@ Fallback AP: Habilitado
 - **Backup**: Anote configurações antes de mudanças críticas
 
 ### 🌐 Conectividade
-- **DHCP vs Estático**: IP estático recomendado para inter-módulos
-- **DNS confiável**: Use servidores DNS estáveis (Google 8.8.8.8)
+- **DHCP automático**: O módulo sempre utiliza DHCP para obter IP
 - **Fallback AP**: Sempre habilite para recuperação remota
 - **Monitoramento**: Intervalo de 15s adequado para a maioria dos casos
 
@@ -288,26 +226,15 @@ Fallback AP: Habilitado
 
 ## Sistema de Configuração Dual
 
-### 📋 Configuração Ativa (Memória)
-- Configurações carregadas na memória RAM
-- Aplicadas imediatamente para teste
-- Perdidas se o módulo for reiniciado sem salvar
-- Permite validação sem comprometimento
-
-### 💾 Configuração Persistente (Flash)
-- Configurações salvas na memória flash NVS
-- Carregadas automaticamente no boot
+### 📋 Configuração Ativa e Persistente
+- Configurações carregadas na memória RAM e salvas automaticamente na flash
+- Aplicadas e persistidas imediatamente ao clicar em "Aplicar"
 - Mantidas mesmo após reinicializações
-- Base para a configuração inicial
+- Permite validação e uso sem necessidade de salvar manualmente
 
 ### 🔄 Sincronização de Configurações
 ```
 Boot → Carregar Configuração Persistente → Configuração Ativa
-Aplicar → Atualizar Configuração Ativa (temporário)
-Salvar na Flash → Configuração Ativa → Configuração Persistente
+Aplicar → Atualizar e salvar Configuração Ativa/Persistente
 Reiniciar → Carregar nova Configuração Persistente → Configuração Ativa
 ```
-
-# ⚠️ IMPORTANTE: Sistema de Configuração Profissional
-## Sempre use "Salvar na Flash" após validar configurações com "Aplicar"
-### Configurações aplicadas apenas com "Aplicar" serão perdidas no próximo reboot!
