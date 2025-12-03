@@ -90,9 +90,43 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
             text-align: center;
             background: #f8f9fa;
             margin: 20px 0;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            background: #e7f3ff;
+            border-color: #0056b3;
+        }
+        .upload-area.drag-over {
+            background: #cfe2ff;
+            border-color: #0056b3;
+            border-style: solid;
         }
         input[type="file"] {
             margin: 10px 0;
+            padding: 10px;
+            border: 2px solid #007bff;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            width: 100%;
+            max-width: 500px;
+        }
+        input[type="file"]:hover {
+            background: #f0f8ff;
+            border-color: #0056b3;
+        }
+        input[type="file"]::file-selector-button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        input[type="file"]::file-selector-button:hover {
+            background: #0056b3;
         }
         .loading-overlay {
             position: fixed;
@@ -204,13 +238,30 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
         <div class="section">
             <div class="section-title">📤 Upload de Arquivos</div>
             <div class="upload-area">
-                <h3>Enviar arquivo para o ESP32</h3>
-                <p>Selecione um arquivo para fazer upload para a flash</p>
+                <h3>📤 Enviar arquivos para o ESP32</h3>
+                <p style="margin-bottom: 5px;"><strong>✨ Upload Múltiplo Habilitado!</strong></p>
+                <p style="font-size: 13px; color: #666; margin-top: 5px; margin-bottom: 15px;">
+                    <strong>🖱️ Opção 1:</strong> Clique em "Escolher arquivos" e selecione múltiplos arquivos<br>
+                    • Use Ctrl+Clique (Windows/Linux) ou Cmd+Clique (Mac) para seleção individual<br>
+                    • Use Ctrl+A / Cmd+A para selecionar todos os arquivos de uma pasta<br>
+                    <strong>🎯 Opção 2:</strong> Arraste e solte múltiplos arquivos diretamente nesta área
+                </p>
                 <form id="upload-form" enctype="multipart/form-data">
-                    <input type="file" id="file-input" name="file" required>
-                    <br>
+                    <input type="file" id="file-input" name="file" multiple required>
+                    <div id="file-count" style="margin: 8px 0; font-size: 13px; color: #007bff; font-weight: bold; display: none;">
+                        📋 <span id="file-count-number">0</span> arquivo(s) selecionado(s)
+                    </div>
                     <button type="submit" class="btn btn-success">📤 Fazer Upload</button>
+                    <button type="button" id="cancel-upload-btn" class="btn btn-warning" style="display:none;">⛔ Cancelar</button>
                 </form>
+                <div id="upload-overall" style="margin-top:12px;display:none;">
+                    <div style="height:14px;background:#e9ecef;border-radius:7px;overflow:hidden;">
+                        <div id="upload-overall-bar" style="height:100%;width:0%;background:#007bff;transition:width .2s;"></div>
+                    </div>
+                    <div id="upload-overall-text" style="margin-top:4px;font-size:12px;color:#555;">0%</div>
+                </div>
+                <div id="upload-progress" style="margin-top:10px;font-size:12px;color:#555;display:none;"></div>
+                <ul id="upload-file-list" style="list-style:none;padding:0;margin:12px 0 0 0;display:none;font-size:12px;max-height:160px;overflow-y:auto;border:1px solid #ddd;background:#fafafa;border-radius:4px;"></ul>
             </div>
         </div>
 
@@ -230,6 +281,57 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
         window.addEventListener('load', function() {
             hideLoading();
             loadFilesList();
+            
+            // Adiciona listener para mostrar contador de arquivos selecionados
+            const fileInput = document.getElementById('file-input');
+            const fileCountDiv = document.getElementById('file-count');
+            const fileCountNumber = document.getElementById('file-count-number');
+            const uploadArea = document.querySelector('.upload-area');
+            
+            fileInput.addEventListener('change', function() {
+                updateFileCount(this.files);
+            });
+            
+            // Suporte para Drag and Drop
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                uploadArea.classList.add('drag-over');
+            });
+            
+            uploadArea.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                uploadArea.classList.remove('drag-over');
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                uploadArea.classList.remove('drag-over');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    fileInput.files = files;
+                    updateFileCount(files);
+                }
+            });
+            
+            function updateFileCount(files) {
+                const count = files.length;
+                if (count > 0) {
+                    fileCountDiv.style.display = 'block';
+                    
+                    // Calcula e mostra tamanho total
+                    let totalSize = 0;
+                    for (let i = 0; i < files.length; i++) {
+                        totalSize += files[i].size;
+                    }
+                    fileCountDiv.innerHTML = `📋 <span id="file-count-number">${count}</span> arquivo(s) selecionado(s) - Total: ${formatBytes(totalSize)}`;
+                } else {
+                    fileCountDiv.style.display = 'none';
+                }
+            }
         });
 
         function loadFilesList() {

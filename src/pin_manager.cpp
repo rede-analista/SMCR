@@ -542,9 +542,13 @@ bool fB_isPinActivated(uint8_t pinIndex) {
     } else if (tipo == PIN_TYPE_ANALOG) {
         // Para pinos analógicos, verifica se está dentro do range configurado
         return (statusAtual >= nivelMin && statusAtual <= nivelMax);
+    } else if (tipo == PIN_TYPE_REMOTE) {
+        // Para pinos remotos (65534), trata como digital
+        // Compara status_atual com nivel_acionamento_min (0 ou 1)
+        return (statusAtual == nivelMin);
     }
     
-    // Pinos remotos ou não utilizados retornam false
+    // Pinos não utilizados retornam false
     return false;
 }
 
@@ -554,6 +558,11 @@ bool fB_isPinActivated(uint8_t pinIndex) {
 // Implementa tempo de retenção e lógica XOR
 //========================================
 void fV_readPinsTask(void) {
+    // Early return se não há pinos configurados
+    if (vU8_activePinsCount == 0) {
+        return;
+    }
+    
     unsigned long currentTime = millis();
     
     for (uint8_t i = 0; i < vU8_activePinsCount; i++) {

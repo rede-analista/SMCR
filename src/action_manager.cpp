@@ -2,6 +2,8 @@
 #include "globals.h"
 #include "FS.h"
 #include "LittleFS.h"
+#include <HTTPClient.h>
+#include <WiFi.h>
 
 // Variáveis globais para gerenciamento de ações
 ActionConfig_t* vA_actionConfigs = nullptr;
@@ -55,7 +57,7 @@ void fV_initActionSystem(void) {
         vA_actionConfigs[i].tempo_on = 0;
         vA_actionConfigs[i].tempo_off = 0;
         vA_actionConfigs[i].pino_remoto = 0;
-        vA_actionConfigs[i].envia_modulo = 0;
+        vA_actionConfigs[i].envia_modulo = "";
         vA_actionConfigs[i].telegram = false;
         vA_actionConfigs[i].assistente = false;
         vA_actionConfigs[i].contador_on = 0;
@@ -180,7 +182,7 @@ void fV_loadActionConfigs(void) {
         vA_actionConfigs[index].tempo_on = action["tempo_on"] | 0;
         vA_actionConfigs[index].tempo_off = action["tempo_off"] | 0;
         vA_actionConfigs[index].pino_remoto = action["pino_remoto"] | 0;
-        vA_actionConfigs[index].envia_modulo = action["envia_modulo"] | 0;
+        vA_actionConfigs[index].envia_modulo = action["envia_modulo"].as<String>();
         vA_actionConfigs[index].telegram = action["telegram"] | false;
         vA_actionConfigs[index].assistente = action["assistente"] | false;
         vA_actionConfigs[index].contador_on = 0;
@@ -441,6 +443,11 @@ void fV_writeActionPin(uint8_t pinIndex, uint8_t pinGpio, bool ligar) {
 // Chamada periodicamente (ex: a cada 100ms)
 //========================================
 void fV_executeActionsTask(void) {
+    // Early return se não há ações configuradas
+    if (vU8_activeActionsCount == 0) {
+        return;
+    }
+    
     for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
         // Pula ações desabilitadas
         if (vA_actionConfigs[i].acao == ACTION_TYPE_NONE) {
@@ -478,6 +485,13 @@ void fV_executeActionsTask(void) {
                         fV_writeActionPin(pinDestinoIndex, vA_actionConfigs[i].pino_destino, false);
                         fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Desligando GPIO %d (origem desativada) - Ação tipo %d", 
                             vA_actionConfigs[i].pino_destino, vA_actionConfigs[i].acao);
+                        
+                        // Se ação deve ser enviada para módulo remoto, envia estado OFF também
+                        if (vA_actionConfigs[i].envia_modulo != "" && vA_actionConfigs[i].pino_remoto > 0) {
+                            fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando OFF para módulo '%s', pino remoto %d", 
+                                vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
+                            fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, false);
+                        }
                     }
                 }
                 
@@ -601,4 +615,72 @@ void fV_executeAction(uint8_t actionIndex) {
         default:
             break;
     }
+    
+    // Se ação deve ser enviada para módulo remoto, envia via HTTP
+    if (action->envia_modulo != "" && action->pino_remoto > 0) {
+        bool remoteState = (vA_pinConfigs[pinDestinoIndex].status_atual != 0);
+        fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando para módulo '%s', pino remoto %d, estado=%d", 
+            action->envia_modulo.c_str(), action->pino_remoto, remoteState);
+        fB_sendRemoteAction(action->envia_modulo, action->pino_remoto, remoteState);
+    }
+}
+
+//========================================
+// Envia ação para módulo remoto via HTTP
+//========================================
+bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, bool state) {
+    // Busca o módulo na lista de módulos cadastrados
+    uint8_t moduleIndex = 255;
+    for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+        if (vA_interModConfigs[i].id == moduleId) {
+            moduleIndex = i;
+            break;
+        }
+    }
+    
+    if (moduleIndex == 255) {
+        fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Módulo '%s' não encontrado na lista", moduleId.c_str());
+        return false;
+    }
+    
+    // Verifica se módulo está online
+    if (!vA_interModConfigs[moduleIndex].online) {
+        fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Módulo '%s' está offline, ignorando envio", moduleId.c_str());
+        return false;
+    }
+    
+    // Monta a URL para o endpoint do módulo remoto
+    String url = "http://";
+    url += vA_interModConfigs[moduleIndex].ip;
+    url += ":";
+    url += String(vA_interModConfigs[moduleIndex].porta);
+    url += "/api/pin/set";
+    
+    fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Enviando comando para %s", url.c_str());
+    
+    HTTPClient http;
+    http.begin(url);
+    http.setTimeout(3000); // 3 segundos de timeout
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    
+    // Monta o body da requisição
+    String postData = "pin=" + String(remotePin) + "&value=" + String(state ? 1 : 0);
+    
+    int httpCode = http.POST(postData);
+    
+    bool success = false;
+    if (httpCode > 0) {
+        if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_ACCEPTED) {
+            String response = http.getString();
+            fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Comando enviado com sucesso: pino=%d, valor=%d", remotePin, state ? 1 : 0);
+            success = true;
+        } else {
+            fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Erro HTTP %d ao enviar comando", httpCode);
+        }
+    } else {
+        fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Falha na conexão: %s", http.errorToString(httpCode).c_str());
+    }
+    
+    http.end();
+    return success;
 }

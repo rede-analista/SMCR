@@ -217,6 +217,7 @@
             <table class="info-table">
                 <tr><td>NTP Status:</td><td id="ntp-status" class="status-warning">-</td></tr>
                 <tr><td>MQTT Status:</td><td id="mqtt-status" class="status-warning">-</td></tr>
+                <tr><td>Inter-Módulos:</td><td id="intermod-status" class="status-warning">-</td></tr>
             </table>
         </div>
     </div>
@@ -320,6 +321,33 @@
                         mqttStatus.className = 'status-error';
                     }
 
+                    // Inter-Módulos Status
+                    const intermodStatus = document.getElementById('intermod-status');
+                    if (data.intermod) {
+                        const enabled = data.intermod.enabled || false;
+                        const totalModules = data.intermod.total_modules || 0;
+                        const onlineModules = data.intermod.online_modules || 0;
+                        
+                        if (enabled) {
+                            intermodStatus.textContent = `Habilitado (${onlineModules}/${totalModules})`;
+                            if (onlineModules === totalModules && totalModules > 0) {
+                                intermodStatus.className = 'status-ok';
+                            } else if (onlineModules > 0) {
+                                intermodStatus.className = 'status-warning';
+                            } else if (totalModules > 0) {
+                                intermodStatus.className = 'status-error';
+                            } else {
+                                intermodStatus.className = 'status-warning';
+                            }
+                        } else {
+                            intermodStatus.textContent = 'Desabilitado';
+                            intermodStatus.className = 'status-error';
+                        }
+                    } else {
+                        intermodStatus.textContent = 'Desabilitado';
+                        intermodStatus.className = 'status-error';
+                    }
+
                     // Pinos
                     const pinsCount = data.pins ? data.pins.length : 0;
                     const pinsMax = data.system ? data.system.max_pins || 16 : 16;
@@ -396,8 +424,8 @@
                                 const nivelMin = pin.nivel_acionamento_min || 0;
                                 const nivelMax = pin.nivel_acionamento_max || 4095;
                                 
-                                // Criar display com cada valor tendo sua própria cor
-                                const historySpans = history.map(valor => {
+                                // Criar display com cada valor tendo sua própria cor (últimas 8 leituras)
+                                const historySpans = history.slice(-8).map(valor => {
                                     const isValorAlerta = (valor >= nivelMin && valor <= nivelMax);
                                     const valorBgColor = isValorAlerta ? corAlerta : corOk;
                                     return `<span style="background-color: ${valorBgColor}; color: white; padding: 3px 6px; margin: 0 2px; border-radius: 3px; display: inline-block; min-width: 30px; text-align: center; font-weight: bold;">${valor}</span>`;
@@ -410,8 +438,8 @@
                                 
                                 console.log(`Histórico digital do pino ${pin.gpio}:`, history, `nivelMin=${nivelMin}`);
                                 
-                                // Criar display com cada estado tendo sua própria cor
-                                const historySpans = history.map(estado => {
+                                // Criar display com cada estado tendo sua própria cor (últimas 8 leituras)
+                                const historySpans = history.slice(-8).map(estado => {
                                     // Se estado coincide com nivelMin, está ativo/alerta
                                     const isAtivo = (estado == nivelMin);
                                     const estadoBgColor = isAtivo ? corAlerta : corOk;

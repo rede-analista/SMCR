@@ -23,8 +23,9 @@ void fV_setupMdns() {
         // Adiciona serviço HTTP para descoberta
         MDNS.addService("http", "tcp", vSt_mainConfig.vU16_webServerPort);
         
-        // Adiciona informações adicionais do serviço
-        MDNS.addServiceTxt("http", "tcp", "version", "1.0");
+        // Adiciona informações adicionais do serviço (device_type é usado para identificar módulos SMCR)
+        MDNS.addServiceTxt("http", "tcp", "version", "2.1.2");
+        MDNS.addServiceTxt("http", "tcp", "device_type", "smcr");
         MDNS.addServiceTxt("http", "tcp", "device", "SMCR");
     } else {
         fV_printSerialDebug(LOG_NETWORK, "Erro ao iniciar mDNS!");

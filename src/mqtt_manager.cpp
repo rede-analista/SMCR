@@ -283,8 +283,10 @@ void fV_publishMqttDiscoveryStep(void) {
     uint8_t publishedThisCycle = 0;
     uint8_t batchSize = vSt_mainConfig.vU8_mqttHaDiscoveryBatchSize;
     if (batchSize == 0) batchSize = 1;
+    
     while (vU8_discoveryIndex < vU8_activePinsCount && publishedThisCycle < batchSize) {
-        PinConfig_t* pin = &vA_pinConfigs[vU8_discoveryIndex++];
+        PinConfig_t* pin = &vA_pinConfigs[vU8_discoveryIndex];
+        vU8_discoveryIndex++;
 
         // Ignorar pinos sem uso ou remotos
         if (pin->tipo == 0 || pin->tipo == 65534) {
@@ -294,13 +296,33 @@ void fV_publishMqttDiscoveryStep(void) {
         String pinName = pin->nome.isEmpty() ? String("Pino ") + String(pin->pino) : pin->nome;
         String objectId = uniqueId + "_pin" + String(pin->pino);
 
-        // Usa classe e ícone configurados no pino, com fallback para padrões por tipo
-        String component = pin->classe_mqtt.isEmpty() ? "sensor" : pin->classe_mqtt;
+        // Determina component type baseado no modo do pino
+        String component;
+        
+        // Corrigir erros comuns de digitação no campo classe_mqtt
+        String classeMqtt = pin->classe_mqtt;
+        classeMqtt.trim();
+        classeMqtt.toLowerCase();
+        if (classeMqtt == "ligth") classeMqtt = "light"; // Corrige erro de digitação comum
+        
+        if (pin->modo == 3 || pin->modo == 12) { // OUTPUT ou OUTPUT_OPEN_DRAIN
+            // Para saídas, usa classe configurada ou default "switch"
+            component = classeMqtt.isEmpty() ? "switch" : classeMqtt;
+        } else {
+            // Para entradas, usa classe configurada ou default "binary_sensor"
+            if (classeMqtt.isEmpty()) {
+                component = pin->tipo == 192 ? "sensor" : "binary_sensor";
+            } else {
+                component = classeMqtt; // Respeita a classe configurada pelo usuário
+            }
+        }
+        
+        // Define ícone
         String icon;
         if (!pin->icone_mqtt.isEmpty()) {
             icon = pin->icone_mqtt;
         } else {
-            // Fallback padrão baseado no tipo
+            // Fallback baseado no tipo
             if (pin->tipo == 1) icon = "mdi:electric-switch";     // Digital
             else if (pin->tipo == 192) icon = "mdi:gauge";         // Analógico
             else icon = "mdi:numeric";
@@ -308,18 +330,49 @@ void fV_publishMqttDiscoveryStep(void) {
 
         String stateTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/pin/" + String(pin->pino) + "/state";
         String configTopic = "homeassistant/" + component + "/" + objectId + "/config";
+        
+        // Adicionar command topic para pinos de saída
+        String commandTopic = "";
+        if (pin->modo == 3 || pin->modo == 12) { // OUTPUT ou OUTPUT_OPEN_DRAIN
+            commandTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/pin/" + String(pin->pino) + "/set";
+        }
 
+        // Montar payload completo de discovery conforme especificação Home Assistant
         String payload = "{";
         payload += "\"name\":\"" + pinName + "\",";
-        payload += "\"uniq_id\":\"" + objectId + "\",";
-        payload += "\"stat_t\":\"" + stateTopic + "\",";
+        payload += "\"unique_id\":\"" + objectId + "\",";
+        payload += "\"state_topic\":\"" + stateTopic + "\",";
+        
+        // Adicionar command_topic e payloads se for saída
+        if (commandTopic.length() > 0) {
+            payload += "\"command_topic\":\"" + commandTopic + "\",";
+            payload += "\"payload_on\":\"1\",";
+            payload += "\"payload_off\":\"0\",";
+            payload += "\"state_on\":\"1\",";
+            payload += "\"state_off\":\"0\",";
+        } else {
+            // Para binary_sensor, definir ON/OFF states
+            payload += "\"payload_on\":\"1\",";
+            payload += "\"payload_off\":\"0\",";
+        }
+        
         payload += "\"icon\":\"" + icon + "\",";
-        payload += "\"dev\":{\"ids\":[\"" + uniqueId + "\"],\"name\":\"" + deviceName + "\"}";
+        
+        // Informações do dispositivo
+        payload += "\"device\":{";
+        payload += "\"identifiers\":[\"" + uniqueId + "\"],";
+        payload += "\"name\":\"" + deviceName + "\",";
+        payload += "\"model\":\"SMCR ESP32\",";
+        payload += "\"manufacturer\":\"SMCR\",";
+        payload += "\"sw_version\":\"" + String(FIRMWARE_VERSION) + "\"";
+        payload += "}";
+        
         payload += "}";
 
         bool success = vO_mqttClient.publish(configTopic.c_str(), payload.c_str(), true);
         if (success) {
-            fV_printSerialDebug(LOG_MQTT, "[MQTT] Discovery publicado para pino %d", pin->pino);
+            fV_printSerialDebug(LOG_MQTT, "[MQTT] Discovery publicado para pino %d (%s) no topico: %s", 
+                pin->pino, component.c_str(), configTopic.c_str());
         } else {
             fV_printSerialDebug(LOG_MQTT, "[MQTT] ERRO ao publicar discovery para pino %d", pin->pino);
         }
@@ -329,7 +382,7 @@ void fV_publishMqttDiscoveryStep(void) {
 
     if (vU8_discoveryIndex >= vU8_activePinsCount) {
         vB_discoveryPublished = true;
-        fV_printSerialDebug(LOG_MQTT, "[MQTT] Auto-discovery concluido (em lotes)");
+        fV_printSerialDebug(LOG_MQTT, "[MQTT] Auto-discovery concluido - %d entidades publicadas", publishedThisCycle);
     }
 }
 
@@ -365,6 +418,11 @@ void fV_publishPinStatus(uint8_t pinIndex) {
  */
 void fV_publishAllPinsStatus(void) {
     if (!vO_mqttClient.connected()) {
+        return;
+    }
+    
+    // Early return se não há pinos configurados
+    if (vU8_activePinsCount == 0) {
         return;
     }
     

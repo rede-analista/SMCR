@@ -36,11 +36,21 @@ NOTA 1: Para não limitar a configuração dos pinos não há uma validação de
 
 - Parâmetro TIPO
   - É o tipo do pino, esta informação pode ser:
-    - Digital
-    - Analógico
-    - Remoto
+    - **Digital** (tipo 1): GPIO físico com leitura digital (0 ou 1)
+    - **Analógico** (tipo 2): GPIO físico com leitura analógica (0-4095)
+    - **Remoto** (tipo 65534): Pino virtual atualizado via comunicação inter-módulos
   
-    - Com o recurso de Inter Módulos ativa a comunicação entre dois ou mais módulos onde um módulo transmissor irá atualizar o status de um pino(físico ou virtual) no módulo receptor.<br>
+    - O tipo **Remoto** é especial:
+      - Não faz leitura física do GPIO (digitalRead/analogRead)
+      - Atualizado exclusivamente via POST de outro módulo
+      - Usado como gatilho para ações locais
+      - Pode ter nível de acionamento configurado (0 ou 1)
+      - Ideal para receber comandos de sensores remotos
+    
+    - Com o recurso de Inter Módulos ativo, você pode:
+      - Criar ações que enviam comandos para pinos remotos
+      - Usar pinos remotos como origem de ações locais
+      - Construir automação distribuída entre múltiplos módulos<br>
     
 
 **Pino virtual (clique na seta abaixo para mais detalhes)**
@@ -155,46 +165,3 @@ NOTA 1: Para não limitar a configuração dos pinos não há uma validação de
   - Ícone exibido no Home Assistant para a entidade do pino.
   - Use valores do conjunto Material Design Icons, como `mdi:light-switch`, `mdi:led-on`, `mdi:motion-sensor`.
   - Se vazio, o sistema escolhe um ícone padrão baseado no tipo do pino.
-
-NOTA MQTT: Cada pino com classe/ícone definidos gera sua própria entrada de discovery. As ações não controlam mais publicação MQTT.
-
-    - O tempo de retenção não é contado em milisegundos mas sim em tempo de clico do processador, para mais detalhe do tempo de retenção veja [Veja CICLOS HANDSHAKE](intermod.md)
-
-
- # Não esqueça de salvar as informações antes de reiniciar/desligar o módulo.
-## Se o módulor for reiniciado antes de salvar as informações na flash as configurações realizadas serão perdidas.
-
-- Se quiser salvar as informações na memória flash do ESP32, Vá para tela inicial clique em "Gerenciar Arquivos", despois clique em "Salvar Configurações".<br>
-  Responda "Sim" à pergunta e clique em "Confirmar".<br>
-
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_pinos_t3.png)
-
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t2.png)
-
-![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/t_salvar_t3.png)
-
-## Renomeação Inteligente de Pinos (>= 2.1.0)
-
-Desde a versão 2.1.0 você pode alterar o número (GPIO) de um pino diretamente no modo edição:
-
-- Ao editar um pino, basta mudar o campo "PINO" e salvar.
-- O sistema atualiza automaticamente TODAS as ações que referenciam este pino como origem ou destino.
-- A persistência é automática: 
-  - Sempre salva o arquivo de pinos (`/pins_config.json`).
-  - Salva o arquivo de ações (`/actions_config.json`) apenas se houve renomeação (evita desgaste excessivo da flash).
-- A resposta da API inclui: `renamed`, `old_pin`, `new_pin`, `updated_source_actions`, `updated_destination_actions`, `persisted`.
-
-Notas:
-1. Se o novo número já existir a operação é recusada (`409`).
-2. Se você apenas altera parâmetros (nome, tipo, modo, níveis) sem mudar o número do pino, somente `pins_config.json` é salvo.
-3. Ações sem alteração de pino não são regravadas, preservando ciclos de escrita.
-
-Benefícios:
-- Evita recriar manualmente ações em cascata.
-- Garante consistência imediata entre cadastros de pinos e ações.
-- Reduz erros humanos ao reorganizar numeração física vs. lógica.
-
-Boas práticas:
-- Planeje a nova numeração antes de renomear vários pinos em sequência.
-- Verifique no dashboard se o comportamento esperado foi mantido.
-- Use pinos virtuais (tipo 65534) quando quiser desacoplar lógica sem consumir GPIO real.

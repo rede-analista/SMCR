@@ -112,6 +112,12 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
     uint8_t vU8_mqttHaDiscoveryBatchSize;   // Tamanho do lote de discovery
     uint16_t vU16_mqttHaDiscoveryIntervalMs; // Intervalo entre lotes (ms)
 
+    // 12. Configurações de Inter-Módulos
+    bool vB_interModEnabled;        // Habilita/desabilita comunicação inter-módulos
+    uint16_t vU16_interModHealthCheckInterval; // Intervalo de healthcheck em segundos (padrão 30)
+    uint8_t vU8_interModMaxFailures; // Quantidade de falhas antes de marcar offline (padrão 3)
+    bool vB_interModAutoDiscovery;  // Habilita descoberta automática via mDNS (padrão true)
+
 };
 
 // --- Estrutura para Configuração de Pinos ---
@@ -147,7 +153,7 @@ struct ActionConfig_t {
     uint16_t tempo_on;           // Tempo ON em ciclos (0-65535)
     uint16_t tempo_off;          // Tempo OFF em ciclos (0-65535)
     uint8_t pino_remoto;         // Máscara do pino no módulo remoto (0-254)
-    uint16_t envia_modulo;       // ID do módulo destino (0=nenhum, 1-65533=ID do módulo)
+    String envia_modulo;         // ID do módulo destino (string vazia=nenhum, ou hostname/ID do módulo)
     bool telegram;               // Envia notificação para Telegram
     bool assistente;             // Envia notificação para Assistente
     // Controle interno da ação
@@ -155,6 +161,18 @@ struct ActionConfig_t {
     uint16_t contador_off;       // Contador atual de ciclos OFF
     bool estado_acao;            // Estado atual da ação (true=executando, false=parada)
     bool ultimo_estado_origem;   // Último estado do pino origem (para detectar mudanças)
+};
+
+// --- Estrutura para Módulos Inter-Comunicação ---
+struct InterModConfig_t {
+    String id;                   // ID único do módulo (MAC address ou UUID)
+    String hostname;             // Hostname do módulo
+    String ip;                   // Endereço IP do módulo
+    uint16_t porta;              // Porta do servidor web do módulo
+    bool online;                 // Status online/offline
+    uint8_t falhas_consecutivas; // Contador de falhas de healthcheck
+    unsigned long ultimo_healthcheck; // Timestamp do último healthcheck bem-sucedido
+    bool auto_descoberto;        // Se foi descoberto via mDNS ou cadastrado manualmente
 };
 
 // Instância global da sua configuração em memória (sua running-config)
@@ -167,6 +185,11 @@ extern uint8_t vU8_activePinsCount;  // Contador de pinos ativos configurados
 // --- Variáveis globais para gerenciamento de ações ---
 extern ActionConfig_t* vA_actionConfigs;  // Array dinâmico de configurações de ações
 extern uint8_t vU8_activeActionsCount;    // Contador de ações ativas configuradas
+
+// --- Variáveis globais para gerenciamento de inter-módulos ---
+extern InterModConfig_t* vA_interModConfigs;  // Array dinâmico de módulos cadastrados
+extern uint8_t vU8_activeInterModCount;       // Contador de módulos ativos
+extern bool vB_firstDiscoveryDone;            // Flag para controlar primeira execução do discovery
 
 // --- Novas funções para carregar e salvar a estrutura MainConfig_t ---
 // Estas serão as funções de interface para a sua "startup-config"
@@ -279,6 +302,7 @@ bool fB_updateActionConfig(uint8_t pinOrigem, uint8_t numeroAcao, const ActionCo
 bool fB_isPinUsedByActions(uint8_t pinNumber); // Verifica se pino está em uso por ações
 void fV_executeActionsTask(void); // Task periódica para execução de ações
 void fV_executeAction(uint8_t actionIndex); // Executa uma ação específica
+bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, bool state); // Envia ação para módulo remoto
 
 /* Funções do Gerenciador de MQTT (mqtt_manager.cpp) */
 void fV_initMqtt(void);               // Inicializa sistema MQTT
@@ -289,5 +313,19 @@ void fV_publishPinStatus(uint8_t pinIndex); // Publica status de um pino especí
 void fV_publishAllPinsStatus(void);   // Publica status de todos os pinos
 String fS_getMqttStatus(void);        // Retorna status da conexão MQTT
 String fS_getMqttUniqueId(void);      // Retorna ID único do módulo para MQTT
+
+/* Funções do Gerenciador de Inter-Módulos (intermod_manager.cpp) */
+void fV_initInterModSystem(void);              // Inicializa sistema de inter-módulos
+void fV_loadInterModConfigs(void);             // Carrega módulos cadastrados do LittleFS
+bool fB_saveInterModConfigs(void);             // Salva módulos cadastrados no LittleFS
+void fV_clearInterModConfigs(void);            // Limpa todas as configurações de módulos
+int fI_addInterModConfig(const InterModConfig_t& config); // Adiciona novo módulo
+bool fB_removeInterModConfig(const String& id); // Remove módulo por ID
+bool fB_updateInterModConfig(const String& id, const InterModConfig_t& config); // Atualiza módulo
+int fI_findInterModIndex(const String& id);    // Encontra índice do módulo por ID
+void fV_interModHealthCheckTask(void);         // Task de healthcheck periódico
+void fV_interModDiscoveryTask(void);           // Task de descoberta automática via mDNS
+bool fB_checkModuleHealth(uint8_t moduleIndex); // Verifica saúde de um módulo específico
+String fS_getInterModStatus(void);             // Retorna resumo de status dos módulos
 
 #endif // GLOBALS_H

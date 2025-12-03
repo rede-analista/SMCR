@@ -16,6 +16,9 @@ const unsigned long vU32_actionExecInterval = 100; // Execução de ações a ca
 unsigned long vU32_lastMqttLoopTime = 0;
 const unsigned long vU32_mqttLoopInterval = 450; // Loop MQTT a cada 50ms (não bloqueante)
 
+unsigned long vU32_lastInterModTaskTime = 0;
+const unsigned long vU32_interModTaskInterval = 15000; // Tasks inter-módulos a cada 15 segundos
+
 // Definição do objeto Preferences.
 Preferences preferences;
 
@@ -74,11 +77,18 @@ void setup() {
     fV_setupMqtt();
   }
   
-  // 9. LEITURA INICIAL DOS PINOS: Garante que todos os pinos tenham estado atualizado ANTES da primeira ação
+  // 9. INICIALIZA SISTEMA DE INTER-MÓDULOS
+  fV_printSerialDebug(LOG_INIT, "Inicializando sistema de inter-módulos...");
+  fV_initInterModSystem();
+  if (vSt_mainConfig.vB_interModEnabled && vB_wifiIsConnected) {
+    fV_printSerialDebug(LOG_INIT, "Inter-módulos habilitado: %d módulo(s) cadastrado(s)", vU8_activeInterModCount);
+  }
+
+  // 10. LEITURA INICIAL DOS PINOS: Garante que todos os pinos tenham estado atualizado ANTES da primeira ação
   fV_printSerialDebug(LOG_INIT, "Realizando leitura inicial de pinos...");
   fV_readPinsTask();
   
-  // 10. EXECUÇÃO INICIAL DE AÇÕES: Aplica ações baseadas no estado atual dos pinos
+  // 11. EXECUÇÃO INICIAL DE AÇÕES: Aplica ações baseadas no estado atual dos pinos
   fV_printSerialDebug(LOG_INIT, "Executando sincronização inicial de ações...");
   fV_executeActionsTask();
 
@@ -90,7 +100,7 @@ void setup() {
 void loop() {
   // 1. CHECAGEM E RECONEXAO: Mantém a conexao Wi-Fi ativa (checa a cada 15s)
   fV_checkWifiConnection();
-  
+ 
   // 2. LEITURA PERIODICA DE PINOS: Atualiza status de pinos físicos (exceto remotos)
   unsigned long vU32_currentTime = millis();
   if (vU32_currentTime - vU32_lastPinReadTime >= vU32_pinReadInterval) {
@@ -103,11 +113,22 @@ void loop() {
     vU32_lastActionExecTime = vU32_currentTime;
     fV_executeActionsTask();
   }
-  
+
   // 4. LOOP MQTT: Mantém conexão MQTT ativa e processa mensagens (não bloqueante)
   if (vU32_currentTime - vU32_lastMqttLoopTime >= vU32_mqttLoopInterval) {
     vU32_lastMqttLoopTime = vU32_currentTime;
     fV_mqttLoop();
   }
   
+  // 5. TASKS DE INTER-MÓDULOS: Healthcheck e descoberta automática
+  if (vU32_currentTime - vU32_lastInterModTaskTime >= vU32_interModTaskInterval) {
+    vU32_lastInterModTaskTime = vU32_currentTime;
+    
+    // Executa healthcheck se inter-módulos estiver habilitado
+    fV_interModHealthCheckTask();
+    
+    // Executa descoberta automática se habilitada
+    fV_interModDiscoveryTask();
+  }
+ 
 }

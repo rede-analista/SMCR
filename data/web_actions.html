@@ -372,8 +372,11 @@
                         </div>
                         
                         <div class="form-group">
-                            <label for="envia_modulo">ID Módulo Destino</label>
-                            <input type="number" id="envia_modulo" name="envia_modulo" min="0" value="0">
+                            <label for="envia_modulo">Módulo Destino</label>
+                            <select id="envia_modulo" name="envia_modulo">
+                                <option value="">Nenhum (Local)</option>
+                            </select>
+                            <small style="color: #666; font-size: 11px; display: block; margin-top: 4px;">Selecione o módulo para enviar a ação via Inter-Módulos</small>
                         </div>
                     </div>
                     
@@ -413,6 +416,7 @@
     <script>
         let actionsData = [];
         let pinsData = [];
+        let modulesData = [];
         let editMode = false;
         let editingOrigin = null;
         let editingNumber = null;
@@ -432,6 +436,7 @@
         // Inicialização
         document.addEventListener('DOMContentLoaded', function() {
             loadPins();
+            loadModules();
             loadActions();
             setupFormSubmit();
         });
@@ -446,6 +451,35 @@
             } catch (error) {
                 console.error('Erro ao carregar pinos:', error);
             }
+        }
+        
+        // Carrega lista de módulos inter-mod
+        async function loadModules() {
+            try {
+                const response = await fetch('/api/intermod/modules');
+                const data = await response.json();
+                modulesData = data.modules || [];
+                populateModuleSelect();
+            } catch (error) {
+                console.error('Erro ao carregar módulos:', error);
+                // Se falhar, deixa apenas opção "Nenhum"
+            }
+        }
+        
+        // Popula select de módulos
+        function populateModuleSelect() {
+            const moduleSelect = document.getElementById('envia_modulo');
+            moduleSelect.innerHTML = '<option value="">Nenhum (Local)</option>';
+            
+            console.log('Populando select com', modulesData.length, 'módulos');
+            
+            modulesData.forEach(module => {
+                const option = document.createElement('option');
+                option.value = module.id;
+                const statusIcon = module.online ? '🟢' : '🔴';
+                option.textContent = `${statusIcon} ${module.hostname || module.id}`;
+                moduleSelect.appendChild(option);
+            });
         }
         
         // Popula os selects de pino

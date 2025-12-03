@@ -539,8 +539,12 @@
             let tipoAtualizado = pin.tipo;
             let modoAtualizado = pin.modo;
             
-            // Mapeamento de tipos antigos (1-7) para novos
-            if (pin.tipo >= 1 && pin.tipo <= 7) {
+            // Detecta formato antigo: tipo entre 1-7 E modo não está definido (0 ou undefined)
+            // No formato novo: tipo=1 (digital), tipo=192 (analógico), tipo=65534 (remoto)
+            // E modo deve estar definido (1, 3, 5, 9, 12)
+            const isFormatoAntigo = (pin.tipo >= 1 && pin.tipo <= 7) && (!pin.modo || pin.modo === 0);
+            
+            if (isFormatoAntigo) {
                 console.log('[DEBUG] Migrando tipo antigo', pin.tipo, 'para novo formato');
                 // Tipo antigo 1-7 eram todos digitais, agora tipo digital = 1
                 tipoAtualizado = 1;

@@ -230,7 +230,11 @@
                     <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Firmware:</td><td style="padding: 5px; border: 1px solid #ddd;" id="firmware-info">Carregando...</td></tr>
                     <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Uptime:</td><td style="padding: 5px; border: 1px solid #ddd;" id="uptime-info">Carregando...</td></tr>
                     <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Memoria Livre:</td><td style="padding: 5px; border: 1px solid #ddd;" id="memory-info">Carregando...</td></tr>
-                    <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Configuracoes Ativas:</td><td style="padding: 5px; border: 1px solid #ddd;" id="config-info">Carregando...</td></tr>
+                    <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Chip Model:</td><td style="padding: 5px; border: 1px solid #ddd;" id="chip-model">Carregando...</td></tr>
+                    <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Chip Revision:</td><td style="padding: 5px; border: 1px solid #ddd;" id="chip-revision">Carregando...</td></tr>
+                    <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">CPU Frequencia:</td><td style="padding: 5px; border: 1px solid #ddd;" id="cpu-freq">Carregando...</td></tr>
+                    <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">MAC Address:</td><td style="padding: 5px; border: 1px solid #ddd;" id="mac-address">Carregando...</td></tr>
+                    <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Flash Size:</td><td style="padding: 5px; border: 1px solid #ddd;" id="flash-size">Carregando...</td></tr>
                 </table>
             </div>
         </div>
@@ -341,9 +345,11 @@
                     document.getElementById('firmware-info').textContent = 'SMCR v' + (data.system.fw_version || 'N/D');
                     document.getElementById('uptime-info').textContent = data.system.uptime || '-';
                     document.getElementById('memory-info').textContent = formatBytes(data.system.free_heap || 0);
-                    
-                    const configStatus = (data.wifi.status === 'Conectado') ? 'Rede configurada' : 'Modo Access Point';
-                    document.getElementById('config-info').textContent = configStatus;
+                    document.getElementById('chip-model').textContent = data.system.chip_model || 'N/D';
+                    document.getElementById('chip-revision').textContent = data.system.chip_revision || 'N/D';
+                    document.getElementById('cpu-freq').textContent = (data.system.cpu_freq || 'N/D') + ' MHz';
+                    document.getElementById('mac-address').textContent = data.system.mac_address || 'N/D';
+                    document.getElementById('flash-size').textContent = formatBytes(data.system.flash_size || 0);
                 })
                 .catch(error => {
                     console.error('Erro ao carregar info do sistema:', error);

@@ -108,6 +108,12 @@ const char* KEY_MQTT_HA_DISCOVERY = "mqtt_had";
 const char* KEY_MQTT_HA_BATCH = "mqtt_hab";
 const char* KEY_MQTT_HA_INTMS = "mqtt_haim";
 
+// Chaves de Inter-Módulos
+const char* KEY_INTERMOD_ENABLED = "imod_en";
+const char* KEY_INTERMOD_HEALTHCHECK = "imod_hchk";
+const char* KEY_INTERMOD_MAX_FAILURES = "imod_mfail";
+const char* KEY_INTERMOD_AUTO_DISCOVERY = "imod_adisc";
+
 void fV_carregarMainConfig(void) {
 
     preferences.begin(NVS_NAMESPACE_MAIN_CONFIG, true); // Abre para leitura
@@ -172,6 +178,12 @@ void fV_carregarMainConfig(void) {
     vSt_mainConfig.vB_mqttHomeAssistantDiscovery = preferences.getBool(KEY_MQTT_HA_DISCOVERY, true); // Habilitado por padrão
     vSt_mainConfig.vU8_mqttHaDiscoveryBatchSize = preferences.getUChar(KEY_MQTT_HA_BATCH, 4);
     vSt_mainConfig.vU16_mqttHaDiscoveryIntervalMs = preferences.getUInt(KEY_MQTT_HA_INTMS, 100);
+
+    // 12. Configurações de Inter-Módulos
+    vSt_mainConfig.vB_interModEnabled = preferences.getBool(KEY_INTERMOD_ENABLED, false); // Padrão desabilitado
+    vSt_mainConfig.vU16_interModHealthCheckInterval = preferences.getUInt(KEY_INTERMOD_HEALTHCHECK, 60); // 60 segundos
+    vSt_mainConfig.vU8_interModMaxFailures = preferences.getUChar(KEY_INTERMOD_MAX_FAILURES, 3); // 3 falhas
+    vSt_mainConfig.vB_interModAutoDiscovery = preferences.getBool(KEY_INTERMOD_AUTO_DISCOVERY, false); // Desabilitado por padrão (evita lentidão)
 
     preferences.end();
 
@@ -249,6 +261,12 @@ void fV_salvarMainConfig(void) {
     preferences.putBool(KEY_MQTT_HA_DISCOVERY, vSt_mainConfig.vB_mqttHomeAssistantDiscovery);
     preferences.putUChar(KEY_MQTT_HA_BATCH, vSt_mainConfig.vU8_mqttHaDiscoveryBatchSize);
     preferences.putUInt(KEY_MQTT_HA_INTMS, vSt_mainConfig.vU16_mqttHaDiscoveryIntervalMs);
+
+    // 12. Configurações de Inter-Módulos
+    preferences.putBool(KEY_INTERMOD_ENABLED, vSt_mainConfig.vB_interModEnabled);
+    preferences.putUInt(KEY_INTERMOD_HEALTHCHECK, vSt_mainConfig.vU16_interModHealthCheckInterval);
+    preferences.putUChar(KEY_INTERMOD_MAX_FAILURES, vSt_mainConfig.vU8_interModMaxFailures);
+    preferences.putBool(KEY_INTERMOD_AUTO_DISCOVERY, vSt_mainConfig.vB_interModAutoDiscovery);
 
     preferences.end();
 

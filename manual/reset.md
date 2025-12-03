@@ -78,6 +78,26 @@ O sistema SMCR possui um menu de reset abrangente com múltiplas opções para r
 - **Estado final**: Sistema usa tempo interno do ESP32
 - **Uso recomendado**: Problemas de sincronização de tempo
 
+## 💾 Informações do Sistema
+
+A página de reset também exibe informações detalhadas sobre o hardware e sistema:
+
+### Informações Disponíveis
+- **Firmware**: Versão atual do firmware SMCR
+- **Uptime**: Tempo de funcionamento desde o último boot
+- **Memória Livre**: RAM disponível no momento
+- **Chip Model**: Modelo do chip ESP32 (ESP32, ESP32-S2, ESP32-S3, ESP32-C3, etc.)
+- **Chip Revision**: Revisão do silício do chip (Rev 0, Rev 1, Rev 3, etc.)
+- **CPU Frequência**: Frequência atual do processador em MHz
+- **MAC Address**: Endereço MAC único do dispositivo (formato XX:XX:XX:XX:XX:XX)
+- **Flash Size**: Tamanho total da memória flash instalada
+
+Estas informações são úteis para:
+- **Diagnóstico**: Identificar modelo e versão do hardware
+- **Suporte técnico**: Fornecer informações precisas ao reportar problemas
+- **Compatibilidade**: Verificar se o hardware suporta determinados recursos
+- **Inventário**: Documentar os módulos instalados na rede
+
 ## Recursos de Segurança
 
 ### Sistema de Countdown

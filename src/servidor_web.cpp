@@ -34,11 +34,30 @@ void fV_handleSerialLogs(AsyncWebServerRequest *request);
 // Helper: serve página de LittleFS com fallback para PROGMEM
 void servePageWithFallback(AsyncWebServerRequest *request, const char* fsPath, const char* progmemContent) {
     if (LittleFS.exists(fsPath)) {
-        fV_printSerialDebug(LOG_WEB, "Servindo %s de LittleFS", fsPath);
-        request->send(LittleFS, fsPath, "text/html");
+        File file = LittleFS.open(fsPath, "r");
+        if (file) {
+            size_t fileSize = file.size();
+            file.close();
+            
+            if (fileSize > 0 && fileSize < 100000) { // Limite de 100KB
+                fV_printSerialDebug(LOG_WEB, "Servindo %s de LittleFS (%d bytes)", fsPath, fileSize);
+                request->send(LittleFS, fsPath, "text/html");
+                return;
+            } else {
+                fV_printSerialDebug(LOG_WEB, "Arquivo %s com tamanho invalido (%d bytes), usando PROGMEM", fsPath, fileSize);
+            }
+        } else {
+            fV_printSerialDebug(LOG_WEB, "Erro ao abrir %s, usando PROGMEM fallback", fsPath);
+        }
     } else {
         fV_printSerialDebug(LOG_WEB, "Arquivo %s nao encontrado, usando PROGMEM fallback", fsPath);
+    }
+    
+    // Fallback para PROGMEM
+    if (strlen(progmemContent) > 0) {
         request->send(200, "text/html", progmemContent);
+    } else {
+        request->send(500, "text/plain", "Pagina nao disponivel");
     }
 }
 
@@ -739,6 +758,251 @@ void fV_setupWebServer() {
     //Rota para retornar dados de status em JSON (para o Dashboard)
     SERVIDOR_WEB_ASYNC->on("/status/json", HTTP_GET, fV_handleStatusJson);
 
+    // ==== API de Inter-Módulos ====
+    
+    // API: Obter configurações de inter-módulos
+    SERVIDOR_WEB_ASYNC->on("/api/intermod/config", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        StaticJsonDocument<512> doc;
+        doc["enabled"] = vSt_mainConfig.vB_interModEnabled;
+        doc["healthCheckInterval"] = vSt_mainConfig.vU16_interModHealthCheckInterval;
+        doc["maxFailures"] = vSt_mainConfig.vU8_interModMaxFailures;
+        doc["autoDiscovery"] = vSt_mainConfig.vB_interModAutoDiscovery;
+        
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+    
+    // API: Salvar configurações de inter-módulos
+    SERVIDOR_WEB_ASYNC->on("/api/intermod/config", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        if (request->hasArg("enabled")) {
+            vSt_mainConfig.vB_interModEnabled = (request->arg("enabled") == "1");
+        }
+        if (request->hasArg("healthCheckInterval")) {
+            vSt_mainConfig.vU16_interModHealthCheckInterval = request->arg("healthCheckInterval").toInt();
+        }
+        if (request->hasArg("maxFailures")) {
+            vSt_mainConfig.vU8_interModMaxFailures = request->arg("maxFailures").toInt();
+        }
+        if (request->hasArg("autoDiscovery")) {
+            vSt_mainConfig.vB_interModAutoDiscovery = (request->arg("autoDiscovery") == "1");
+        }
+        
+        fV_salvarMainConfig();
+        request->send(200, "application/json", "{\"success\": true}");
+    });
+    
+    // API: Listar módulos cadastrados
+    SERVIDOR_WEB_ASYNC->on("/api/intermod/modules", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        // Early return para lista vazia
+        if (vU8_activeInterModCount == 0) {
+            request->send(200, "application/json", "{\"modules\":[]}");
+            return;
+        }
+        
+        DynamicJsonDocument doc(4096);
+        JsonArray modules = doc.createNestedArray("modules");
+        
+        for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+            JsonObject module = modules.createNestedObject();
+            module["id"] = vA_interModConfigs[i].id;
+            module["hostname"] = vA_interModConfigs[i].hostname;
+            module["ip"] = vA_interModConfigs[i].ip;
+            module["porta"] = vA_interModConfigs[i].porta;
+            module["online"] = vA_interModConfigs[i].online;
+            module["falhas_consecutivas"] = vA_interModConfigs[i].falhas_consecutivas;
+            module["ultimo_healthcheck"] = vA_interModConfigs[i].ultimo_healthcheck;
+            module["auto_descoberto"] = vA_interModConfigs[i].auto_descoberto;
+        }
+        
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+    
+    // API: Adicionar módulo manual
+    SERVIDOR_WEB_ASYNC->on("/api/intermod/modules/add", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        if (!request->hasArg("moduleId") || !request->hasArg("moduleHostname") || 
+            !request->hasArg("moduleIp") || !request->hasArg("modulePort")) {
+            request->send(400, "text/plain", "Parametros incompletos");
+            return;
+        }
+        
+        InterModConfig_t newModule;
+        newModule.id = request->arg("moduleId");
+        newModule.hostname = request->arg("moduleHostname");
+        newModule.ip = request->arg("moduleIp");
+        newModule.porta = request->arg("modulePort").toInt();
+        newModule.auto_descoberto = false;
+        
+        int index = fI_addInterModConfig(newModule);
+        if (index >= 0) {
+            fB_saveInterModConfigs();
+            request->send(200, "application/json", "{\"success\": true}");
+        } else {
+            request->send(400, "text/plain", "Modulo ja existe");
+        }
+    });
+    
+    // API: Remover módulo
+    SERVIDOR_WEB_ASYNC->on("/api/intermod/modules/delete", HTTP_DELETE, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        if (!request->hasArg("id")) {
+            request->send(400, "text/plain", "ID do modulo nao fornecido");
+            return;
+        }
+        
+        String moduleId = request->arg("id");
+        if (fB_removeInterModConfig(moduleId)) {
+            fB_saveInterModConfigs();
+            request->send(200, "application/json", "{\"success\": true}");
+        } else {
+            request->send(404, "text/plain", "Modulo nao encontrado");
+        }
+    });
+    
+    // API: Testar conectividade de módulo
+    SERVIDOR_WEB_ASYNC->on("/api/intermod/modules/test", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        if (!request->hasArg("id")) {
+            request->send(400, "text/plain", "ID do modulo nao fornecido");
+            return;
+        }
+        
+        String moduleId = request->arg("id");
+        int index = fI_findInterModIndex(moduleId);
+        
+        if (index < 0) {
+            request->send(404, "application/json", "{\"success\": false, \"message\": \"Modulo nao encontrado\"}");
+            return;
+        }
+        
+        bool success = fB_checkModuleHealth(index);
+        String response = success ? 
+            "{\"success\": true, \"message\": \"Modulo online\"}" :
+            "{\"success\": false, \"message\": \"Modulo offline\"}";
+        
+        request->send(200, "application/json", response);
+    });
+    
+    // API: Executar descoberta mDNS
+    SERVIDOR_WEB_ASYNC->on("/api/intermod/discovery", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        // Força execução imediata da descoberta
+        uint8_t countBefore = vU8_activeInterModCount;
+        fV_interModDiscoveryTask();
+        uint8_t countAfter = vU8_activeInterModCount;
+        
+        StaticJsonDocument<256> doc;
+        doc["found"] = (countAfter - countBefore);
+        doc["total"] = countAfter;
+        
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+    
+    // API: Endpoint de healthcheck (para outros módulos checarem este)
+    SERVIDOR_WEB_ASYNC->on("/api/healthcheck", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // Healthcheck não requer autenticação para facilitar comunicação entre módulos
+        StaticJsonDocument<256> doc;
+        doc["status"] = "online";
+        doc["hostname"] = vSt_mainConfig.vS_hostname;
+        doc["uptime"] = millis();
+        doc["firmware"] = FIRMWARE_VERSION;
+        
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+    
+    // Endpoint para receber comandos de pino de módulos remotos
+    SERVIDOR_WEB_ASYNC->on("/api/pin/set", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // Não requer autenticação para facilitar comunicação inter-módulos
+        if (!request->hasArg("pin") || !request->hasArg("value")) {
+            request->send(400, "text/plain", "Missing pin or value parameter");
+            return;
+        }
+        
+        uint8_t pin = request->arg("pin").toInt();
+        uint8_t value = request->arg("value").toInt();
+        
+        fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Recebido comando remoto: pino=%d, valor=%d", pin, value);
+        
+        // Busca o índice do pino na configuração
+        uint8_t pinIndex = fU8_findPinIndex(pin);
+        if (pinIndex == 255) {
+            fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Pino %d não encontrado na configuração", pin);
+            request->send(404, "text/plain", "Pin not found");
+            return;
+        }
+        
+        // Aceita pino de SAÍDA ou pino REMOTO (tipo 65534)
+        // Pino REMOTO: entrada virtual que recebe valor via POST (não faz digitalRead)
+        // Pino SAÍDA: escreve fisicamente no GPIO
+        const uint16_t PIN_TYPE_REMOTE = 65534;
+        
+        if (vA_pinConfigs[pinIndex].tipo == PIN_TYPE_REMOTE) {
+            // Pino remoto (entrada virtual) - apenas atualiza o valor
+            vA_pinConfigs[pinIndex].status_atual = value;
+            fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Pino REMOTO %d atualizado: valor=%d", pin, value);
+            request->send(200, "text/plain", "OK - Remote pin updated");
+            
+        } else if (vA_pinConfigs[pinIndex].modo == 3 || vA_pinConfigs[pinIndex].modo == 12) { 
+            // OUTPUT (3) ou OUTPUT_OPEN_DRAIN (12)
+            // Pino de saída - escreve fisicamente no GPIO
+            digitalWrite(pin, value ? HIGH : LOW);
+            vA_pinConfigs[pinIndex].status_atual = value;
+            fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] GPIO %d acionado: valor=%d", pin, value);
+            request->send(200, "text/plain", "OK - Output pin set");
+            
+        } else {
+            // Pino não é saída nem remoto
+            fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Pino %d não é saída nem remoto (tipo=%d, modo=%d)", 
+                pin, vA_pinConfigs[pinIndex].tipo, vA_pinConfigs[pinIndex].modo);
+            request->send(400, "text/plain", "Pin must be output or remote type");
+        }
+    });
+
     // Rota de nao encontrado
     SERVIDOR_WEB_ASYNC->onNotFound(fV_handleNotFound);
     
@@ -997,6 +1261,21 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
     // Versão do firmware
     system_obj["fw_version"] = FIRMWARE_VERSION;
     
+    // Informações detalhadas do chip ESP32
+    system_obj["chip_model"] = ESP.getChipModel();
+    system_obj["chip_revision"] = ESP.getChipRevision();
+    system_obj["cpu_freq"] = ESP.getCpuFreqMHz();
+    
+    // MAC Address formatado
+    uint64_t mac = ESP.getEfuseMac();
+    char macStr[18];
+    snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+             (uint8_t)(mac >> 40), (uint8_t)(mac >> 32), (uint8_t)(mac >> 24),
+             (uint8_t)(mac >> 16), (uint8_t)(mac >> 8), (uint8_t)mac);
+    system_obj["mac_address"] = String(macStr);
+    
+    system_obj["flash_size"] = ESP.getFlashChipSize();
+    
     // Adiciona informações sobre pinos
     system_obj["max_pins"] = vSt_mainConfig.vU8_quantidadePinos;
     system_obj["show_pin_status"] = vSt_mainConfig.vB_statusPinosEnabled;
@@ -1069,6 +1348,19 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
     // Usa o tempo formatado se o NTP estiver OK, caso contrario, Uptime formatado
     sync_obj["last_update"] = vL_ntp_ok ? fS_getFormattedTime() : fS_formatUptime(millis()); 
 
+    // 4. Inter-Módulos (Agrupados em "intermod")
+    JsonObject intermod_obj = vL_jsonDoc["intermod"].to<JsonObject>();
+    intermod_obj["enabled"] = vSt_mainConfig.vB_interModEnabled;
+    intermod_obj["total_modules"] = vU8_activeInterModCount;
+    
+    // Conta módulos online (online = true)
+    uint8_t onlineModules = 0;
+    for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+        if (vA_interModConfigs[i].online) {
+            onlineModules++;
+        }
+    }
+    intermod_obj["online_modules"] = onlineModules;
 
     // 5. Serializa o JSON para uma String
     String vS_response;
@@ -2394,7 +2686,7 @@ void fV_handleActionCreateApi(AsyncWebServerRequest *request) {
     newAction.tempo_on = request->hasArg("tempo_on") ? request->arg("tempo_on").toInt() : 0;
     newAction.tempo_off = request->hasArg("tempo_off") ? request->arg("tempo_off").toInt() : 0;
     newAction.pino_remoto = request->hasArg("pino_remoto") ? request->arg("pino_remoto").toInt() : 0;
-    newAction.envia_modulo = request->hasArg("envia_modulo") ? request->arg("envia_modulo").toInt() : 0;
+    newAction.envia_modulo = request->hasArg("envia_modulo") ? request->arg("envia_modulo") : "";
     newAction.telegram = request->hasArg("telegram") && request->arg("telegram") == "true";
     newAction.assistente = request->hasArg("assistente") && request->arg("assistente") == "true";
     

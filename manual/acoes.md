@@ -1,6 +1,6 @@
 # Configuração de Ações
 
-- Ações podem ser configuradas para que o múdulo execute uma funcionalidade, como acionar um led/relé, notificar quando um sensor for acionado, comunicar com um broker mqtt, etc.<br>
+- Ações podem ser configuradas para que o módulo execute uma funcionalidade, como acionar um led/relé, notificar quando um sensor for acionado, comunicar com um broker mqtt, enviar comandos para outros módulos (inter-módulos), etc.<br>
 
 - Cada pino pode ter configurado até 4 ações, primeira ação, segunda ação, terceira ação e quarta ação.<br>
 
@@ -18,6 +18,68 @@ Quando o valor de um pino ṕe igual ou maior que o valor cadastrado no campo "N
 
 - Será aberta a página com todas as informações de ações mas para cadastrar uma ação é necessário que já tenha pelo menos um pino cadastrado. O cadastro das ações pode ser realizada considerando a informação do "Pino Origem".<br>
 <br>
+
+## Ações Inter-Módulos
+
+Com o sistema Inter-Módulos habilitado, você pode criar ações que controlam pinos em outros módulos remotos.
+
+### Como Funciona
+
+1. **Módulo Origem**: Cria uma ação com os campos "Módulo Remoto" e "Pino Remoto" preenchidos
+2. **Transmissão**: Quando o pino origem é acionado, o módulo envia um comando HTTP POST para o módulo destino
+3. **Módulo Destino**: Recebe o comando e atualiza o pino virtual
+4. **Ação Local**: O pino virtual no destino dispara ações locais configuradas
+
+### Exemplo Prático
+
+**Cenário**: Sensor de movimento no MOD1 aciona luz no MOD2
+
+**MOD1 (Transmissor)**:
+- Pino 15: Sensor de movimento (INPUT)
+- Ação configurada:
+  - Pino Origem: 15
+  - Pino Destino: 2 (LED indicador local - opcional)
+  - **Módulo Remoto**: esp32modular2
+  - **Pino Remoto**: 201
+  - Tipo Ação: LIGA
+
+**MOD2 (Receptor)**:
+- **Pino 201**: Pino virtual tipo REMOTO (não é GPIO físico)
+- Pino 4: Relé da lâmpada (OUTPUT)
+- Ação configurada:
+  - Pino Origem: 201 (virtual)
+  - Pino Destino: 4 (relé)
+  - Tipo Ação: LIGA
+
+### Sincronização Completa
+
+O sistema sincroniza **automaticamente** tanto a ativação quanto a desativação:
+
+- **Sensor acionado** → MOD1 envia value=1 → MOD2 pino 201=1 → Relé liga
+- **Sensor normalizado** → MOD1 envia value=0 → MOD2 pino 201=0 → Relé desliga
+
+### Configuração no Formulário
+
+Ao cadastrar/editar uma ação, você verá:
+
+- **Módulo Remoto**: Dropdown com lista de módulos cadastrados (mostra 🟢 online / 🔴 offline)
+- **Pino Remoto**: Campo numérico para o pino virtual no módulo destino
+
+**Importante**: Certifique-se de:
+1. Cadastrar o módulo destino no sistema Inter-Módulos
+2. Criar o pino virtual (tipo REMOTO) no módulo destino
+3. Criar a ação no módulo destino que usa o pino virtual como origem
+
+### Tipos de Pinos
+
+- **Digital/Analógico**: Pinos físicos do ESP32
+- **Remoto (65534)**: Pinos virtuais atualizados via comando de outro módulo
+  - Não fazem leitura física (digitalRead/analogRead)
+  - Apenas recebem valores via POST
+  - Podem disparar ações normalmente
+  - Use números altos (200+) para evitar conflito com GPIOs
+
+
 - Pino Origem == Pino de entrada == Pino de sensor (botão, reed switch, etc.).<br>
 Pino que irá disparar uma ação.<br>
 <br>
