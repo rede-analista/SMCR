@@ -111,12 +111,19 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
     // Controle de auto-discovery (lotes)
     uint8_t vU8_mqttHaDiscoveryBatchSize;   // Tamanho do lote de discovery
     uint16_t vU16_mqttHaDiscoveryIntervalMs; // Intervalo entre lotes (ms)
+    uint32_t vU32_mqttHaDiscoveryRepeatSec;  // Intervalo para re-executar discovery completo (segundos, padrão 900 = 15min)
 
     // 12. Configurações de Inter-Módulos
     bool vB_interModEnabled;        // Habilita/desabilita comunicação inter-módulos
     uint16_t vU16_interModHealthCheckInterval; // Intervalo de healthcheck em segundos (padrão 30)
     uint8_t vU8_interModMaxFailures; // Quantidade de falhas antes de marcar offline (padrão 3)
     bool vB_interModAutoDiscovery;  // Habilita descoberta automática via mDNS (padrão true)
+
+    // 13. Configurações de Telegram
+    bool vB_telegramEnabled;        // Habilita/desabilita notificações por Telegram
+    String vS_telegramToken;        // Token do bot Telegram
+    String vS_telegramChatId;       // Chat ID do destinatário
+    uint16_t vU16_telegramCheckInterval; // Intervalo de verificação de mensagens em segundos (padrão 30)
 
 };
 
@@ -253,7 +260,6 @@ void fV_handlePinUpdateApi(AsyncWebServerRequest *request); // Handler para API 
 void fV_handlePinDeleteApi(AsyncWebServerRequest *request); // Handler para API de deleção de pinos
 void fV_handlePinsSaveApi(AsyncWebServerRequest *request); // Handler para API de salvamento de pinos
 void fV_handlePinsReloadApi(AsyncWebServerRequest *request); // Handler para API de reload de pinos
-void fV_handleFilesPage(AsyncWebServerRequest *request);    // Handler para página de arquivos (deprecated - usa firmware)
 void fV_handleFirmwarePage(AsyncWebServerRequest *request);  // Handler para página de firmware OTA
 void fV_handlePreferenciasPage(AsyncWebServerRequest *request); // Handler para página de preferências NVS
 void fV_handleLittleFSPage(AsyncWebServerRequest *request);  // Handler para página LittleFS
@@ -302,6 +308,12 @@ bool fB_updateActionConfig(uint8_t pinOrigem, uint8_t numeroAcao, const ActionCo
 bool fB_isPinUsedByActions(uint8_t pinNumber); // Verifica se pino está em uso por ações
 void fV_executeActionsTask(void); // Task periódica para execução de ações
 void fV_executeAction(uint8_t actionIndex); // Executa uma ação específica
+
+/* Funções do Gerenciador de Telegram (telegram_manager.cpp) */
+void fV_initTelegram(void);
+void fV_telegramLoop(void);
+bool fB_sendTelegramMessage(const String& message);
+void fV_sendTelegramActionNotification(const ActionConfig_t* action, const String& pinOrigemNome, const String& pinDestinoNome);
 bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, bool state); // Envia ação para módulo remoto
 
 /* Funções do Gerenciador de MQTT (mqtt_manager.cpp) */

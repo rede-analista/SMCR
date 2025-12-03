@@ -433,6 +433,11 @@ void fV_writeActionPin(uint8_t pinIndex, uint8_t pinGpio, bool ligar) {
         
         fV_printSerialDebug(LOG_ACTIONS, "[ACTION] GPIO %d mudou para %s [Histórico: %d/8]", 
             pinGpio, novoEstado ? "HIGH" : "LOW", vA_pinConfigs[pinIndex].historico_count);
+        
+        // Publica no MQTT se habilitado
+        if (vSt_mainConfig.vB_mqttEnabled) {
+            fV_publishPinStatus(pinIndex);
+        }
     }
     
     digitalWrite(pinGpio, valorFisico ? HIGH : LOW);
@@ -475,6 +480,28 @@ void fV_executeActionsTask(void) {
                 
                 fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Ação iniciada: Origem=%d, Ação#%d", 
                     vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].numero_acao);
+                
+                // Envia para módulo remoto se configurado (envia estado ON)
+                if (vA_actionConfigs[i].envia_modulo != "" && vA_actionConfigs[i].pino_remoto > 0) {
+                    fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando ON para módulo '%s', pino remoto %d", 
+                        vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
+                    fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, true);
+                }
+                
+                // Envia notificação Telegram se habilitado na ação
+                if (vA_actionConfigs[i].telegram) {
+                    String pinOrigemNome = vA_pinConfigs[pinOrigemIndex].nome;
+                    uint8_t pinDestinoIndex = fU8_findPinIndex(vA_actionConfigs[i].pino_destino);
+                    String pinDestinoNome = "";
+                    if (pinDestinoIndex != 255) {
+                        pinDestinoNome = vA_pinConfigs[pinDestinoIndex].nome;
+                    }
+                    fV_sendTelegramActionNotification(
+                        &vA_actionConfigs[i],
+                        pinOrigemNome,
+                        pinDestinoNome
+                    );
+                }
             } else {
                 // Pino origem desativou - desliga destino e reseta contadores
                 uint8_t pinDestinoIndex = fU8_findPinIndex(vA_actionConfigs[i].pino_destino);
@@ -493,6 +520,54 @@ void fV_executeActionsTask(void) {
                             fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, false);
                         }
                     }
+                }
+                
+                // Envia notificação Telegram de normalização se habilitado na ação
+                if (vA_actionConfigs[i].telegram) {
+                    fV_printSerialDebug(LOG_ACTIONS, "[TELEGRAM] Enviando notificação de normalização - Pino %d, Ação #%d", 
+                        vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].numero_acao);
+                    
+                    String pinOrigemNome = vA_pinConfigs[pinOrigemIndex].nome;
+                    uint8_t pinDestinoIndex = fU8_findPinIndex(vA_actionConfigs[i].pino_destino);
+                    String pinDestinoNome = "";
+                    if (pinDestinoIndex != 255) {
+                        pinDestinoNome = vA_pinConfigs[pinDestinoIndex].nome;
+                    }
+                    
+                    // Determinar texto do tipo de ação
+                    String tipoAcao;
+                    switch(vA_actionConfigs[i].acao) {
+                        case 1: tipoAcao = "LIGA"; break;
+                        case 2: tipoAcao = "LIGA COM DELAY"; break;
+                        case 3: tipoAcao = "PISCA"; break;
+                        case 4: tipoAcao = "PULSO"; break;
+                        case 5: tipoAcao = "PULSO COM DELAY"; break;
+                        case 65534: tipoAcao = "STATUS"; break;
+                        case 65535: tipoAcao = "SINCRONISMO"; break;
+                        default: tipoAcao = "DESCONHECIDO"; break;
+                    }
+                    
+                    String message = "✅ <b>Normalização SMCR</b>\n\n";
+                    message += "📌 <b>Módulo:</b> " + vSt_mainConfig.vS_hostname + "\n";
+                    
+                    // Pino de origem
+                    message += "📍 <b>Pino Origem:</b> " + String(vA_actionConfigs[i].pino_origem);
+                    if (!pinOrigemNome.isEmpty()) {
+                        message += " (" + pinOrigemNome + ")";
+                    }
+                    message += "\n";
+                    
+                    // Pino de destino
+                    message += "🎯 <b>Pino Destino:</b> " + String(vA_actionConfigs[i].pino_destino);
+                    if (!pinDestinoNome.isEmpty()) {
+                        message += " (" + pinDestinoNome + ")";
+                    }
+                    message += "\n";
+                    
+                    message += "⚡ <b>Ação:</b> #" + String(vA_actionConfigs[i].numero_acao) + " - " + tipoAcao + " normalizada\n";
+                    message += "🕐 <b>Horário:</b> " + fS_getFormattedTime();
+                    
+                    fB_sendTelegramMessage(message);
                 }
                 
                 // Reseta contadores e estado da ação
@@ -615,15 +690,10 @@ void fV_executeAction(uint8_t actionIndex) {
         default:
             break;
     }
-    
-    // Se ação deve ser enviada para módulo remoto, envia via HTTP
-    if (action->envia_modulo != "" && action->pino_remoto > 0) {
-        bool remoteState = (vA_pinConfigs[pinDestinoIndex].status_atual != 0);
-        fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando para módulo '%s', pino remoto %d, estado=%d", 
-            action->envia_modulo.c_str(), action->pino_remoto, remoteState);
-        fB_sendRemoteAction(action->envia_modulo, action->pino_remoto, remoteState);
-    }
 }
+
+// NOTA: O envio para módulo remoto agora é feito apenas na mudança de estado do pino origem,
+// não a cada execução da ação, para evitar envios repetidos em ações tipo PISCA
 
 //========================================
 // Envia ação para módulo remoto via HTTP

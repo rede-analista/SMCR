@@ -143,6 +143,7 @@
                 <div style="position:absolute;background:#fff;border:1px solid #e9ecef;box-shadow:0 8px 20px rgba(0,0,0,0.1);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:10;">
                     <a href="/mqtt" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">MQTT</a>
                     <a href="/intermod" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Inter-Módulos</a>
+                    <a href="/assistentes" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Assistentes</a>
                 </div>
             </details>
             <details style="position:relative;">
@@ -220,8 +221,12 @@
                     <td><input type="number" name="mqtt_ha_batch" id="mqtt_ha_batch" value="4" min="1" max="16"></td>
                 </tr>
                 <tr>
-                    <td>Discovery - Intervalo (ms):</td>
+                    <td>Discovery - Intervalo do Lote(ms):</td>
                     <td><input type="number" name="mqtt_ha_interval_ms" id="mqtt_ha_interval_ms" value="100" min="10" max="5000"></td>
+                </tr>
+                <tr>
+                    <td>Discovery - Repetir a Cada (segundos):</td>
+                    <td><input type="number" name="mqtt_ha_repeat_sec" id="mqtt_ha_repeat_sec" value="900" min="0" max="86400"></td>
                 </tr>
             </table>
             <div style="background: #e7f3ff; padding: 15px; border-left: 4px solid #2196F3; margin: 20px 0;">
@@ -231,7 +236,10 @@
             <p style="font-size: 12px; color: #666; margin-top: 10px;">
                 <strong>Tópico Base:</strong> usado para publicação de status e recebimento de comandos.<br>
                 Exemplo: com tópico "smcr" e ID único "smcr_123abc", será usado "smcr/smcr_123abc/pin/X/state" para publicar status.<br><br>
-                <strong>Home Assistant Auto-Discovery:</strong> quando habilitado, o módulo publicará automaticamente as configurações de descoberta no formato do Home Assistant, permitindo que seus pinos apareçam automaticamente na interface.
+                <strong>Home Assistant Auto-Discovery:</strong> quando habilitado, o módulo publicará automaticamente as configurações de descoberta no formato do Home Assistant, permitindo que seus pinos apareçam automaticamente na interface.<br><br>
+                <strong>Discovery - Tamanho do Lote:</strong> número de entidades publicadas por vez (padrão: 4).<br>
+                <strong>Discovery - Intervalo do Lote(ms):</strong> tempo de espera entre cada lote de publicação (padrão: 100ms).<br>
+                <strong>Discovery - Repetir a Cada:</strong> intervalo para re-executar o discovery periodicamente em segundos (padrão: 900 = 15 minutos). Use 0 para desabilitar a repetição periódica.
             </p>
         </form>
     </div>
@@ -274,6 +282,7 @@
                     document.getElementById('mqtt_ha_discovery').value = data.mqtt_ha_discovery ? 'true' : 'false';
                     document.getElementById('mqtt_ha_batch').value = data.mqtt_ha_batch || 4;
                     document.getElementById('mqtt_ha_interval_ms').value = data.mqtt_ha_interval_ms || 100;
+                    document.getElementById('mqtt_ha_repeat_sec').value = data.mqtt_ha_repeat_sec || 900;
                     
                     hideLoading();
                     // Buscar status em chamada separada e não bloquear a página
@@ -327,6 +336,7 @@
             formData.append('mqtt_ha_discovery', document.getElementById('mqtt_ha_discovery').value);
             formData.append('mqtt_ha_batch', document.getElementById('mqtt_ha_batch').value);
             formData.append('mqtt_ha_interval_ms', document.getElementById('mqtt_ha_interval_ms').value);
+            formData.append('mqtt_ha_repeat_sec', document.getElementById('mqtt_ha_repeat_sec').value);
             
             fetch('/api/mqtt/save', {
                 method: 'POST',

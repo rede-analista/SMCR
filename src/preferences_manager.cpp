@@ -107,12 +107,19 @@ const char* KEY_MQTT_PUBLISH_INTERVAL = "mqtt_pint";
 const char* KEY_MQTT_HA_DISCOVERY = "mqtt_had";
 const char* KEY_MQTT_HA_BATCH = "mqtt_hab";
 const char* KEY_MQTT_HA_INTMS = "mqtt_haim";
+const char* KEY_MQTT_HA_REPEAT = "mqtt_harp";
 
 // Chaves de Inter-Módulos
 const char* KEY_INTERMOD_ENABLED = "imod_en";
 const char* KEY_INTERMOD_HEALTHCHECK = "imod_hchk";
 const char* KEY_INTERMOD_MAX_FAILURES = "imod_mfail";
 const char* KEY_INTERMOD_AUTO_DISCOVERY = "imod_adisc";
+
+// Chaves de Telegram
+const char* KEY_TELEGRAM_ENABLED = "tg_en";
+const char* KEY_TELEGRAM_TOKEN = "tg_token";
+const char* KEY_TELEGRAM_CHATID = "tg_chatid";
+const char* KEY_TELEGRAM_INTERVAL = "tg_intval";
 
 void fV_carregarMainConfig(void) {
 
@@ -178,12 +185,19 @@ void fV_carregarMainConfig(void) {
     vSt_mainConfig.vB_mqttHomeAssistantDiscovery = preferences.getBool(KEY_MQTT_HA_DISCOVERY, true); // Habilitado por padrão
     vSt_mainConfig.vU8_mqttHaDiscoveryBatchSize = preferences.getUChar(KEY_MQTT_HA_BATCH, 4);
     vSt_mainConfig.vU16_mqttHaDiscoveryIntervalMs = preferences.getUInt(KEY_MQTT_HA_INTMS, 100);
+    vSt_mainConfig.vU32_mqttHaDiscoveryRepeatSec = preferences.getUInt(KEY_MQTT_HA_REPEAT, 900); // 15 minutos
 
     // 12. Configurações de Inter-Módulos
     vSt_mainConfig.vB_interModEnabled = preferences.getBool(KEY_INTERMOD_ENABLED, false); // Padrão desabilitado
     vSt_mainConfig.vU16_interModHealthCheckInterval = preferences.getUInt(KEY_INTERMOD_HEALTHCHECK, 60); // 60 segundos
     vSt_mainConfig.vU8_interModMaxFailures = preferences.getUChar(KEY_INTERMOD_MAX_FAILURES, 3); // 3 falhas
     vSt_mainConfig.vB_interModAutoDiscovery = preferences.getBool(KEY_INTERMOD_AUTO_DISCOVERY, false); // Desabilitado por padrão (evita lentidão)
+
+    // 13. Configurações de Telegram
+    vSt_mainConfig.vB_telegramEnabled = preferences.getBool(KEY_TELEGRAM_ENABLED, false); // Padrão desabilitado
+    vSt_mainConfig.vS_telegramToken = preferences.getString(KEY_TELEGRAM_TOKEN, "");
+    vSt_mainConfig.vS_telegramChatId = preferences.getString(KEY_TELEGRAM_CHATID, "");
+    vSt_mainConfig.vU16_telegramCheckInterval = preferences.getUInt(KEY_TELEGRAM_INTERVAL, 30); // 30 segundos
 
     preferences.end();
 
@@ -261,12 +275,19 @@ void fV_salvarMainConfig(void) {
     preferences.putBool(KEY_MQTT_HA_DISCOVERY, vSt_mainConfig.vB_mqttHomeAssistantDiscovery);
     preferences.putUChar(KEY_MQTT_HA_BATCH, vSt_mainConfig.vU8_mqttHaDiscoveryBatchSize);
     preferences.putUInt(KEY_MQTT_HA_INTMS, vSt_mainConfig.vU16_mqttHaDiscoveryIntervalMs);
+    preferences.putUInt(KEY_MQTT_HA_REPEAT, vSt_mainConfig.vU32_mqttHaDiscoveryRepeatSec);
 
     // 12. Configurações de Inter-Módulos
     preferences.putBool(KEY_INTERMOD_ENABLED, vSt_mainConfig.vB_interModEnabled);
     preferences.putUInt(KEY_INTERMOD_HEALTHCHECK, vSt_mainConfig.vU16_interModHealthCheckInterval);
     preferences.putUChar(KEY_INTERMOD_MAX_FAILURES, vSt_mainConfig.vU8_interModMaxFailures);
     preferences.putBool(KEY_INTERMOD_AUTO_DISCOVERY, vSt_mainConfig.vB_interModAutoDiscovery);
+
+    // 13. Configurações de Telegram
+    preferences.putBool(KEY_TELEGRAM_ENABLED, vSt_mainConfig.vB_telegramEnabled);
+    preferences.putString(KEY_TELEGRAM_TOKEN, vSt_mainConfig.vS_telegramToken);
+    preferences.putString(KEY_TELEGRAM_CHATID, vSt_mainConfig.vS_telegramChatId);
+    preferences.putUInt(KEY_TELEGRAM_INTERVAL, vSt_mainConfig.vU16_telegramCheckInterval);
 
     preferences.end();
 

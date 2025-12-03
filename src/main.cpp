@@ -84,11 +84,15 @@ void setup() {
     fV_printSerialDebug(LOG_INIT, "Inter-módulos habilitado: %d módulo(s) cadastrado(s)", vU8_activeInterModCount);
   }
 
-  // 10. LEITURA INICIAL DOS PINOS: Garante que todos os pinos tenham estado atualizado ANTES da primeira ação
+  // 10. INICIALIZA SISTEMA DE TELEGRAM
+  fV_printSerialDebug(LOG_INIT, "Inicializando sistema de notificações Telegram...");
+  fV_initTelegram();
+
+  // 11. LEITURA INICIAL DOS PINOS: Garante que todos os pinos tenham estado atualizado ANTES da primeira ação
   fV_printSerialDebug(LOG_INIT, "Realizando leitura inicial de pinos...");
   fV_readPinsTask();
   
-  // 11. EXECUÇÃO INICIAL DE AÇÕES: Aplica ações baseadas no estado atual dos pinos
+  // 12. EXECUÇÃO INICIAL DE AÇÕES: Aplica ações baseadas no estado atual dos pinos
   fV_printSerialDebug(LOG_INIT, "Executando sincronização inicial de ações...");
   fV_executeActionsTask();
 
@@ -130,5 +134,8 @@ void loop() {
     // Executa descoberta automática se habilitada
     fV_interModDiscoveryTask();
   }
+
+  // 6. LOOP TELEGRAM: Verificação periódica de mensagens
+  fV_telegramLoop();
  
 }

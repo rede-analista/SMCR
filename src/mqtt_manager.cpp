@@ -20,6 +20,7 @@ unsigned long vUL_lastMqttReconnectAttempt = 0;
 unsigned long vUL_lastMqttPublish = 0;
 const uint32_t MQTT_RECONNECT_INTERVAL = 15000; // 15 segundos entre tentativas de reconexão
 bool vB_discoveryPublished = false; // Flag para publicar discovery apenas uma vez por conexão
+unsigned long vUL_lastDiscoveryComplete = 0; // Timestamp do último discovery completo
 // Publicação de discovery em lotes para reduzir burst
 uint8_t vU8_discoveryIndex = 0;           // índice do próximo pino para publicar
 unsigned long vUL_lastDiscoveryPublish = 0; // controle de ritmo entre publicações
@@ -246,6 +247,17 @@ void fV_mqttLoop(void) {
         fV_publishMqttDiscoveryStep();
     }
     
+    // Re-executar discovery periodicamente se habilitado e já concluído
+    if (vSt_mainConfig.vB_mqttHomeAssistantDiscovery && vB_discoveryPublished) {
+        unsigned long now = millis();
+        uint32_t repeatInterval = vSt_mainConfig.vU32_mqttHaDiscoveryRepeatSec * 1000; // Converte segundos para ms
+        
+        if (repeatInterval > 0 && (now - vUL_lastDiscoveryComplete) >= repeatInterval) {
+            fV_printSerialDebug(LOG_MQTT, "[MQTT] Re-executando discovery periódico após %d segundos", vSt_mainConfig.vU32_mqttHaDiscoveryRepeatSec);
+            fV_publishMqttDiscovery(); // Reseta vB_discoveryPublished para false
+        }
+    }
+    
     // Publicar status periodicamente
     unsigned long now = millis();
     uint32_t publishInterval = vSt_mainConfig.vU16_mqttPublishInterval * 1000;
@@ -288,8 +300,9 @@ void fV_publishMqttDiscoveryStep(void) {
         PinConfig_t* pin = &vA_pinConfigs[vU8_discoveryIndex];
         vU8_discoveryIndex++;
 
-        // Ignorar pinos sem uso ou remotos
-        if (pin->tipo == 0 || pin->tipo == 65534) {
+        // Ignorar apenas pinos sem uso (tipo 0 = não configurado)
+        // Pinos remotos (tipo 65534) devem ser publicados
+        if (pin->tipo == 0) {
             continue;
         }
 
@@ -305,16 +318,29 @@ void fV_publishMqttDiscoveryStep(void) {
         classeMqtt.toLowerCase();
         if (classeMqtt == "ligth") classeMqtt = "light"; // Corrige erro de digitação comum
         
-        if (pin->modo == 3 || pin->modo == 12) { // OUTPUT ou OUTPUT_OPEN_DRAIN
+        // Determina se é entrada ou saída baseado no MODO
+        bool isOutput = (pin->modo == 3 || pin->modo == 12); // OUTPUT ou OUTPUT_OPEN_DRAIN
+        bool isInput = (pin->modo == 1 || pin->modo == 5 || pin->modo == 9); // INPUT, INPUT_PULLUP, INPUT_PULLDOWN
+        bool isRemote = (pin->tipo == 65534); // Pino remoto (de outro módulo)
+        
+        if (isRemote) {
+            // Para pinos remotos, SEMPRE usar binary_sensor (read-only)
+            // Pinos remotos apenas refletem o estado de um pino em outro módulo
+            // Não podem ser controlados diretamente via MQTT (devem usar ação inter-módulo)
+            component = "binary_sensor";
+        } else if (isOutput) {
             // Para saídas, usa classe configurada ou default "switch"
             component = classeMqtt.isEmpty() ? "switch" : classeMqtt;
-        } else {
-            // Para entradas, usa classe configurada ou default "binary_sensor"
-            if (classeMqtt.isEmpty()) {
+        } else if (isInput) {
+            // Para entradas, SEMPRE usa binary_sensor (ignora classe_mqtt se estiver errada)
+            if (classeMqtt.isEmpty() || classeMqtt == "switch" || classeMqtt == "light") {
                 component = pin->tipo == 192 ? "sensor" : "binary_sensor";
             } else {
-                component = classeMqtt; // Respeita a classe configurada pelo usuário
+                component = classeMqtt; // Respeita apenas se for uma classe válida para entrada
             }
+        } else {
+            // Fallback para modos desconhecidos
+            component = "binary_sensor";
         }
         
         // Define ícone
@@ -325,6 +351,7 @@ void fV_publishMqttDiscoveryStep(void) {
             // Fallback baseado no tipo
             if (pin->tipo == 1) icon = "mdi:electric-switch";     // Digital
             else if (pin->tipo == 192) icon = "mdi:gauge";         // Analógico
+            else if (pin->tipo == 65534) icon = "mdi:lan-connect"; // Remoto
             else icon = "mdi:numeric";
         }
 
@@ -358,6 +385,23 @@ void fV_publishMqttDiscoveryStep(void) {
         
         payload += "\"icon\":\"" + icon + "\",";
         
+        // Para sensores analógicos, adicionar unidade e classe de dispositivo
+        if (pin->tipo == 192) { // Analógico
+            payload += "\"unit_of_measurement\":\"ADC\",";
+            payload += "\"device_class\":\"voltage\",";
+            // Adicionar informações de nível de acionamento como atributos JSON
+            String attrTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/pin/" + String(pin->pino) + "/attributes";
+            payload += "\"json_attributes_topic\":\"" + attrTopic + "\",";
+            
+            // Publicar atributos (níveis de acionamento)
+            String attrPayload = "{";
+            attrPayload += "\"nivel_acionamento_min\":" + String(pin->nivel_acionamento_min) + ",";
+            attrPayload += "\"nivel_acionamento_max\":" + String(pin->nivel_acionamento_max) + ",";
+            attrPayload += "\"acionado\":" + String((pin->status_atual >= pin->nivel_acionamento_min && pin->status_atual <= pin->nivel_acionamento_max) ? "true" : "false");
+            attrPayload += "}";
+            vO_mqttClient.publish(attrTopic.c_str(), attrPayload.c_str(), true);
+        }
+        
         // Informações do dispositivo
         payload += "\"device\":{";
         payload += "\"identifiers\":[\"" + uniqueId + "\"],";
@@ -371,8 +415,10 @@ void fV_publishMqttDiscoveryStep(void) {
 
         bool success = vO_mqttClient.publish(configTopic.c_str(), payload.c_str(), true);
         if (success) {
-            fV_printSerialDebug(LOG_MQTT, "[MQTT] Discovery publicado para pino %d (%s) no topico: %s", 
-                pin->pino, component.c_str(), configTopic.c_str());
+            fV_printSerialDebug(LOG_MQTT, "[MQTT] Discovery publicado para pino %d (tipo=%d, modo=%d, component=%s)", 
+                pin->pino, pin->tipo, pin->modo, component.c_str());
+            fV_printSerialDebug(LOG_MQTT, "[MQTT] Topico: %s", configTopic.c_str());
+            fV_printSerialDebug(LOG_MQTT, "[MQTT] Payload: %s", payload.c_str());
         } else {
             fV_printSerialDebug(LOG_MQTT, "[MQTT] ERRO ao publicar discovery para pino %d", pin->pino);
         }
@@ -382,6 +428,7 @@ void fV_publishMqttDiscoveryStep(void) {
 
     if (vU8_discoveryIndex >= vU8_activePinsCount) {
         vB_discoveryPublished = true;
+        vUL_lastDiscoveryComplete = millis(); // Registra timestamp da conclusão
         fV_printSerialDebug(LOG_MQTT, "[MQTT] Auto-discovery concluido - %d entidades publicadas", publishedThisCycle);
     }
 }
@@ -396,21 +443,57 @@ void fV_publishPinStatus(uint8_t pinIndex) {
     
     PinConfig_t* pin = &vA_pinConfigs[pinIndex];
     
-    // Ignorar pinos sem uso ou remotos
-    if (pin->tipo == 0 || pin->tipo == 65534) {
+    // Ignorar apenas pinos sem uso (tipo 0 = não configurado)
+    // Pinos remotos (tipo 65534) devem publicar status
+    if (pin->tipo == 0) {
         return;
     }
     
     String uniqueId = fS_getMqttUniqueId();
     String stateTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/pin/" + String(pin->pino) + "/state";
     
-    // Sempre publicar valor numérico (0/1 para digital, 0-4095 para analógico)
-    String payload = String(pin->status_atual);
+    String payload;
+    
+    if (pin->tipo == 192) {
+        // ANALÓGICO: Envia valor bruto (0-4095)
+        payload = String(pin->status_atual);
+        fV_printSerialDebug(LOG_MQTT, "[MQTT] Status publicado - Pino %d: %s (analógico)", 
+                           pin->pino, payload.c_str());
+    } else {
+        // DIGITAL: Considera nível de acionamento para entradas
+        bool isInput = (pin->modo == 1 || pin->modo == 5 || pin->modo == 9); // INPUT, INPUT_PULLUP, INPUT_PULLDOWN
+        bool isOutput = (pin->modo == 3 || pin->modo == 12); // OUTPUT, OUTPUT_OPEN_DRAIN
+        bool isRemote = (pin->tipo == 65534); // Pino remoto
+        
+        int estadoLogico = pin->status_atual;
+        
+        if (isRemote) {
+            // Para pinos remotos, usar status atual direto (já vem processado do módulo de origem)
+            estadoLogico = pin->status_atual;
+            fV_printSerialDebug(LOG_MQTT, "[MQTT] Status publicado - Pino %d: %d (remoto)", 
+                               pin->pino, estadoLogico);
+        } else if (isInput) {
+            // Para entradas, verificar se o estado atual corresponde ao nível de acionamento
+            // Se nivel_acionamento_min == 0: acionado quando status_atual == 0 (inverte para enviar 1)
+            // Se nivel_acionamento_min == 1: acionado quando status_atual == 1 (mantém)
+            if (pin->status_atual == pin->nivel_acionamento_min) {
+                estadoLogico = 1; // Acionado
+            } else {
+                estadoLogico = 0; // Não acionado
+            }
+            fV_printSerialDebug(LOG_MQTT, "[MQTT] Status publicado - Pino %d: %d (físico=%d, nível_acion=%d)", 
+                               pin->pino, estadoLogico, pin->status_atual, pin->nivel_acionamento_min);
+        } else if (isOutput) {
+            // Para saídas, envia estado físico direto (comando MQTT já considera lógica invertida)
+            estadoLogico = pin->status_atual;
+            fV_printSerialDebug(LOG_MQTT, "[MQTT] Status publicado - Pino %d: %d (saída)", 
+                               pin->pino, estadoLogico);
+        }
+        
+        payload = String(estadoLogico);
+    }
     
     vO_mqttClient.publish(stateTopic.c_str(), payload.c_str());
-    
-    fV_printSerialDebug(LOG_MQTT, "[MQTT] Status publicado - Pino %d: %s", 
-                       pin->pino, payload.c_str());
 }
 
 /**

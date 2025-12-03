@@ -7,6 +7,7 @@
 #include "web_pins.h"
 #include "web_mqtt.h"
 #include "web_intermod.h"
+#include "web_assistentes.h"
 #include "web_actions.h"
 #include "web_firmware.h"
 #include "web_preferencias.h"
@@ -568,6 +569,12 @@ void fV_setupWebServer() {
             vSt_mainConfig.vU16_mqttHaDiscoveryIntervalMs = (uint16_t)v;
             configChanged = true;
         }
+        if (request->hasArg("mqtt_ha_repeat_sec")) {
+            int v = request->arg("mqtt_ha_repeat_sec").toInt();
+            if (v < 0) v = 0; if (v > 86400) v = 86400; // 0 a 24 horas
+            vSt_mainConfig.vU32_mqttHaDiscoveryRepeatSec = (uint32_t)v;
+            configChanged = true;
+        }
         
         if (configChanged) {
             fV_salvarMainConfig();
@@ -596,7 +603,8 @@ void fV_setupWebServer() {
         json += "\"mqtt_publish_interval\":" + String(vSt_mainConfig.vU16_mqttPublishInterval) + ",";
         json += "\"mqtt_ha_discovery\":" + String(vSt_mainConfig.vB_mqttHomeAssistantDiscovery ? "true" : "false") + ",";
         json += "\"mqtt_ha_batch\":" + String(vSt_mainConfig.vU8_mqttHaDiscoveryBatchSize) + ",";
-        json += "\"mqtt_ha_interval_ms\":" + String(vSt_mainConfig.vU16_mqttHaDiscoveryIntervalMs);
+        json += "\"mqtt_ha_interval_ms\":" + String(vSt_mainConfig.vU16_mqttHaDiscoveryIntervalMs) + ",";
+        json += "\"mqtt_ha_repeat_sec\":" + String(vSt_mainConfig.vU32_mqttHaDiscoveryRepeatSec);
         json += "}";
         
         request->send(200, "application/json", json);
@@ -985,6 +993,10 @@ void fV_setupWebServer() {
             // Pino remoto (entrada virtual) - apenas atualiza o valor
             vA_pinConfigs[pinIndex].status_atual = value;
             fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Pino REMOTO %d atualizado: valor=%d", pin, value);
+            
+            // Publicar status no MQTT imediatamente
+            fV_publishPinStatus(pinIndex);
+            
             request->send(200, "text/plain", "OK - Remote pin updated");
             
         } else if (vA_pinConfigs[pinIndex].modo == 3 || vA_pinConfigs[pinIndex].modo == 12) { 
@@ -1000,6 +1012,97 @@ void fV_setupWebServer() {
             fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Pino %d não é saída nem remoto (tipo=%d, modo=%d)", 
                 pin, vA_pinConfigs[pinIndex].tipo, vA_pinConfigs[pinIndex].modo);
             request->send(400, "text/plain", "Pin must be output or remote type");
+        }
+    });
+
+    // ========================================
+    // API: Endpoints de Assistentes (Telegram)
+    // ========================================
+    
+    // Página de configuração de assistentes
+    SERVIDOR_WEB_ASYNC->on("/assistentes", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        servePageWithFallback(request, "/web_assistentes.html", web_assistentes_html);
+    });
+    
+    // API: Obter configurações de assistentes
+    SERVIDOR_WEB_ASYNC->on("/api/assistentes/config", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        StaticJsonDocument<512> doc;
+        doc["telegram_enabled"] = vSt_mainConfig.vB_telegramEnabled;
+        doc["telegram_token"] = vSt_mainConfig.vS_telegramToken;
+        doc["telegram_chatid"] = vSt_mainConfig.vS_telegramChatId;
+        doc["telegram_interval"] = vSt_mainConfig.vU16_telegramCheckInterval;
+        
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+    
+    // API: Salvar configurações de assistentes
+    SERVIDOR_WEB_ASYNC->on("/api/assistentes/config", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        if (request->hasArg("telegram_enabled")) {
+            vSt_mainConfig.vB_telegramEnabled = (request->arg("telegram_enabled") == "1");
+        }
+        if (request->hasArg("telegram_token")) {
+            vSt_mainConfig.vS_telegramToken = request->arg("telegram_token");
+        }
+        if (request->hasArg("telegram_chatid")) {
+            vSt_mainConfig.vS_telegramChatId = request->arg("telegram_chatid");
+        }
+        if (request->hasArg("telegram_interval")) {
+            vSt_mainConfig.vU16_telegramCheckInterval = request->arg("telegram_interval").toInt();
+        }
+        
+        fV_salvarMainConfig();
+        request->send(200, "text/plain", "Configurações salvas com sucesso!");
+    });
+    
+    // API: Testar notificação do Telegram
+    SERVIDOR_WEB_ASYNC->on("/api/assistentes/telegram/test", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        if (!vSt_mainConfig.vB_telegramEnabled) {
+            request->send(400, "text/plain", "Telegram não está habilitado");
+            return;
+        }
+        
+        if (vSt_mainConfig.vS_telegramToken.isEmpty() || vSt_mainConfig.vS_telegramChatId.isEmpty()) {
+            request->send(400, "text/plain", "Token ou Chat ID não configurado");
+            return;
+        }
+        
+        // Envia notificação de teste (implementação será feita depois)
+        String message = "🔔 Teste de notificação do SMCR!\n\n";
+        message += "Módulo: " + vSt_mainConfig.vS_hostname + "\n";
+        message += "Firmware: " + String(FIRMWARE_VERSION) + "\n";
+        message += "IP: " + WiFi.localIP().toString();
+        
+        bool success = fB_sendTelegramMessage(message);
+        
+        if (success) {
+            request->send(200, "text/plain", "Notificação enviada com sucesso!");
+        } else {
+            request->send(500, "text/plain", "Falha ao enviar notificação");
         }
     });
 
@@ -1343,7 +1446,8 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
     // 3. Sincronizacao (Agrupados em "sync")
     JsonObject sync_obj = vL_jsonDoc["sync"].to<JsonObject>();
     sync_obj["ntp_status"] = vL_ntp_ok ? "Sincronizado" : "Desabilitado";
-    sync_obj["mqtt_status"] = fS_getMqttStatus(); 
+    sync_obj["mqtt_status"] = fS_getMqttStatus();
+    sync_obj["telegram_status"] = vSt_mainConfig.vB_telegramEnabled ? "Ativo" : "Inativo";
     
     // Usa o tempo formatado se o NTP estiver OK, caso contrario, Uptime formatado
     sync_obj["last_update"] = vL_ntp_ok ? fS_getFormattedTime() : fS_formatUptime(millis()); 
