@@ -9,7 +9,7 @@ Inclusão de bibliotecas
 #include "include.h"
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.1.2"
+#define FIRMWARE_VERSION "2.1.3"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -131,7 +131,7 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
 struct PinConfig_t {
     String nome;                 // Nome descritivo do pino
     uint8_t pino;               // Número físico do GPIO (0-254)
-    uint16_t tipo;              // Tipo: 0=Sem Uso, 1=Digital, 192=Analógico, 65534=Remoto
+    uint16_t tipo;              // Tipo: 0=Sem Uso, 1=Digital, 192=Analógico(ADC), 193=PWM(Saída), 65533=Remoto Analógico, 65534=Remoto Digital
     uint8_t modo;               // pinMode(): 0=SEM_USO, 1=INPUT, 3=OUTPUT, etc.
     uint8_t xor_logic;          // Lógica invertida (0=normal, 1=invertido)
     uint32_t tempo_retencao;    // Tempo em millisegundos para ações temporizadas
@@ -182,6 +182,15 @@ struct InterModConfig_t {
     bool auto_descoberto;        // Se foi descoberto via mDNS ou cadastrado manualmente
 };
 
+// --- Estrutura para Log de Comunicações Inter-Módulos ---
+struct InterModCommLog_t {
+    String time;                 // Horário da comunicação (HH:MM:SS)
+    String module;               // Nome do módulo (from/to)
+    uint8_t pin;                 // Número do pino
+    uint16_t value;              // Valor (0-65535, suporta analógico 0-4095)
+    bool is_sent;                // true=enviado, false=recebido
+};
+
 // Instância global da sua configuração em memória (sua running-config)
 extern MainConfig_t vSt_mainConfig; // vSt_ para variável do tipo Struct
 
@@ -197,6 +206,17 @@ extern uint8_t vU8_activeActionsCount;    // Contador de ações ativas configur
 extern InterModConfig_t* vA_interModConfigs;  // Array dinâmico de módulos cadastrados
 extern uint8_t vU8_activeInterModCount;       // Contador de módulos ativos
 extern bool vB_firstDiscoveryDone;            // Flag para controlar primeira execução do discovery
+
+// --- Variáveis globais para log de comunicações inter-módulos ---
+#define MAX_INTERMOD_COMM_LOG 5  // Máximo de 5 comunicações de cada tipo
+extern InterModCommLog_t vSt_InterModCommReceived[MAX_INTERMOD_COMM_LOG];
+extern InterModCommLog_t vSt_InterModCommSent[MAX_INTERMOD_COMM_LOG];
+extern uint8_t vU8_InterModCommReceivedIndex; // Índice do próximo slot (circular buffer)
+extern uint8_t vU8_InterModCommSentIndex;     // Índice do próximo slot (circular buffer)
+
+// Funções de gerenciamento do log
+void fV_logInterModReceived(const String& module, uint8_t pin, uint16_t value);
+void fV_logInterModSent(const String& module, uint8_t pin, uint16_t value);
 
 // --- Novas funções para carregar e salvar a estrutura MainConfig_t ---
 // Estas serão as funções de interface para a sua "startup-config"
@@ -314,7 +334,8 @@ void fV_initTelegram(void);
 void fV_telegramLoop(void);
 bool fB_sendTelegramMessage(const String& message);
 void fV_sendTelegramActionNotification(const ActionConfig_t* action, const String& pinOrigemNome, const String& pinDestinoNome);
-bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, bool state); // Envia ação para módulo remoto
+bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, bool state); // Envia ação digital para módulo remoto
+bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, uint16_t value); // Envia valor analógico para módulo remoto
 
 /* Funções do Gerenciador de MQTT (mqtt_manager.cpp) */
 void fV_initMqtt(void);               // Inicializa sistema MQTT

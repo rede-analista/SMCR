@@ -65,6 +65,14 @@ void fV_initPinSystem(void) {
         vA_pinConfigs[i].nivel_acionamento_max = 0;
         vA_pinConfigs[i].status_atual = 0;
         vA_pinConfigs[i].ignore_contador = 0;
+        // Inicializar históricos para evitar lixo de memória
+        vA_pinConfigs[i].historico_index = 0;
+        vA_pinConfigs[i].historico_count = 0;
+        vA_pinConfigs[i].ultimo_acionamento_ms = 0;
+        for (uint8_t h = 0; h < 8; h++) {
+            vA_pinConfigs[i].historico_analogico[h] = 0;
+            vA_pinConfigs[i].historico_digital[h] = 0;
+        }
     }
     
     vU8_activePinsCount = 0;
@@ -511,9 +519,14 @@ void fV_updatePinStatus(void) {
             
             // Lê apenas pinos digitais e analógicos (não remotos)
             if (tipo == PIN_TYPE_DIGITAL) {
-                // Leitura digital
-                int value = digitalRead(pinNumber);
-                vA_pinConfigs[i].status_atual = value;
+                // Leitura digital - APENAS para pinos de ENTRADA
+                // Pinos de SAÍDA mantêm o valor definido por digitalWrite() no action_manager
+                uint8_t modo = vA_pinConfigs[i].modo;
+                if (modo == PIN_MODE_INPUT || modo == PIN_MODE_INPUT_PULLUP || modo == PIN_MODE_INPUT_PULLDOWN) {
+                    int value = digitalRead(pinNumber);
+                    vA_pinConfigs[i].status_atual = value;
+                }
+                // Pinos OUTPUT (3) e OUTPUT_OPEN_DRAIN (12) não fazem leitura
                 
             } else if (tipo == PIN_TYPE_ANALOG) {
                 // Leitura analógica
@@ -542,9 +555,11 @@ bool fB_isPinActivated(uint8_t pinIndex) {
     } else if (tipo == PIN_TYPE_ANALOG) {
         // Para pinos analógicos, verifica se está dentro do range configurado
         return (statusAtual >= nivelMin && statusAtual <= nivelMax);
-    } else if (tipo == PIN_TYPE_REMOTE) {
-        // Para pinos remotos (65534), trata como digital
-        // Compara status_atual com nivel_acionamento_min (0 ou 1)
+    } else if (tipo == 65533) {  // PIN_TYPE_REMOTE_ANALOG
+        // Para pinos remotos analógicos, verifica range (igual ao analógico local)
+        return (statusAtual >= nivelMin && statusAtual <= nivelMax);
+    } else if (tipo == PIN_TYPE_REMOTE) {  // 65534 - PIN_TYPE_REMOTE_DIGITAL
+        // Para pinos remotos digitais, compara com nivel_acionamento_min (0 ou 1)
         return (statusAtual == nivelMin);
     }
     

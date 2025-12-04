@@ -221,6 +221,25 @@
                 <tr><td>Telegram:</td><td id="telegram-status" class="status-warning">-</td></tr>
                 <tr><td>Inter-Módulos:</td><td id="intermod-status" class="status-warning">-</td></tr>
             </table>
+
+            <!-- Card de Comunicações Inter-Módulos -->
+            <div id="intermod-comm-card" style="display: none;">
+                <div class="section-title" style="font-size: 16px;">Comunicacoes Inter-Modulos</div>
+                
+                <div style="margin-bottom: 15px;">
+                    <div style="font-weight: bold; color: #007bff; margin-bottom: 8px; font-size: 14px;">📥 Ultimas Recepcoes (5):</div>
+                    <div id="intermod-received" style="font-size: 12px; color: #666; padding-left: 10px;">
+                        <div style="color: #999; font-style: italic;">Nenhuma comunicacao recebida ainda</div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div style="font-weight: bold; color: #28a745; margin-bottom: 8px; font-size: 14px;">📤 Ultimos Envios (5):</div>
+                    <div id="intermod-sent" style="font-size: 12px; color: #666; padding-left: 10px;">
+                        <div style="color: #999; font-style: italic;">Nenhuma comunicacao enviada ainda</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -364,6 +383,48 @@
                         intermodStatus.className = 'status-error';
                     }
 
+                    // Card de Comunicações Inter-Módulos
+                    const showIntermodInfo = data.system && data.system.inter_modulos_enabled;
+                    const intermodCommCard = document.getElementById('intermod-comm-card');
+                    
+                    if (showIntermodInfo && data.intermod_comm) {
+                        intermodCommCard.style.display = 'block';
+                        
+                        // Processar comunicações recebidas
+                        const receivedDiv = document.getElementById('intermod-received');
+                        if (data.intermod_comm.received && data.intermod_comm.received.length > 0) {
+                            let receivedHTML = '';
+                            data.intermod_comm.received.forEach((comm, index) => {
+                                receivedHTML += `<div style="padding: 5px 0; border-bottom: 1px solid #eee;">`;
+                                receivedHTML += `<span style="color: #007bff;">⏱ ${comm.time}</span> `;
+                                receivedHTML += `<span style="color: #333;">de <strong>${comm.from}</strong></span> `;
+                                receivedHTML += `<span style="color: #666;">→ Pino ${comm.pin} = ${comm.value}</span>`;
+                                receivedHTML += `</div>`;
+                            });
+                            receivedDiv.innerHTML = receivedHTML;
+                        } else {
+                            receivedDiv.innerHTML = '<div style="color: #999; font-style: italic;">Nenhuma comunicacao recebida ainda</div>';
+                        }
+                        
+                        // Processar comunicações enviadas
+                        const sentDiv = document.getElementById('intermod-sent');
+                        if (data.intermod_comm.sent && data.intermod_comm.sent.length > 0) {
+                            let sentHTML = '';
+                            data.intermod_comm.sent.forEach((comm, index) => {
+                                sentHTML += `<div style="padding: 5px 0; border-bottom: 1px solid #eee;">`;
+                                sentHTML += `<span style="color: #28a745;">⏱ ${comm.time}</span> `;
+                                sentHTML += `<span style="color: #333;">para <strong>${comm.to}</strong></span> `;
+                                sentHTML += `<span style="color: #666;">→ Pino ${comm.pin} = ${comm.value}</span>`;
+                                sentHTML += `</div>`;
+                            });
+                            sentDiv.innerHTML = sentHTML;
+                        } else {
+                            sentDiv.innerHTML = '<div style="color: #999; font-style: italic;">Nenhuma comunicacao enviada ainda</div>';
+                        }
+                    } else {
+                        intermodCommCard.style.display = 'none';
+                    }
+
                     // Pinos
                     const pinsCount = data.pins ? data.pins.length : 0;
                     const pinsMax = data.system ? data.system.max_pins || 16 : 16;
@@ -398,11 +459,15 @@
                             const PIN_MODE_OUTPUT_OPEN_DRAIN = 12;
                             const PIN_TYPE_DIGITAL = 1;
                             const PIN_TYPE_ANALOG = 192;
-                            const PIN_TYPE_REMOTE = 65534;
+                            const PIN_TYPE_PWM = 193;
+                            const PIN_TYPE_REMOTE_ANALOG = 65533;
+                            const PIN_TYPE_REMOTE_DIGITAL = 65534;
                             
-                            if (tipo === PIN_TYPE_REMOTE) {
-                                tipoStr = 'Remoto';
-                            } else if (tipo === PIN_TYPE_ANALOG) {
+                            if (tipo === PIN_TYPE_REMOTE_DIGITAL) {
+                                tipoStr = 'Remoto Digital';
+                            } else if (tipo === PIN_TYPE_REMOTE_ANALOG) {
+                                tipoStr = 'Remoto Analógico';
+                            } else if (tipo === PIN_TYPE_ANALOG || tipo === PIN_TYPE_PWM) {
                                 tipoStr = 'Analógico';
                             } else if (modo === PIN_MODE_OUTPUT || modo === PIN_MODE_OUTPUT_OPEN_DRAIN) {
                                 tipoStr = 'Saída';
@@ -415,8 +480,8 @@
                             
                             // Determinar se está em alerta ou ok baseado no nível de acionamento
                             let isAlerta = false;
-                            if (tipo === 192) {
-                                // Pino analógico: verifica se está dentro do range configurado
+                            if (tipo === 192 || tipo === 193 || tipo === 65533) {
+                                // Pino analógico (local, PWM ou remoto): verifica se está dentro do range configurado
                                 const nivelMin = pin.nivel_acionamento_min || 0;
                                 const nivelMax = pin.nivel_acionamento_max || 4095;
                                 isAlerta = (valorAtual >= nivelMin && valorAtual <= nivelMax);
@@ -429,14 +494,14 @@
                             const bgColor = isAlerta ? corAlerta : corOk;
                             
                             // Prefixo: R para remoto, D para digital/analógico
-                            const prefixo = (tipo === PIN_TYPE_REMOTE) ? 'R' : 'D';
+                            const prefixo = (tipo === PIN_TYPE_REMOTE_DIGITAL || tipo === PIN_TYPE_REMOTE_ANALOG) ? 'R' : 'D';
                             
                             // Mostrar histórico se disponível
                             let statusDisplay = '';
                             const history = pin.historico || [];
                             
-                            if (tipo === PIN_TYPE_ANALOG && history.length > 0) {
-                                // Para pinos analógicos, mostrar histórico de 8 valores numéricos
+                            if ((tipo === PIN_TYPE_ANALOG || tipo === PIN_TYPE_PWM || tipo === PIN_TYPE_REMOTE_ANALOG) && history.length > 0) {
+                                // Para pinos analógicos (local, PWM ou remoto), mostrar histórico de 8 valores numéricos
                                 const nivelMin = pin.nivel_acionamento_min || 0;
                                 const nivelMax = pin.nivel_acionamento_max || 4095;
                                 
@@ -448,8 +513,8 @@
                                 }).join('');
                                 statusDisplay = `<div style="display: flex; align-items: center; font-family: monospace; font-size: 12px;">${historySpans}</div>`;
                                 
-                            } else if (tipo === PIN_TYPE_DIGITAL && history.length > 0) {
-                                // Para pinos digitais, mostrar histórico de 8 estados (valores 0/1)
+                            } else if ((tipo === PIN_TYPE_DIGITAL || tipo === PIN_TYPE_REMOTE_DIGITAL) && history.length > 0) {
+                                // Para pinos digitais (local ou remoto), mostrar histórico de 8 estados (valores 0/1)
                                 const nivelMin = pin.nivel_acionamento_min || 0;
                                 
                                 console.log(`Histórico digital do pino ${pin.gpio}:`, history, `nivelMin=${nivelMin}`);

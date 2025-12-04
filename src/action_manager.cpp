@@ -481,11 +481,23 @@ void fV_executeActionsTask(void) {
                 fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Ação iniciada: Origem=%d, Ação#%d", 
                     vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].numero_acao);
                 
-                // Envia para módulo remoto se configurado (envia estado ON)
+                // Envia para módulo remoto se configurado
                 if (vA_actionConfigs[i].envia_modulo != "" && vA_actionConfigs[i].pino_remoto > 0) {
-                    fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando ON para módulo '%s', pino remoto %d", 
-                        vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
-                    fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, true);
+                    // Verifica se pino de origem é analógico (tipo 192 ou 193)
+                    bool isAnalog = (vA_pinConfigs[pinOrigemIndex].tipo == 192 || vA_pinConfigs[pinOrigemIndex].tipo == 193);
+                    
+                    if (isAnalog) {
+                        // Envia valor analógico real (0-4095)
+                        uint16_t analogValue = vA_pinConfigs[pinOrigemIndex].status_atual;
+                        fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando valor analógico %d para módulo '%s', pino remoto %d", 
+                            analogValue, vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
+                        fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, analogValue);
+                    } else {
+                        // Envia estado digital ON (1) para pino remoto
+                        fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando ON (1) para módulo '%s', pino remoto %d", 
+                            vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
+                        fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, (uint16_t)1);
+                    }
                 }
                 
                 // Envia notificação Telegram se habilitado na ação
@@ -513,11 +525,23 @@ void fV_executeActionsTask(void) {
                         fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Desligando GPIO %d (origem desativada) - Ação tipo %d", 
                             vA_actionConfigs[i].pino_destino, vA_actionConfigs[i].acao);
                         
-                        // Se ação deve ser enviada para módulo remoto, envia estado OFF também
+                        // Se ação deve ser enviada para módulo remoto, envia estado OFF ou valor 0
                         if (vA_actionConfigs[i].envia_modulo != "" && vA_actionConfigs[i].pino_remoto > 0) {
-                            fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando OFF para módulo '%s', pino remoto %d", 
-                                vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
-                            fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, false);
+                            // Verifica se pino de origem é analógico
+                            bool isAnalog = (vA_pinConfigs[pinOrigemIndex].tipo == 192 || vA_pinConfigs[pinOrigemIndex].tipo == 193);
+                            
+                            if (isAnalog) {
+                                // Envia valor analógico real (pode ser 0 ou valor atual)
+                                uint16_t analogValue = vA_pinConfigs[pinOrigemIndex].status_atual;
+                                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando valor analógico %d (normalização) para módulo '%s', pino remoto %d", 
+                                    analogValue, vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
+                                fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, analogValue);
+                            } else {
+                                // Envia estado digital OFF (0) para pino remoto
+                                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando OFF (0) para módulo '%s', pino remoto %d", 
+                                    vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
+                                fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, (uint16_t)0);
+                            }
                         }
                     }
                 }
@@ -743,6 +767,76 @@ bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, bool state) 
         if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_ACCEPTED) {
             String response = http.getString();
             fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Comando enviado com sucesso: pino=%d, valor=%d", remotePin, state ? 1 : 0);
+            
+            // Registrar comunicação enviada (exclui healthcheck - pino 0)
+            if (remotePin != 0) {
+                fV_logInterModSent(vA_interModConfigs[moduleIndex].hostname, remotePin, state ? 1 : 0);
+            }
+            
+            success = true;
+        } else {
+            fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Erro HTTP %d ao enviar comando", httpCode);
+        }
+    } else {
+        fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Falha na conexão: %s", http.errorToString(httpCode).c_str());
+    }
+    
+    http.end();
+    return success;
+}
+
+// Sobrecarga para enviar valor analógico (0-4095) ou qualquer valor numérico
+bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, uint16_t value) {
+    // Busca o módulo na lista de módulos cadastrados
+    uint8_t moduleIndex = 255;
+    for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+        if (vA_interModConfigs[i].id == moduleId) {
+            moduleIndex = i;
+            break;
+        }
+    }
+    
+    if (moduleIndex == 255) {
+        fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Módulo '%s' não encontrado na lista", moduleId.c_str());
+        return false;
+    }
+    
+    // Verifica se módulo está online
+    if (!vA_interModConfigs[moduleIndex].online) {
+        fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Módulo '%s' está offline, ignorando envio", moduleId.c_str());
+        return false;
+    }
+    
+    // Monta a URL para o endpoint do módulo remoto
+    String url = "http://";
+    url += vA_interModConfigs[moduleIndex].ip;
+    url += ":";
+    url += String(vA_interModConfigs[moduleIndex].porta);
+    url += "/api/pin/set";
+    
+    fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Enviando comando para %s", url.c_str());
+    
+    HTTPClient http;
+    http.begin(url);
+    http.setTimeout(3000); // 3 segundos de timeout
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    
+    // Monta o body da requisição com valor numérico
+    String postData = "pin=" + String(remotePin) + "&value=" + String(value);
+    
+    int httpCode = http.POST(postData);
+    
+    bool success = false;
+    if (httpCode > 0) {
+        if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_ACCEPTED) {
+            String response = http.getString();
+            fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Comando enviado com sucesso: pino=%d, valor=%d", remotePin, value);
+            
+            // Registrar comunicação enviada (exclui healthcheck - pino 0)
+            if (remotePin != 0) {
+                fV_logInterModSent(vA_interModConfigs[moduleIndex].hostname, remotePin, value);
+            }
+            
             success = true;
         } else {
             fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Erro HTTP %d ao enviar comando", httpCode);

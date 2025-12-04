@@ -495,6 +495,23 @@ void fV_setupWebServer() {
     SERVIDOR_WEB_ASYNC->on("/reset/config", HTTP_POST, fV_handleConfigReset);
     SERVIDOR_WEB_ASYNC->on("/reset/pins", HTTP_POST, fV_handlePinsReset);
     SERVIDOR_WEB_ASYNC->on("/restart", HTTP_POST, fV_handleRestart);
+    
+    // Rota GET para factory reset direto (requer parâmetro confirm=yes para segurança)
+    SERVIDOR_WEB_ASYNC->on("/api/reset/factory", HTTP_GET, [](AsyncWebServerRequest *request) {
+        // Verifica autenticação se habilitada
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        
+        // Requer parâmetro confirm=yes para evitar reset acidental
+        if (request->hasArg("confirm") && request->arg("confirm") == "yes") {
+            fV_handleFactoryReset(request);
+        } else {
+            request->send(400, "text/plain", "Factory reset requer parametro: ?confirm=yes");
+        }
+    });
 
     // Favicon: servir a partir do LittleFS para evitar 404
     SERVIDOR_WEB_ASYNC->on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -972,9 +989,20 @@ void fV_setupWebServer() {
         }
         
         uint8_t pin = request->arg("pin").toInt();
-        uint8_t value = request->arg("value").toInt();
+        uint16_t value = request->arg("value").toInt(); // uint16_t para suportar valores analógicos 0-4095
         
-        fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Recebido comando remoto: pino=%d, valor=%d", pin, value);
+        // Identificar módulo de origem (pode vir como parâmetro ou pelo IP)
+        String fromModule = "Desconhecido";
+        if (request->hasArg("from")) {
+            fromModule = request->arg("from");
+        } else {
+            // Tentar identificar pelo IP
+            IPAddress remoteIP = request->client()->remoteIP();
+            fromModule = remoteIP.toString();
+        }
+        
+        fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Recebido comando remoto de %s: pino=%d, valor=%d", 
+                            fromModule.c_str(), pin, value);
         
         // Busca o índice do pino na configuração
         uint8_t pinIndex = fU8_findPinIndex(pin);
@@ -984,15 +1012,41 @@ void fV_setupWebServer() {
             return;
         }
         
-        // Aceita pino de SAÍDA ou pino REMOTO (tipo 65534)
+        // Aceita pino de SAÍDA ou pino REMOTO (tipo 65534 digital ou 65533 analógico)
         // Pino REMOTO: entrada virtual que recebe valor via POST (não faz digitalRead)
         // Pino SAÍDA: escreve fisicamente no GPIO
-        const uint16_t PIN_TYPE_REMOTE = 65534;
+        const uint16_t PIN_TYPE_REMOTE_DIGITAL = 65534;
+        const uint16_t PIN_TYPE_REMOTE_ANALOG = 65533;
         
-        if (vA_pinConfigs[pinIndex].tipo == PIN_TYPE_REMOTE) {
+        if (vA_pinConfigs[pinIndex].tipo == PIN_TYPE_REMOTE_DIGITAL || vA_pinConfigs[pinIndex].tipo == PIN_TYPE_REMOTE_ANALOG) {
             // Pino remoto (entrada virtual) - apenas atualiza o valor
+            // Para remoto analógico (65533), aceita valores 0-4095
+            // Para remoto digital (65534), aceita valores 0-1
             vA_pinConfigs[pinIndex].status_atual = value;
+            
+            // Atualizar histórico para pinos remotos analógicos
+            if (vA_pinConfigs[pinIndex].tipo == PIN_TYPE_REMOTE_ANALOG) {
+                // Adicionar ao histórico analógico (circular buffer)
+                vA_pinConfigs[pinIndex].historico_analogico[vA_pinConfigs[pinIndex].historico_index] = value;
+                vA_pinConfigs[pinIndex].historico_index = (vA_pinConfigs[pinIndex].historico_index + 1) % 8;
+                if (vA_pinConfigs[pinIndex].historico_count < 8) {
+                    vA_pinConfigs[pinIndex].historico_count++;
+                }
+            } else if (vA_pinConfigs[pinIndex].tipo == PIN_TYPE_REMOTE_DIGITAL) {
+                // Adicionar ao histórico digital (circular buffer)
+                vA_pinConfigs[pinIndex].historico_digital[vA_pinConfigs[pinIndex].historico_index] = value;
+                vA_pinConfigs[pinIndex].historico_index = (vA_pinConfigs[pinIndex].historico_index + 1) % 8;
+                if (vA_pinConfigs[pinIndex].historico_count < 8) {
+                    vA_pinConfigs[pinIndex].historico_count++;
+                }
+            }
+            
             fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Pino REMOTO %d atualizado: valor=%d", pin, value);
+            
+            // Registrar comunicação recebida (exclui healthcheck - pino 0 ou mudanças de valor)
+            if (pin != 0) {
+                fV_logInterModReceived(fromModule, pin, value);
+            }
             
             // Publicar status no MQTT imediatamente
             fV_publishPinStatus(pinIndex);
@@ -1005,6 +1059,12 @@ void fV_setupWebServer() {
             digitalWrite(pin, value ? HIGH : LOW);
             vA_pinConfigs[pinIndex].status_atual = value;
             fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] GPIO %d acionado: valor=%d", pin, value);
+            
+            // Registrar comunicação recebida (exclui healthcheck - pino 0)
+            if (pin != 0) {
+                fV_logInterModReceived(fromModule, pin, value);
+            }
+            
             request->send(200, "text/plain", "OK - Output pin set");
             
         } else {
@@ -1287,16 +1347,16 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
         fV_printSerialDebug(LOG_WEB, "Configuracoes avancadas completas recebidas via POST.");
     }
     
-    // === CONCEITO CISCO-LIKE: SALVAR AUTOMATICAMENTE NA FLASH ===
+    // === CONCEITO CONF-INIT: SALVAR AUTOMATICAMENTE NA FLASH ===
     // Salva na memoria flash (NVS) imediatamente após qualquer alteração
     fV_salvarMainConfig();
-    fV_printSerialDebug(LOG_WEB, "[CISCO-LIKE] Configurações salvas automaticamente na flash");
+    fV_printSerialDebug(LOG_WEB, "[CONF-INIT] Configurações salvas automaticamente na flash");
     
     // Envia resposta 200 (OK) para o JavaScript
     request->send(200, "text/plain", "Configurações salvas! O sistema será reiniciado...");
     
     // === REBOOT AUTOMÁTICO APÓS SALVAMENTO ===
-    fV_printSerialDebug(LOG_WEB, "[CISCO-LIKE] Reiniciando sistema automaticamente...");
+    fV_printSerialDebug(LOG_WEB, "[CONF-INIT] Reiniciando sistema automaticamente...");
     Serial.flush();
     delay(500);  // Tempo para enviar resposta HTTP
     ESP.restart();
@@ -1406,8 +1466,8 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
                 pin_obj["nivel_acionamento_min"] = vA_pinConfigs[i].nivel_acionamento_min;
                 pin_obj["nivel_acionamento_max"] = vA_pinConfigs[i].nivel_acionamento_max;
                 
-                // Adiciona histórico para pinos analógicos (se habilitado)
-                if (vA_pinConfigs[i].tipo == 192 && vSt_mainConfig.vB_showAnalogHistory) { // PIN_TYPE_ANALOG
+                // Adiciona histórico para pinos analógicos locais (192) ou remotos (65533) - se habilitado
+                if ((vA_pinConfigs[i].tipo == 192 || vA_pinConfigs[i].tipo == 65533) && vSt_mainConfig.vB_showAnalogHistory) {
                     JsonArray history_array = pin_obj["historico"].to<JsonArray>();
                     
                     // Monta o histórico na ordem correta (mais antigo para mais novo)
@@ -1421,8 +1481,8 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
                     }
                 }
                 
-                // Adiciona histórico para pinos digitais (se habilitado) - ENTRADA ou SAÍDA
-                if (vA_pinConfigs[i].tipo == 1 && vSt_mainConfig.vB_showDigitalHistory) { // PIN_TYPE_DIGITAL
+                // Adiciona histórico para pinos digitais locais (1) ou remotos (65534) - se habilitado
+                if ((vA_pinConfigs[i].tipo == 1 || vA_pinConfigs[i].tipo == 65534) && vSt_mainConfig.vB_showDigitalHistory) {
                     JsonArray history_array = pin_obj["historico"].to<JsonArray>();
                     
                     // Monta o histórico na ordem correta (mais antigo para mais novo)
@@ -1465,8 +1525,52 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
         }
     }
     intermod_obj["online_modules"] = onlineModules;
+    
+    // Adiciona informação de visibilidade na system
+    system_obj["inter_modulos_enabled"] = vSt_mainConfig.vB_interModulosEnabled;
 
-    // 5. Serializa o JSON para uma String
+    // 5. Log de Comunicações Inter-Módulos (Agrupado em "intermod_comm")
+    if (vSt_mainConfig.vB_interModulosEnabled) {
+        JsonObject intermod_comm_obj = vL_jsonDoc["intermod_comm"].to<JsonObject>();
+        
+        // Array de comunicações recebidas (últimas 5)
+        JsonArray received_array = intermod_comm_obj["received"].to<JsonArray>();
+        for (uint8_t i = 0; i < MAX_INTERMOD_COMM_LOG; i++) {
+            // Buscar no circular buffer: começar pelo mais antigo até o mais novo
+            uint8_t idx = (vU8_InterModCommReceivedIndex + i) % MAX_INTERMOD_COMM_LOG;
+            
+            // Se o time está vazio, significa que o slot nunca foi preenchido
+            if (vSt_InterModCommReceived[idx].time.isEmpty()) {
+                continue;
+            }
+            
+            JsonObject comm_obj = received_array.add<JsonObject>();
+            comm_obj["time"] = vSt_InterModCommReceived[idx].time;
+            comm_obj["from"] = vSt_InterModCommReceived[idx].module;
+            comm_obj["pin"] = vSt_InterModCommReceived[idx].pin;
+            comm_obj["value"] = vSt_InterModCommReceived[idx].value;
+        }
+        
+        // Array de comunicações enviadas (últimas 5)
+        JsonArray sent_array = intermod_comm_obj["sent"].to<JsonArray>();
+        for (uint8_t i = 0; i < MAX_INTERMOD_COMM_LOG; i++) {
+            // Buscar no circular buffer: começar pelo mais antigo até o mais novo
+            uint8_t idx = (vU8_InterModCommSentIndex + i) % MAX_INTERMOD_COMM_LOG;
+            
+            // Se o time está vazio, significa que o slot nunca foi preenchido
+            if (vSt_InterModCommSent[idx].time.isEmpty()) {
+                continue;
+            }
+            
+            JsonObject comm_obj = sent_array.add<JsonObject>();
+            comm_obj["time"] = vSt_InterModCommSent[idx].time;
+            comm_obj["to"] = vSt_InterModCommSent[idx].module;
+            comm_obj["pin"] = vSt_InterModCommSent[idx].pin;
+            comm_obj["value"] = vSt_InterModCommSent[idx].value;
+        }
+    }
+
+    // 6. Serializa o JSON para uma String
     String vS_response;
     vS_response.reserve(1024);  // Aumentar o buffer para incluir dados de pinos 
     serializeJson(vL_jsonDoc, vS_response);
@@ -1559,26 +1663,26 @@ void fV_handleApplyConfig(AsyncWebServerRequest *request) {
     }
     vSt_mainConfig.vB_dashboardAuthRequired = request->hasArg("dashboard_auth_required") && request->arg("dashboard_auth_required") != "0";
 
-    fV_printSerialDebug(LOG_WEB, "[CISCO-LIKE] Configurações aplicadas em memória");
+    fV_printSerialDebug(LOG_WEB, "[CONF-INIT] Configurações aplicadas em memória");
     
-    // === CONCEITO CISCO-LIKE: SALVAR AUTOMATICAMENTE NA FLASH ===
+    // === CONCEITO CONF-INIT: SALVAR AUTOMATICAMENTE NA FLASH ===
     // Salva na memoria flash (NVS) imediatamente após alteração
     fV_salvarMainConfig();
-    fV_printSerialDebug(LOG_WEB, "[CISCO-LIKE] Configurações salvas automaticamente na flash");
+    fV_printSerialDebug(LOG_WEB, "[CONF-INIT] Configurações salvas automaticamente na flash");
     
     // Envia resposta 200 (OK)
     request->send(200, "text/plain", "Configurações salvas! O sistema será reiniciado...");
     
     // === REBOOT AUTOMÁTICO APÓS SALVAMENTO ===
-    fV_printSerialDebug(LOG_WEB, "[CISCO-LIKE] Reiniciando sistema automaticamente...");
+    fV_printSerialDebug(LOG_WEB, "[CONF-INIT] Reiniciando sistema automaticamente...");
     Serial.flush();
     delay(500);  // Tempo para enviar resposta HTTP
     ESP.restart();
 }
 
-// Handler para SALVAR configurações na flash (CISCO-LIKE - deprecated, agora é automático)
+// Handler para SALVAR configurações na flash (CONF-INIT - deprecated, agora é automático)
 void fV_handleSaveToFlash(AsyncWebServerRequest *request) {
-    fV_printSerialDebug(LOG_WEB, "[CISCO-LIKE] Aviso: Save explícito não necessário - configurações já são salvas automaticamente!");
+    fV_printSerialDebug(LOG_WEB, "[CONF-INIT] Aviso: Save explícito não necessário - configurações já são salvas automaticamente!");
     request->send(200, "text/plain", "AVISO: Sistema já salva automaticamente. Configurações são persistidas a cada alteração!");
 }
 
@@ -2300,10 +2404,18 @@ void fV_handleFactoryReset(AsyncWebServerRequest *request) {
     // Pequeno delay para enviar resposta
     delay(100);
     
-    // Limpa todas as configurações da flash
+    // 1. Limpa todas as configurações do NVS (Preferences)
     fV_clearPreferences();
     
-    // Delay adicional para garantir que a limpeza seja concluída
+    // 2. Formata LittleFS (apaga TODOS os arquivos incluindo HTMLs)
+    fV_printSerialDebug(LOG_WEB, "[RESET] Formatando LittleFS...");
+    if (LittleFS.format()) {
+        fV_printSerialDebug(LOG_WEB, "[RESET] LittleFS formatado com sucesso");
+    } else {
+        fV_printSerialDebug(LOG_WEB, "[RESET] ERRO ao formatar LittleFS");
+    }
+    
+    // Delay adicional para garantir que a formatação seja concluída
     delay(500);
     
     // Reinicia o ESP32
@@ -2414,7 +2526,7 @@ void fV_handlePinAdd(AsyncWebServerRequest *request) {
     int result = fI_addPinConfig(newPin);
     
     if (result >= 0) {
-        // === CONCEITO CISCO-LIKE: SALVAR AUTOMATICAMENTE ===
+        // === CONCEITO CONF-INIT: SALVAR AUTOMATICAMENTE ===
         fB_savePinConfigs();  // Salva configurações na flash automaticamente
         fV_printSerialDebug(LOG_WEB, "[PINS] Pino %d adicionado com sucesso (indice %d) e salvo na flash", newPin.pino, result);
         request->send(200, "text/plain", "OK");

@@ -9,6 +9,12 @@
 InterModConfig_t* vA_interModConfigs = nullptr;
 uint8_t vU8_activeInterModCount = 0;
 
+// Variáveis globais para log de comunicações
+InterModCommLog_t vSt_InterModCommReceived[MAX_INTERMOD_COMM_LOG];
+InterModCommLog_t vSt_InterModCommSent[MAX_INTERMOD_COMM_LOG];
+uint8_t vU8_InterModCommReceivedIndex = 0;
+uint8_t vU8_InterModCommSentIndex = 0;
+
 // Controle de timing para tasks periódicas
 unsigned long vU32_lastHealthCheck = 0;
 unsigned long vU32_lastDiscovery = 0;

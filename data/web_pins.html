@@ -263,8 +263,10 @@
                         <select id="pin-type" name="tipo" onchange="updateModeOptions()">
                             <option value="0">Não Utilizado</option>
                             <option value="1">Digital</option>
-                            <option value="192">Analógico (ADC)</option>
-                            <option value="65534">Remoto (Inter-módulos)</option>
+                            <option value="192">Analógico (ADC - Entrada)</option>
+                            <option value="193">PWM (Analógico - Saída)</option>
+                            <option value="65533">Remoto Analógico (0-4095)</option>
+                            <option value="65534">Remoto Digital (0-1)</option>
                         </select>
                     </td></tr>
                     <tr><td>Modo:</td><td>
@@ -322,6 +324,7 @@
                                     <tr><td>Ícone MDI:</td><td>
                                         <input type="text" id="pin-icone-mqtt" name="icone_mqtt" maxlength="50" placeholder="Ex: mdi:light-switch, mdi:led-on">
                                         <small style="display: block; color: #666; font-size: 11px;">Ícone Material Design Icons para exibição no HA</small>
+                                        <small style="display: block; color: #666; font-size: 11px;">(mdi:sine-wave,mdi:led-on,mdi:light-switch etc.)</small>
                                     </td></tr>
                                 </table>
                 </div>
@@ -358,11 +361,17 @@
                     <option value="12">Output Open-Drain (Saída Open-Drain)</option>
                 `;
             } else if (pinType === 192) {
-                // Analógico
-                modeSelect.innerHTML = '<option value="192">Analógico (ADC)</option>';
+                // Analógico ADC (entrada)
+                modeSelect.innerHTML = '<option value="1">Input (Leitura ADC)</option>';
+            } else if (pinType === 193) {
+                // PWM (saída analógica)
+                modeSelect.innerHTML = '<option value="3">Output (PWM 0-255)</option>';
+            } else if (pinType === 65533) {
+                // Remoto Analógico
+                modeSelect.innerHTML = '<option value="0">Remoto Analógico (0-4095)</option>';
             } else if (pinType === 65534) {
-                // Remoto
-                modeSelect.innerHTML = '<option value="0">Remoto (Não aplicável)</option>';
+                // Remoto Digital
+                modeSelect.innerHTML = '<option value="0">Remoto Digital (0-1)</option>';
             }
             
             // Atualiza campos de acionamento
@@ -508,16 +517,20 @@
             const minRow = document.getElementById('pin-min').closest('tr');
             const maxRow = document.getElementById('pin-max').closest('tr');
             
-            // Verificar se é analógico (tipo 192 OU modo 192)
-            const isAnalog = (pinType === 192 || pinMode === 192);
+            // Verificar se é analógico (tipo 192=ADC local, 65533=Remoto Analógico, OU modo 192)
+            const isAnalog = (pinType === 192 || pinType === 65533 || pinMode === 192);
             
             if (isAnalog) {
-                // Mostrar apenas campos ADC
+                // Mostrar campos ADC (0-4095)
                 triggerRow.style.display = 'none';
                 minRow.style.display = 'table-row';
                 maxRow.style.display = 'table-row';
+                
+                // Ajustar max dos inputs para 4095
+                document.getElementById('pin-min').max = 4095;
+                document.getElementById('pin-max').max = 4095;
             } else {
-                // Mostrar apenas campo digital
+                // Mostrar campo digital (0-1)
                 triggerRow.style.display = 'table-row';
                 minRow.style.display = 'none';
                 maxRow.style.display = 'none';

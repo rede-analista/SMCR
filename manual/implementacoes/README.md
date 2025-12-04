@@ -8,6 +8,7 @@ Esta pasta contém a documentação detalhada de todas as implementações, corr
 - **[PIN_PERSISTENCE_FIX.md](PIN_PERSISTENCE_FIX.md)** - Correção do sistema de persistência de pinos na flash
 - **[RESET_PIN_CONFIGS_FIX.md](RESET_PIN_CONFIGS_FIX.md)** - Correção da limpeza de configurações de pinos no reset seletivo
 - **[MISSING_RESET_ENDPOINTS_FIX.md](MISSING_RESET_ENDPOINTS_FIX.md)** - Correção de endpoints de reset ausentes (404 errors)
+- **[REMOTE_ANALOG_PIN_FIX.md](REMOTE_ANALOG_PIN_FIX.md)** - Correção de overflow em valores analógicos e leitura incorreta de pinos de saída
 
 ### ⭐ Novas Funcionalidades
 - **[NIVEL_ACIONAMENTO_IMPLEMENTATION.md](NIVEL_ACIONAMENTO_IMPLEMENTATION.md)** - Sistema de configuração de níveis de acionamento para pinos
@@ -63,6 +64,7 @@ Cada documento segue esta estrutura:
 | 26/11/2025 | NVS Export/Import & Crash Fix | ⭐ Feature / 🐛 Correção | ✅ Implementado |
 | 27/11/2025 | mDNS Implementation | ⭐ Feature | ✅ Implementado |
 | 27/11/2025 | Performance Indicators | 🎨 UX | ✅ Implementado |
+| 04/12/2025 | Remote Analog Pin Fix | 🐛 Correção / ⭐ Feature | ✅ Implementado |
 
 ## 🔄 Processo Recomendado
 

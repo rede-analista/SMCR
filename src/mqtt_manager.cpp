@@ -97,8 +97,23 @@ void fV_mqttCallback(char* topic, byte* payload, unsigned int length) {
         if (pinIndex < vU8_activePinsCount) {
             PinConfig_t* pin = &vA_pinConfigs[pinIndex];
             
-            // Verificar se é pino de saída
-            if (pin->modo == OUTPUT && pin->tipo == 1) { // Digital output
+            // Tipo 193 = PWM (saída analógica)
+            if (pin->tipo == 193) {
+                // Processar valor PWM (0-255)
+                int pwmValue = message.toInt();
+                if (pwmValue < 0) pwmValue = 0;
+                if (pwmValue > 255) pwmValue = 255;
+                
+                // Escrever PWM (assumindo que o pino já foi configurado como OUTPUT)
+                analogWrite(pin->pino, pwmValue);
+                pin->status_atual = pwmValue;
+                
+                fV_printSerialDebug(LOG_PINS, "[MQTT] Pino PWM %d ajustado para %d via MQTT", pinNumber, pwmValue);
+                
+                // Publicar estado atualizado
+                fV_publishPinStatus(pinIndex);
+                
+            } else if (pin->modo == OUTPUT && pin->tipo == 1) { // Digital output
                 // Processar comando (aceita 0/1 ou ON/OFF para compatibilidade)
                 int value = message.toInt();
                 if (message == "ON") value = 1;
@@ -309,7 +324,7 @@ void fV_publishMqttDiscoveryStep(void) {
         String pinName = pin->nome.isEmpty() ? String("Pino ") + String(pin->pino) : pin->nome;
         String objectId = uniqueId + "_pin" + String(pin->pino);
 
-        // Determina component type baseado no modo do pino
+        // Determina component type baseado no TIPO e MODO do pino
         String component;
         
         // Corrigir erros comuns de digitação no campo classe_mqtt
@@ -321,23 +336,34 @@ void fV_publishMqttDiscoveryStep(void) {
         // Determina se é entrada ou saída baseado no MODO
         bool isOutput = (pin->modo == 3 || pin->modo == 12); // OUTPUT ou OUTPUT_OPEN_DRAIN
         bool isInput = (pin->modo == 1 || pin->modo == 5 || pin->modo == 9); // INPUT, INPUT_PULLUP, INPUT_PULLDOWN
-        bool isRemote = (pin->tipo == 65534); // Pino remoto (de outro módulo)
+        bool isRemoteDigital = (pin->tipo == 65534); // Pino remoto digital (de outro módulo)
+        bool isRemoteAnalog = (pin->tipo == 65533); // Pino remoto analógico (de outro módulo)
+        bool isAnalogInput = (pin->tipo == 192); // ADC (leitura analógica)
+        bool isPWM = (pin->tipo == 193); // PWM (saída analógica)
         
-        if (isRemote) {
-            // Para pinos remotos, SEMPRE usar binary_sensor (read-only)
-            // Pinos remotos apenas refletem o estado de um pino em outro módulo
-            // Não podem ser controlados diretamente via MQTT (devem usar ação inter-módulo)
+        // Prioridade: TIPO tem precedência sobre MODO para casos especiais
+        if (isRemoteDigital) {
+            // Para pinos remotos digitais, SEMPRE usar binary_sensor (read-only)
             component = "binary_sensor";
+        } else if (isRemoteAnalog) {
+            // Para pinos remotos analógicos, usar sensor (read-only, valores 0-4095)
+            component = classeMqtt.isEmpty() ? "sensor" : classeMqtt;
+        } else if (isAnalogInput) {
+            // Entrada analógica (ADC): SEMPRE sensor, ignora modo
+            component = classeMqtt.isEmpty() ? "sensor" : classeMqtt;
+        } else if (isPWM) {
+            // Saída PWM: usa number (controle 0-255) ou light se configurado
+            if (classeMqtt == "light" || classeMqtt == "fan") {
+                component = classeMqtt; // Respeita light ou fan
+            } else {
+                component = "number"; // Default para PWM é number
+            }
         } else if (isOutput) {
-            // Para saídas, usa classe configurada ou default "switch"
+            // Saídas digitais: usa classe configurada ou default "switch"
             component = classeMqtt.isEmpty() ? "switch" : classeMqtt;
         } else if (isInput) {
-            // Para entradas, SEMPRE usa binary_sensor (ignora classe_mqtt se estiver errada)
-            if (classeMqtt.isEmpty() || classeMqtt == "switch" || classeMqtt == "light") {
-                component = pin->tipo == 192 ? "sensor" : "binary_sensor";
-            } else {
-                component = classeMqtt; // Respeita apenas se for uma classe válida para entrada
-            }
+            // Entradas digitais: binary_sensor
+            component = "binary_sensor";
         } else {
             // Fallback para modos desconhecidos
             component = "binary_sensor";
@@ -350,17 +376,21 @@ void fV_publishMqttDiscoveryStep(void) {
         } else {
             // Fallback baseado no tipo
             if (pin->tipo == 1) icon = "mdi:electric-switch";     // Digital
-            else if (pin->tipo == 192) icon = "mdi:gauge";         // Analógico
-            else if (pin->tipo == 65534) icon = "mdi:lan-connect"; // Remoto
+            else if (pin->tipo == 192) icon = "mdi:gauge";         // Analógico ADC
+            else if (pin->tipo == 193) icon = "mdi:tune";         // PWM
+            else if (pin->tipo == 65533) icon = "mdi:lan-check";   // Remoto Analógico
+            else if (pin->tipo == 65534) icon = "mdi:lan-connect"; // Remoto Digital
             else icon = "mdi:numeric";
         }
 
         String stateTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/pin/" + String(pin->pino) + "/state";
         String configTopic = "homeassistant/" + component + "/" + objectId + "/config";
         
-        // Adicionar command topic para pinos de saída
+        // Adicionar command topic para pinos de saída (digital ou PWM)
         String commandTopic = "";
-        if (pin->modo == 3 || pin->modo == 12) { // OUTPUT ou OUTPUT_OPEN_DRAIN
+        // isPWM, isOutput já foram declarados anteriormente
+        
+        if (isOutput || isPWM) {
             commandTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/pin/" + String(pin->pino) + "/set";
         }
 
@@ -370,25 +400,44 @@ void fV_publishMqttDiscoveryStep(void) {
         payload += "\"unique_id\":\"" + objectId + "\",";
         payload += "\"state_topic\":\"" + stateTopic + "\",";
         
-        // Adicionar command_topic e payloads se for saída
-        if (commandTopic.length() > 0) {
+        // Configurações específicas por tipo de componente
+        if (isPWM && component == "number") {
+            // PWM como Number: controle 0-255
+            payload += "\"command_topic\":\"" + commandTopic + "\",";
+            payload += "\"min\":0,";
+            payload += "\"max\":255,";
+            payload += "\"step\":1,";
+            payload += "\"mode\":\"slider\",";
+        } else if (isPWM && component == "light") {
+            // PWM como Light: controle de brilho
+            payload += "\"command_topic\":\"" + commandTopic + "\",";
+            payload += "\"brightness_state_topic\":\"" + stateTopic + "\",";
+            payload += "\"brightness_command_topic\":\"" + commandTopic + "\",";
+            payload += "\"brightness_scale\":255,";
+            payload += "\"on_command_type\":\"brightness\",";
+        } else if (commandTopic.length() > 0) {
+            // Saídas digitais (switch, light digital)
             payload += "\"command_topic\":\"" + commandTopic + "\",";
             payload += "\"payload_on\":\"1\",";
             payload += "\"payload_off\":\"0\",";
             payload += "\"state_on\":\"1\",";
             payload += "\"state_off\":\"0\",";
         } else {
-            // Para binary_sensor, definir ON/OFF states
-            payload += "\"payload_on\":\"1\",";
-            payload += "\"payload_off\":\"0\",";
+            // Sensores (binary_sensor, sensor)
+            if (component == "binary_sensor") {
+                payload += "\"payload_on\":\"1\",";
+                payload += "\"payload_off\":\"0\",";
+            }
         }
         
         payload += "\"icon\":\"" + icon + "\",";
         
-        // Para sensores analógicos, adicionar unidade e classe de dispositivo
-        if (pin->tipo == 192) { // Analógico
+        // Para sensores analógicos (ADC local ou remoto), adicionar unidade e atributos
+        if (pin->tipo == 192 || pin->tipo == 65533) {
             payload += "\"unit_of_measurement\":\"ADC\",";
-            payload += "\"device_class\":\"voltage\",";
+            if (classeMqtt.isEmpty()) {
+                payload += "\"device_class\":\"voltage\",";
+            }
             // Adicionar informações de nível de acionamento como atributos JSON
             String attrTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/pin/" + String(pin->pino) + "/attributes";
             payload += "\"json_attributes_topic\":\"" + attrTopic + "\",";
@@ -454,8 +503,8 @@ void fV_publishPinStatus(uint8_t pinIndex) {
     
     String payload;
     
-    if (pin->tipo == 192) {
-        // ANALÓGICO: Envia valor bruto (0-4095)
+    // ANALÓGICO (ADC local ou remoto): Envia valor bruto (0-4095)
+    if (pin->tipo == 192 || pin->tipo == 65533) {
         payload = String(pin->status_atual);
         fV_printSerialDebug(LOG_MQTT, "[MQTT] Status publicado - Pino %d: %s (analógico)", 
                            pin->pino, payload.c_str());
