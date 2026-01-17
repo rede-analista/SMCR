@@ -231,12 +231,15 @@
                     <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Firmware:</td><td style="padding: 5px; border: 1px solid #ddd;" id="firmware-info">Carregando...</td></tr>
                     <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Uptime:</td><td style="padding: 5px; border: 1px solid #ddd;" id="uptime-info">Carregando...</td></tr>
                     <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Memoria Livre:</td><td style="padding: 5px; border: 1px solid #ddd;" id="memory-info">Carregando...</td></tr>
+                    <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Uso CPU (Media): <span style="font-size:9px;color:#888;" title="Valor aproximado baseado em métricas do sistema">ⓘ</span></td><td style="padding: 5px; border: 1px solid #ddd;" id="cpu-usage-avg">Carregando...</td></tr>
+                    <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">CPU Cores:</td><td style="padding: 5px; border: 1px solid #ddd; font-size: 12px;" id="cpu-cores-detail">Carregando...</td></tr>
                     <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Chip Model:</td><td style="padding: 5px; border: 1px solid #ddd;" id="chip-model">Carregando...</td></tr>
                     <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Chip Revision:</td><td style="padding: 5px; border: 1px solid #ddd;" id="chip-revision">Carregando...</td></tr>
                     <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">CPU Frequencia:</td><td style="padding: 5px; border: 1px solid #ddd;" id="cpu-freq">Carregando...</td></tr>
                     <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">MAC Address:</td><td style="padding: 5px; border: 1px solid #ddd;" id="mac-address">Carregando...</td></tr>
                     <tr><td style="padding: 5px; border: 1px solid #ddd; background: #f8f9fa; font-weight: bold;">Flash Size:</td><td style="padding: 5px; border: 1px solid #ddd;" id="flash-size">Carregando...</td></tr>
                 </table>
+                <div style="font-size:10px;color:#888;margin-top:8px;font-style:italic;">* Valores de CPU são aproximados (baseados em tasks, WiFi e atividade do sistema)</div>
             </div>
         </div>
 
@@ -346,6 +349,24 @@
                     document.getElementById('firmware-info').textContent = 'SMCR v' + (data.system.fw_version || 'N/D');
                     document.getElementById('uptime-info').textContent = data.system.uptime || '-';
                     document.getElementById('memory-info').textContent = formatBytes(data.system.free_heap || 0);
+                    
+                    // Uso de CPU com cores dinâmicos
+                    const cpuAvg = data.system.cpu_usage_avg || 0;
+                    const cpuColor = cpuAvg > 80 ? '#dc3545' : cpuAvg > 50 ? '#ffc107' : '#28a745';
+                    document.getElementById('cpu-usage-avg').innerHTML = `<strong style="color:${cpuColor}">${cpuAvg.toFixed(1)}%</strong>`;
+                    
+                    // Renderiza todos os cores detectados
+                    const cpuCores = data.system.cpu_cores || [];
+                    if (cpuCores.length > 0) {
+                        const coresHtml = cpuCores.map(core => {
+                            const coreColor = core.usage > 80 ? '#dc3545' : core.usage > 50 ? '#ffc107' : '#28a745';
+                            return `Core ${core.core}: <span style="color:${coreColor}">${core.usage.toFixed(1)}%</span>`;
+                        }).join(' | ');
+                        document.getElementById('cpu-cores-detail').innerHTML = coresHtml;
+                    } else {
+                        document.getElementById('cpu-cores-detail').textContent = '-';
+                    }
+                    
                     document.getElementById('chip-model').textContent = data.system.chip_model || 'N/D';
                     document.getElementById('chip-revision').textContent = data.system.chip_revision || 'N/D';
                     document.getElementById('cpu-freq').textContent = (data.system.cpu_freq || 'N/D') + ' MHz';

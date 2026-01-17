@@ -18,6 +18,7 @@ Esta pasta contém a documentação detalhada de todas as implementações, corr
 - **[NVS_EXPORT_IMPORT.md](NVS_EXPORT_IMPORT.md)** - Exportação/Importação do NVS com máscara de segredos e limpeza opcional
 - **[MDNS_IMPLEMENTATION.md](MDNS_IMPLEMENTATION.md)** - Serviço mDNS para acesso via hostname (ex: esp32modularx.local)
 - **[PERFORMANCE_INDICATORS.md](PERFORMANCE_INDICATORS.md)** - Indicadores de tempo de carregamento em todas as páginas web
+- **[MQTT_REBOOT_BUTTON.md](MQTT_REBOOT_BUTTON.md)** - Botão de reboot via MQTT com integração Home Assistant
 
 ### 🎨 Melhorias de Interface
 - **[NAVIGATION_MENU_IMPLEMENTATION.md](NAVIGATION_MENU_IMPLEMENTATION.md)** - Menu de navegação unificado entre páginas
@@ -65,6 +66,7 @@ Cada documento segue esta estrutura:
 | 27/11/2025 | mDNS Implementation | ⭐ Feature | ✅ Implementado |
 | 27/11/2025 | Performance Indicators | 🎨 UX | ✅ Implementado |
 | 04/12/2025 | Remote Analog Pin Fix | 🐛 Correção / ⭐ Feature | ✅ Implementado |
+| 08/12/2025 | MQTT Reboot Button | ⭐ Feature | ✅ Implementado |
 
 ## 🔄 Processo Recomendado
 

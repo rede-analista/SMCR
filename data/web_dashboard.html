@@ -211,8 +211,11 @@
                 <tr><td>Data/Hora Atual:</td><td id="current-time">-</td></tr>
                 <tr><td>Tempo de Atividade (Uptime):</td><td id="uptime">-</td></tr>
                 <tr><td>Memoria Livre (Heap):</td><td id="free-heap">-</td></tr>
+                <tr><td>Uso CPU (Media): <span style="font-size:10px;color:#888;" title="Valor aproximado baseado em métricas do sistema">ⓘ</span></td><td id="cpu-usage-avg">-</td></tr>
+                <tr id="cpu-cores-row"><td colspan="2" id="cpu-cores-detail" style="font-size:11px;color:#666;padding:4px 8px;">-</td></tr>
                 <tr><td>Versao Firmware:</td><td id="fw-version">-</td></tr>
             </table>
+            <div style="font-size:10px;color:#888;margin-top:5px;font-style:italic;">* Valores de CPU são aproximados (baseados em tasks, WiFi e atividade)</div>
 
             <div class="section-title" style="font-size: 16px;">Sincronizacao</div>
             <table class="info-table">
@@ -314,6 +317,25 @@
                     document.getElementById('current-time').textContent = data.system.current_time || '-';
                     document.getElementById('uptime').textContent = data.system.uptime || '-';
                     document.getElementById('free-heap').textContent = formatBytes(data.system.free_heap || 0);
+                    
+                    // Uso de CPU com cores dinâmicos
+                    const cpuAvg = data.system.cpu_usage_avg || 0;
+                    const cpuColor = cpuAvg > 80 ? '#dc3545' : cpuAvg > 50 ? '#ffc107' : '#28a745';
+                    document.getElementById('cpu-usage-avg').innerHTML = `<strong style="color:${cpuColor}">${cpuAvg.toFixed(1)}%</strong>`;
+                    
+                    // Renderiza todos os cores detectados
+                    const cpuCores = data.system.cpu_cores || [];
+                    const coresCount = data.system.cpu_cores_count || cpuCores.length;
+                    if (cpuCores.length > 0) {
+                        const coresHtml = cpuCores.map(core => {
+                            const coreColor = core.usage > 80 ? '#dc3545' : core.usage > 50 ? '#ffc107' : '#28a745';
+                            return `Core ${core.core}: <span style="color:${coreColor}">${core.usage.toFixed(1)}%</span>`;
+                        }).join(' &nbsp;|&nbsp; ');
+                        document.getElementById('cpu-cores-detail').innerHTML = coresHtml;
+                    } else {
+                        document.getElementById('cpu-cores-detail').textContent = '-';
+                    }
+                    
                     document.getElementById('fw-version').textContent = data.system.fw_version || '-';
 
                     // Sincronizacao

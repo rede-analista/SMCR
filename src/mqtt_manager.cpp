@@ -80,10 +80,33 @@ void fV_mqttCallback(char* topic, byte* payload, unsigned int length) {
     
     fV_printSerialDebug(LOG_MQTT, "[MQTT] Payload: %s", message.c_str());
     
+    String topicStr = String(topic);
+    String uniqueId = fS_getMqttUniqueId();
+    
+    // Processar comando de reboot do sistema
+    // Formato: <topicBase>/<uniqueId>/system/reboot
+    String rebootTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/system/reboot";
+    if (topicStr == rebootTopic) {
+        if (message == "PRESS" || message == "ON" || message == "1") {
+            fV_printSerialDebug(LOG_MQTT, "[MQTT] Comando de reboot recebido via MQTT");
+            
+            // Publicar confirmação
+            String statusTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/system/status";
+            vO_mqttClient.publish(statusTopic.c_str(), "Reiniciando...", false);
+            
+            // Aguardar publicação
+            delay(100);
+            vO_mqttClient.loop();
+            
+            // Executar reboot
+            ESP.restart();
+        }
+        return;
+    }
+    
     // Processar comandos de controle de pinos
     // Formato do tópico: <topicBase>/<uniqueId>/pin/<pinNumber>/set
-    String topicStr = String(topic);
-    String expectedPrefix = vSt_mainConfig.vS_mqttTopicBase + "/" + fS_getMqttUniqueId() + "/pin/";
+    String expectedPrefix = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/pin/";
     
     if (topicStr.startsWith(expectedPrefix) && topicStr.endsWith("/set")) {
         // Extrair número do pino
@@ -223,6 +246,11 @@ void fV_setupMqtt(void) {
         vO_mqttClient.subscribe(commandTopic.c_str());
         fV_printSerialDebug(LOG_MQTT, "[MQTT] Subscrito ao topico: %s", commandTopic.c_str());
         
+        // Subscrever ao tópico de reboot do sistema
+        String rebootTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + clientId + "/system/reboot";
+        vO_mqttClient.subscribe(rebootTopic.c_str());
+        fV_printSerialDebug(LOG_MQTT, "[MQTT] Subscrito ao topico de reboot: %s", rebootTopic.c_str());
+        
         // Agendar discovery (em lotes) se habilitado
         if (vSt_mainConfig.vB_mqttHomeAssistantDiscovery) {
             fV_publishMqttDiscovery();
@@ -298,6 +326,49 @@ void fV_publishMqttDiscovery(void) {
 // Publica um ou mais itens de discovery respeitando limites de taxa
 void fV_publishMqttDiscoveryStep(void) {
     if (!vSt_mainConfig.vB_mqttHomeAssistantDiscovery) return;
+    
+    // Se o index está em 0, publicar primeiro o botão de reboot do sistema
+    if (vU8_discoveryIndex == 0) {
+        String uniqueId = fS_getMqttUniqueId();
+        String configTopic = "homeassistant/button/" + uniqueId + "_reboot/config";
+        String commandTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/system/reboot";
+        String statusTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/system/status";
+        String availabilityTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/status";
+        
+        StaticJsonDocument<512> doc;
+        doc["name"] = vSt_mainConfig.vS_hostname + " Reboot";
+        doc["unique_id"] = uniqueId + "_reboot";
+        doc["command_topic"] = commandTopic;
+        doc["payload_press"] = "PRESS";
+        doc["device_class"] = "restart";
+        doc["availability_topic"] = availabilityTopic;
+        doc["payload_available"] = "online";
+        doc["payload_not_available"] = "offline";
+        
+        JsonObject device = doc.createNestedObject("device");
+        device["identifiers"][0] = uniqueId;
+        device["name"] = vSt_mainConfig.vS_hostname;
+        device["model"] = "SMCR ESP32";
+        device["manufacturer"] = "SMCR";
+        device["sw_version"] = FIRMWARE_VERSION;
+        
+        String payload;
+        serializeJson(doc, payload);
+        
+        bool published = vO_mqttClient.publish(configTopic.c_str(), payload.c_str(), true);
+        if (published) {
+            fV_printSerialDebug(LOG_MQTT, "[MQTT] Discovery do botao reboot publicado");
+        } else {
+            fV_printSerialDebug(LOG_MQTT, "[MQTT] Falha ao publicar discovery do botao reboot");
+        }
+        
+        // Publicar status inicial
+        vO_mqttClient.publish(statusTopic.c_str(), "Pronto", false);
+        
+        vU8_discoveryIndex = 1; // Avançar para os pinos
+        vUL_lastDiscoveryPublish = millis();
+        return;
+    }
     if (!vO_mqttClient.connected() || vB_discoveryPublished) return;
 
     unsigned long now = millis();
@@ -311,8 +382,12 @@ void fV_publishMqttDiscoveryStep(void) {
     uint8_t batchSize = vSt_mainConfig.vU8_mqttHaDiscoveryBatchSize;
     if (batchSize == 0) batchSize = 1;
     
-    while (vU8_discoveryIndex < vU8_activePinsCount && publishedThisCycle < batchSize) {
-        PinConfig_t* pin = &vA_pinConfigs[vU8_discoveryIndex];
+    // Ajustar índice: vU8_discoveryIndex=1 corresponde ao primeiro pino (index 0 no array)
+    uint8_t pinArrayIndex = vU8_discoveryIndex - 1;
+    
+    while (pinArrayIndex < vU8_activePinsCount && publishedThisCycle < batchSize) {
+        PinConfig_t* pin = &vA_pinConfigs[pinArrayIndex];
+        pinArrayIndex++;
         vU8_discoveryIndex++;
 
         // Ignorar apenas pinos sem uso (tipo 0 = não configurado)
@@ -475,7 +550,8 @@ void fV_publishMqttDiscoveryStep(void) {
         publishedThisCycle++;
     }
 
-    if (vU8_discoveryIndex >= vU8_activePinsCount) {
+    // Discovery completo quando processar todos os pinos (índice = activePinsCount + 1, pois começou em 1)
+    if (pinArrayIndex >= vU8_activePinsCount) {
         vB_discoveryPublished = true;
         vUL_lastDiscoveryComplete = millis(); // Registra timestamp da conclusão
         fV_printSerialDebug(LOG_MQTT, "[MQTT] Auto-discovery concluido - %d entidades publicadas", publishedThisCycle);
