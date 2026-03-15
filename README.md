@@ -69,7 +69,7 @@ Desta forma, uma configuração incorreta pode causar travamentos, falhas ou ain
 <br>Após realizar a gravação do programa no ESP32 e rebootar o módulo ele irá gerar uma rede wifi (modo AP) com o nome padrão default do módulo "esp32modularx Ponto de Acesso" a senha padrão é "senha12345678".<br>
 ![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_wifi_inicial_t1.png)
 
-Conecte-se na rede e pelo navegador você deve acessar o endereço "http://192.168.4.1:8080/wifiinicio". ao abrir a página informe o nome e senha da sua rede wifi e salve as informações.<br>
+Conecte-se na rede e pelo navegador você deve acessar o endereço [Novo Módulo](http://192.168.4.1:8080/wifiinicio). ao abrir a página informe o nome e senha da sua rede wifi e salve as informações.<br>
 ![image](https://github.com/rede-analista/SMCR/blob/main/manual/telas/c_wifi_inicial_t2.png)
 
 
