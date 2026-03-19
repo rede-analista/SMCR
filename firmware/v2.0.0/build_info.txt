@@ -1,10 +1,10 @@
 SMCR Firmware v2.0.0
-Build Date: sex 28 nov 2025 07:24:42 -03
-Git Commit: 19b179f0463bb06575e4caac58bc54be3436286c
+Build Date: qui 19 mar 2026 17:17:24 -03
+Git Commit: ac8efa73b0c663bb55cf848cb3f72438ee81093f
 Git Branch: main
 
 Files:
-- SMCR_v2.0.0_firmware.bin (959KB)
+- SMCR_v2.0.0_firmware.bin (1,2MB)
 - SMCR_v2.0.0_bootloader.bin (18KB)  
 - SMCR_v2.0.0_partitions.bin (3,0KB)
 
