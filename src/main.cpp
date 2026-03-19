@@ -96,6 +96,13 @@ void setup() {
   fV_printSerialDebug(LOG_INIT, "Executando sincronização inicial de ações...");
   fV_executeActionsTask();
 
+  // 13. SINCRONIZAÇÃO DE PINOS REMOTOS: Envia estado atual para módulos remotos após boot
+  if (vSt_mainConfig.vB_interModEnabled && vB_wifiIsConnected) {
+    fV_printSerialDebug(LOG_INIT, "Aguardando 5 segundos antes de sincronizar pinos remotos...");
+    delay(5000); // Aguarda 5 segundos para garantir que módulos remotos estejam prontos
+    fV_syncRemotePinsOnBoot();
+  }
+
   fV_printSerialDebug(LOG_INIT, "Hostname: %s", vSt_mainConfig.vS_hostname.c_str());
   fV_printSerialDebug(LOG_INIT, "--- Fim da inicializacao SMCR ---");
   // Use vSt_mainConfig.vS_hostname aqui se precisar
@@ -104,7 +111,7 @@ void setup() {
 void loop() {
   // 1. CHECAGEM E RECONEXAO: Mantém a conexao Wi-Fi ativa (checa a cada 15s)
   fV_checkWifiConnection();
- 
+
   // 2. LEITURA PERIODICA DE PINOS: Atualiza status de pinos físicos (exceto remotos)
   unsigned long vU32_currentTime = millis();
   if (vU32_currentTime - vU32_lastPinReadTime >= vU32_pinReadInterval) {

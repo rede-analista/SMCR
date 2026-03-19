@@ -66,7 +66,7 @@ void fV_loadInterModConfigs(void) {
     }
     
     // Parse JSON
-    StaticJsonDocument<4096> doc;
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, jsonContent);
     
     if (error) {
@@ -124,12 +124,12 @@ bool fB_saveInterModConfigs(void) {
     fV_printSerialDebug(LOG_INTERMOD, "Salvando %d módulos no LittleFS", vU8_activeInterModCount);
     
     // Cria documento JSON
-    StaticJsonDocument<4096> doc;
-    JsonArray modules = doc.createNestedArray("modules");
-    
+    JsonDocument doc;
+    JsonArray modules = doc["modules"].to<JsonArray>();
+
     // Adiciona cada módulo
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
-        JsonObject module = modules.createNestedObject();
+        JsonObject module = modules.add<JsonObject>();
         module["id"] = vA_interModConfigs[i].id;
         module["hostname"] = vA_interModConfigs[i].hostname;
         module["ip"] = vA_interModConfigs[i].ip;
@@ -183,7 +183,9 @@ void fV_clearInterModConfigs(void) {
  */
 int fI_findInterModIndex(const String& id) {
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
-        if (vA_interModConfigs[i].id == id) {
+        if (vA_interModConfigs[i].id == id ||
+            vA_interModConfigs[i].hostname == id ||
+            vA_interModConfigs[i].ip == id) {
             return i;
         }
     }
@@ -319,15 +321,34 @@ bool fB_checkModuleHealth(uint8_t moduleIndex) {
     int httpCode = http.POST("");
     
     if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_NO_CONTENT) {
+        // Verifica se o módulo estava offline e agora voltou
+        bool wasOffline = !module->online;
+
         // Módulo respondeu
         module->online = true;
         module->falhas_consecutivas = 0;
         module->ultimo_healthcheck = millis();
-        
-        fV_printSerialDebug(LOG_INTERMOD, "Healthcheck OK: %s (%s)", 
+
+        fV_printSerialDebug(LOG_INTERMOD, "Healthcheck OK: %s (%s)",
                            module->hostname.c_str(), module->ip.c_str());
-        
-        http.end();
+
+        // Se o módulo estava offline e voltou, sincroniza em ambas as direções
+        if (wasOffline) {
+            fV_printSerialDebug(LOG_INTERMOD, "[AUTO-SYNC] Módulo %s voltou ONLINE, sincronizando...",
+                               module->hostname.c_str());
+
+            http.end(); // Fecha conexão do healthcheck primeiro
+            delay(500); // Pequeno delay para módulo estabilizar
+
+            // 1. Pede ao módulo que envie seus estados para cá
+            fB_requestPinSyncFromModule(module->id);
+
+            // 2. Envia nossos estados de pino para o módulo que voltou online
+            fV_syncRemotePinsOnBoot();
+        } else {
+            http.end();
+        }
+
         return true;
     } else {
         // Módulo não respondeu ou erro HTTP
@@ -435,21 +456,77 @@ void fV_interModDiscoveryTask(void) {
         String ip = MDNS.IP(i).toString();
         uint16_t port = MDNS.port(i);
         
-        fV_printSerialDebug(LOG_INTERMOD, "Serviço #%d: hostname=%s, ip=%s, port=%d, txtRecords=%d", 
-                           i, hostname.c_str(), ip.c_str(), port, MDNS.numTxt(i));
-        
+        int numTxtRecords = MDNS.numTxt(i);
+        fV_printSerialDebug(LOG_INTERMOD, "Serviço #%d: hostname=%s, ip=%s, port=%d, txtRecords=%d",
+                           i, hostname.c_str(), ip.c_str(), port, numTxtRecords);
+
         // Verifica se é um módulo SMCR (possui TXT record com device_type=smcr OU apenas "smcr")
         bool isSmcr = false;
-        for (int j = 0; j < MDNS.numTxt(i); j++) {
+
+        // Método 1: Leitura de TXT records (padrão)
+        for (int j = 0; j < numTxtRecords; j++) {
             String txtRecord = String(MDNS.txt(i, j));
             fV_printSerialDebug(LOG_INTERMOD, "  TXT[%d]: %s", j, txtRecord.c_str());
-            
+
             // Aceita formato completo "device_type=smcr" ou apenas o valor "smcr"
             if (txtRecord.indexOf("device_type=smcr") >= 0 || txtRecord.equalsIgnoreCase("smcr")) {
                 isSmcr = true;
             }
         }
+
+        // Método 2: Se não encontrou TXT records, tenta buscar por chave específica
+        if (!isSmcr && numTxtRecords == 0) {
+            fV_printSerialDebug(LOG_INTERMOD, "  -> Nenhum TXT record via numTxt(), tentando método alternativo...");
+
+            // Tenta acessar TXT record diretamente por chave (algumas bibliotecas usam essa abordagem)
+            String deviceType = MDNS.txt(i, "device_type");
+            fV_printSerialDebug(LOG_INTERMOD, "  -> device_type direto: %s", deviceType.c_str());
+
+            if (deviceType == "smcr" || deviceType == "SMCR") {
+                isSmcr = true;
+                fV_printSerialDebug(LOG_INTERMOD, "  -> Módulo SMCR identificado via método alternativo!");
+            }
+        }
+
+        // Método 3: Identificação por padrão de hostname (fallback)
+        if (!isSmcr) {
+            // Se o hostname contém "esp32modular" ou "smcr", assume que é um módulo SMCR
+            String hostnameLower = hostname;
+            hostnameLower.toLowerCase();
+            if (hostnameLower.indexOf("esp32modular") >= 0 || hostnameLower.indexOf("smcr") >= 0) {
+                fV_printSerialDebug(LOG_INTERMOD, "  -> Possível módulo SMCR por hostname (sem TXT records confirmados)");
+                // Não marca como isSmcr automaticamente para evitar falsos positivos
+            }
+        }
         
+        // Método 4: Se ainda não identificou, tenta healthcheck HTTP (fallback final)
+        if (!isSmcr && port > 0) {
+            fV_printSerialDebug(LOG_INTERMOD, "  -> Tentando identificação via healthcheck HTTP...");
+
+            HTTPClient http;
+            http.setTimeout(2000); // Timeout curto de 2 segundos
+
+            String healthUrl = "http://" + ip + ":" + String(port) + "/api/healthcheck";
+
+            if (http.begin(healthUrl)) {
+                int httpCode = http.POST("");
+
+                if (httpCode == HTTP_CODE_OK) {
+                    // Tenta parsear resposta JSON
+                    String payload = http.getString();
+                    fV_printSerialDebug(LOG_INTERMOD, "  -> Resposta healthcheck: %s", payload.c_str());
+
+                    // Se contém "hostname" e "firmware", provavelmente é SMCR
+                    if (payload.indexOf("hostname") >= 0 && payload.indexOf("firmware") >= 0) {
+                        isSmcr = true;
+                        fV_printSerialDebug(LOG_INTERMOD, "  -> Módulo SMCR identificado via healthcheck HTTP!");
+                    }
+                }
+
+                http.end();
+            }
+        }
+
         if (!isSmcr) {
             fV_printSerialDebug(LOG_INTERMOD, "  -> Não é módulo SMCR, ignorando");
             continue; // Não é um módulo SMCR

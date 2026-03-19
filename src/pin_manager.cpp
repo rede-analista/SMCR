@@ -154,8 +154,8 @@ void fV_loadPinConfigs(void) {
             break;
         }
         
-        uint8_t pinNumber = pin["pino"] | 0;
-        
+        uint16_t pinNumber = pin["pino"] | 0;
+
         if (pinNumber == 0) {
             fV_printSerialDebug(LOG_PINS, "[PIN] Pulando pino inválido (número 0)");
             continue;
@@ -309,7 +309,7 @@ void fV_setupConfiguredPins(void) {
     
     for (uint8_t i = 0; i < vU8_activePinsCount; i++) {
         if (vA_pinConfigs[i].pino > 0 && vA_pinConfigs[i].tipo != PIN_TYPE_UNUSED) {
-            uint8_t pinNumber = vA_pinConfigs[i].pino;
+            uint16_t pinNumber = vA_pinConfigs[i].pino;
             uint8_t modo = vA_pinConfigs[i].modo;
             uint16_t tipo = vA_pinConfigs[i].tipo;
             
@@ -355,7 +355,7 @@ void fV_setupConfiguredPins(void) {
 //========================================
 // Encontra índice do pino no array
 //========================================
-uint8_t fU8_findPinIndex(uint8_t pinNumber) {
+uint8_t fU8_findPinIndex(uint16_t pinNumber) {
     for (uint8_t i = 0; i < vU8_activePinsCount; i++) {
         if (vA_pinConfigs[i].pino == pinNumber) {
             return i;
@@ -398,7 +398,7 @@ int fI_addPinConfig(const PinConfig_t& config) {
 //========================================
 // Remove configuração de pino
 //========================================
-bool fB_removePinConfig(uint8_t pinNumber) {
+bool fB_removePinConfig(uint16_t pinNumber) {
     uint8_t index = fU8_findPinIndex(pinNumber);
     if (index == 255) {
         fV_printSerialDebug(LOG_PINS, "[PIN] Pino %d não encontrado para remoção", pinNumber);
@@ -433,7 +433,7 @@ bool fB_removePinConfig(uint8_t pinNumber) {
 //========================================
 // Atualiza configuração de pino
 //========================================
-bool fB_updatePinConfig(uint8_t pinNumber, const PinConfig_t& config) {
+bool fB_updatePinConfig(uint16_t pinNumber, const PinConfig_t& config) {
     uint8_t index = fU8_findPinIndex(pinNumber);
     if (index == 255) {
         fV_printSerialDebug(LOG_PINS, "[PIN] Pino %d não encontrado para atualização", pinNumber);
@@ -487,7 +487,7 @@ bool fB_hasPinConfigChanges(void) {
     // Verifica se os pinos são idênticos
     uint8_t matchCount = 0;
     for (JsonObject savedPin : savedPins) {
-        uint8_t pinNumber = savedPin["pino"] | 0;
+        uint16_t pinNumber = savedPin["pino"] | 0;
         uint8_t index = fU8_findPinIndex(pinNumber);
         
         if (index != 255) {
@@ -514,9 +514,9 @@ bool fB_hasPinConfigChanges(void) {
 void fV_updatePinStatus(void) {
     for (uint8_t i = 0; i < vU8_activePinsCount; i++) {
         if (vA_pinConfigs[i].pino > 0 && vA_pinConfigs[i].tipo != PIN_TYPE_UNUSED) {
-            uint8_t pinNumber = vA_pinConfigs[i].pino;
+            uint16_t pinNumber = vA_pinConfigs[i].pino;
             uint16_t tipo = vA_pinConfigs[i].tipo;
-            
+
             // Lê apenas pinos digitais e analógicos (não remotos)
             if (tipo == PIN_TYPE_DIGITAL) {
                 // Leitura digital - APENAS para pinos de ENTRADA
@@ -586,7 +586,7 @@ void fV_readPinsTask(void) {
             continue;
         }
         
-        uint8_t pinNumber = vA_pinConfigs[i].pino;
+        uint16_t pinNumber = vA_pinConfigs[i].pino;
         uint16_t tipo = vA_pinConfigs[i].tipo;
         uint8_t modo = vA_pinConfigs[i].modo;
         uint32_t tempoRetencao = vA_pinConfigs[i].tempo_retencao;

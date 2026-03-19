@@ -113,7 +113,7 @@ void fV_mqttCallback(char* topic, byte* payload, unsigned int length) {
         int startIdx = expectedPrefix.length();
         int endIdx = topicStr.lastIndexOf("/set");
         String pinNumberStr = topicStr.substring(startIdx, endIdx);
-        uint8_t pinNumber = pinNumberStr.toInt();
+        uint16_t pinNumber = pinNumberStr.toInt();
         
         // Encontrar índice do pino
         uint8_t pinIndex = fU8_findPinIndex(pinNumber);

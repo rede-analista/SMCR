@@ -130,7 +130,7 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
 // --- Estrutura para Configuração de Pinos ---
 struct PinConfig_t {
     String nome;                 // Nome descritivo do pino
-    uint8_t pino;               // Número físico do GPIO (0-254)
+    uint16_t pino;              // Número físico do GPIO (0-65535)
     uint16_t tipo;              // Tipo: 0=Sem Uso, 1=Digital, 192=Analógico(ADC), 193=PWM(Saída), 65533=Remoto Analógico, 65534=Remoto Digital
     uint8_t modo;               // pinMode(): 0=SEM_USO, 1=INPUT, 3=OUTPUT, etc.
     uint8_t xor_logic;          // Lógica invertida (0=normal, 1=invertido)
@@ -153,13 +153,13 @@ struct PinConfig_t {
 
 // --- Estrutura para Configuração de Ações ---
 struct ActionConfig_t {
-    uint8_t pino_origem;         // GPIO que dispara a ação (pino de entrada/sensor)
+    uint16_t pino_origem;        // GPIO que dispara a ação (pino de entrada/sensor)
     uint8_t numero_acao;         // Número da ação (1, 2, 3 ou 4)
-    uint8_t pino_destino;        // GPIO que será acionado (pino de saída/controle)
+    uint16_t pino_destino;       // GPIO que será acionado (pino de saída/controle)
     uint16_t acao;               // Tipo de ação: 0=NENHUMA, 1=LIGA, 2=LIGA_DELAY, 3=PISCA, 4=PULSO, 5=PULSO_DELAY_ON, 65534=STATUS, 65535=SINCRONISMO
     uint16_t tempo_on;           // Tempo ON em ciclos (0-65535)
     uint16_t tempo_off;          // Tempo OFF em ciclos (0-65535)
-    uint8_t pino_remoto;         // Máscara do pino no módulo remoto (0-254)
+    uint16_t pino_remoto;        // Número do pino no módulo remoto (0-65535)
     String envia_modulo;         // ID do módulo destino (string vazia=nenhum, ou hostname/ID do módulo)
     bool telegram;               // Envia notificação para Telegram
     bool assistente;             // Envia notificação para Assistente
@@ -186,7 +186,7 @@ struct InterModConfig_t {
 struct InterModCommLog_t {
     String time;                 // Horário da comunicação (HH:MM:SS)
     String module;               // Nome do módulo (from/to)
-    uint8_t pin;                 // Número do pino
+    uint16_t pin;                // Número do pino
     uint16_t value;              // Valor (0-65535, suporta analógico 0-4095)
     bool is_sent;                // true=enviado, false=recebido
 };
@@ -215,8 +215,8 @@ extern uint8_t vU8_InterModCommReceivedIndex; // Índice do próximo slot (circu
 extern uint8_t vU8_InterModCommSentIndex;     // Índice do próximo slot (circular buffer)
 
 // Funções de gerenciamento do log
-void fV_logInterModReceived(const String& module, uint8_t pin, uint16_t value);
-void fV_logInterModSent(const String& module, uint8_t pin, uint16_t value);
+void fV_logInterModReceived(const String& module, uint16_t pin, uint16_t value);
+void fV_logInterModSent(const String& module, uint16_t pin, uint16_t value);
 
 // --- Novas funções para carregar e salvar a estrutura MainConfig_t ---
 // Estas serão as funções de interface para a sua "startup-config"
@@ -231,10 +231,10 @@ void fV_loadPinConfigs(void);      // Carrega configurações de pinos do Little
 bool fB_savePinConfigs(void);      // Salva configurações de pinos no LittleFS (retorna true se sucesso)
 void fV_clearPinConfigs(void);     // Limpa todas as configurações de pinos
 void fV_setupConfiguredPins(void); // Aplica pinMode() para pinos configurados
-uint8_t fU8_findPinIndex(uint8_t pinNumber); // Encontra índice do pino no array
+uint8_t fU8_findPinIndex(uint16_t pinNumber); // Encontra índice do pino no array
 int fI_addPinConfig(const PinConfig_t& config); // Adiciona nova configuração de pino
-bool fB_removePinConfig(uint8_t pinNumber);    // Remove configuração de pino
-bool fB_updatePinConfig(uint8_t pinNumber, const PinConfig_t& config); // Atualiza configuração
+bool fB_removePinConfig(uint16_t pinNumber);    // Remove configuração de pino
+bool fB_updatePinConfig(uint16_t pinNumber, const PinConfig_t& config); // Atualiza configuração
 
 
 //Gera um ID para o módulo com base nas informações do chip ESP32
@@ -307,10 +307,10 @@ void fV_loadPinConfigs(void);
 bool fB_savePinConfigs(void);
 void fV_clearPinConfigs(void);
 void fV_setupConfiguredPins(void);
-uint8_t fU8_findPinIndex(uint8_t pinNumber);
+uint8_t fU8_findPinIndex(uint16_t pinNumber);
 int fI_addPinConfig(const PinConfig_t& config);
-bool fB_removePinConfig(uint8_t pinNumber);
-bool fB_updatePinConfig(uint8_t pinNumber, const PinConfig_t& config);
+bool fB_removePinConfig(uint16_t pinNumber);
+bool fB_updatePinConfig(uint16_t pinNumber, const PinConfig_t& config);
 bool fB_hasPinConfigChanges(void);
 void fV_updatePinStatus(void);
 void fV_readPinsTask(void); // Task periódica para leitura de pinos (ignora remotos)
@@ -321,21 +321,23 @@ void fV_initActionSystem(void);
 void fV_loadActionConfigs(void);
 bool fB_saveActionConfigs(void);
 void fV_clearActionConfigs(void);
-uint8_t fU8_findActionIndex(uint8_t pinOrigem, uint8_t numeroAcao);
+uint8_t fU8_findActionIndex(uint16_t pinOrigem, uint8_t numeroAcao);
 int fI_addActionConfig(const ActionConfig_t& config);
-bool fB_removeActionConfig(uint8_t pinOrigem, uint8_t numeroAcao);
-bool fB_updateActionConfig(uint8_t pinOrigem, uint8_t numeroAcao, const ActionConfig_t& config);
-bool fB_isPinUsedByActions(uint8_t pinNumber); // Verifica se pino está em uso por ações
+bool fB_removeActionConfig(uint16_t pinOrigem, uint8_t numeroAcao);
+bool fB_updateActionConfig(uint16_t pinOrigem, uint8_t numeroAcao, const ActionConfig_t& config);
+bool fB_isPinUsedByActions(uint16_t pinNumber); // Verifica se pino está em uso por ações
 void fV_executeActionsTask(void); // Task periódica para execução de ações
 void fV_executeAction(uint8_t actionIndex); // Executa uma ação específica
+void fV_syncRemotePinsOnBoot(void); // Sincroniza todos os pinos remotos após inicialização
 
 /* Funções do Gerenciador de Telegram (telegram_manager.cpp) */
 void fV_initTelegram(void);
 void fV_telegramLoop(void);
 bool fB_sendTelegramMessage(const String& message);
 void fV_sendTelegramActionNotification(const ActionConfig_t* action, const String& pinOrigemNome, const String& pinDestinoNome);
-bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, bool state); // Envia ação digital para módulo remoto
-bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, uint16_t value); // Envia valor analógico para módulo remoto
+bool fB_sendRemoteAction(const String& moduleId, uint16_t remotePin, bool state); // Envia ação digital para módulo remoto
+bool fB_sendRemoteAction(const String& moduleId, uint16_t remotePin, uint16_t value); // Envia valor analógico para módulo remoto
+bool fB_requestPinSyncFromModule(const String& moduleId); // Solicita sincronização de pinos de um módulo específico
 
 /* Funções do Gerenciador de MQTT (mqtt_manager.cpp) */
 void fV_initMqtt(void);               // Inicializa sistema MQTT

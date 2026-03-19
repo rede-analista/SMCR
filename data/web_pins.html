@@ -242,8 +242,9 @@
         </div>
 
         <div class="action-menu">
-            <button onclick="applyPinConfig()" class="btn btn-primary">Aplicar</button>
-            <button onclick="showAddForm()" class="btn btn-success">Novo Pino</button>
+            <button onclick="savePinsToFlash()" class="btn btn-success">Salvar</button>
+            <button onclick="restartESP()" class="btn btn-warning">Reiniciar</button>
+            <button onclick="showAddForm()" class="btn btn-primary">Novo Pino</button>
         </div>
 
         <div class="section">
@@ -541,6 +542,13 @@
         document.getElementById('pin-type').addEventListener('change', updateTriggerFields);
         document.getElementById('pin-mode').addEventListener('change', updateTriggerFields);
 
+        // Sincronizar pin-trigger com pin-min/pin-max para pinos digitais
+        document.getElementById('pin-trigger').addEventListener('change', function() {
+            const triggerValue = this.value;
+            document.getElementById('pin-min').value = triggerValue;
+            document.getElementById('pin-max').value = triggerValue;
+        });
+
         function editPin(index) {
             const pin = pinsData[index];
             console.log('[DEBUG] Editando pino:', pin);
@@ -591,8 +599,8 @@
             document.getElementById('pin-trigger').value = pin.nivel_acionamento_min === 1 ? '1' : '0';
             document.getElementById('pin-min').value = pin.nivel_acionamento_min || 0;
             document.getElementById('pin-max').value = pin.nivel_acionamento_max || 0;
-                        document.getElementById('pin-classe-mqtt').value = pin.classe_mqtt || '';
-                        document.getElementById('pin-icone-mqtt').value = pin.icone_mqtt || '';
+            document.getElementById('pin-classe-mqtt').value = pin.classe_mqtt || '';
+            document.getElementById('pin-icone-mqtt').value = pin.icone_mqtt || '';
             
             // Definir tipo (pode ser migrado)
             document.getElementById('pin-type').value = tipoAtualizado;
@@ -622,36 +630,40 @@
             document.getElementById('add-pin-section').style.display = 'none';
         }
 
-        function applyPinConfig() {
-            if (confirm('Aplicar configuracoes de pinos? O ESP sera reiniciado.')) {
-                showLoading('Aplicando configuracoes e reiniciando...');
+        function savePinsToFlash() {
+            if (confirm('Salvar configuracoes de pinos na flash?')) {
+                showLoading('Salvando configuracoes na flash...');
                 fetch('/pins/save_flash', { method: 'POST' })
-                    .then(response => response.text())
+                    .then(response => response.json())
                     .then(result => {
-                        if (result === 'OK') {
-                            showStatus('Configuracoes aplicadas! Reiniciando ESP...', 'success');
-                            // Reiniciar ESP após 2 segundos
-                            setTimeout(() => {
-                                fetch('/restart', { method: 'POST' })
-                                    .then(() => {
-                                        showStatus('ESP reiniciado com sucesso!', 'success');
-                                        // Recarregar página após reinicialização
-                                        setTimeout(() => {
-                                            window.location.reload();
-                                        }, 3000);
-                                    })
-                                    .catch(() => {
-                                        showStatus('ESP reiniciado. Recarregue a página manualmente.', 'success');
-                                    });
-                            }, 2000);
+                        hideLoading();
+                        if (result.success) {
+                            showStatus('Configuracoes salvas com sucesso na flash!', 'success');
                         } else {
-                            hideLoading();
-                            showStatus('Erro ao aplicar configuracoes.', 'error');
+                            showStatus('Erro ao salvar: ' + (result.error || 'Desconhecido'), 'error');
                         }
                     })
                     .catch(error => {
                         hideLoading();
-                        showStatus('Erro de comunicacao.', 'error');
+                        showStatus('Erro de comunicacao ao salvar.', 'error');
+                    });
+            }
+        }
+
+        function restartESP() {
+            if (confirm('Reiniciar o ESP32? Todas as configuracoes nao salvas serao perdidas.')) {
+                showLoading('Reiniciando ESP32...');
+                fetch('/restart', { method: 'POST' })
+                    .then(() => {
+                        showStatus('ESP32 reiniciado! Aguarde reconexao...', 'success');
+                        // Recarregar página após 5 segundos
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 5000);
+                    })
+                    .catch(() => {
+                        hideLoading();
+                        showStatus('ESP32 reiniciado. Recarregue a pagina manualmente.', 'success');
                     });
             }
         }

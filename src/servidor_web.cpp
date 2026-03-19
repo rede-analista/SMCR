@@ -943,7 +943,36 @@ void fV_setupWebServer() {
         
         request->send(200, "application/json", response);
     });
-    
+
+    // API: Solicitar sincronização de pinos de um módulo
+    SERVIDOR_WEB_ASYNC->on("/api/intermod/modules/sync", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+
+        if (!request->hasArg("id")) {
+            request->send(400, "text/plain", "ID do modulo nao fornecido");
+            return;
+        }
+
+        String moduleId = request->arg("id");
+        int index = fI_findInterModIndex(moduleId);
+
+        if (index < 0) {
+            request->send(404, "application/json", "{\"success\": false, \"message\": \"Modulo nao encontrado\"}");
+            return;
+        }
+
+        bool success = fB_requestPinSyncFromModule(moduleId);
+        String response = success ?
+            "{\"success\": true, \"message\": \"Sincronizacao solicitada com sucesso\"}" :
+            "{\"success\": false, \"message\": \"Falha ao solicitar sincronizacao\"}";
+
+        request->send(200, "application/json", response);
+    });
+
     // API: Executar descoberta mDNS
     SERVIDOR_WEB_ASYNC->on("/api/intermod/discovery", HTTP_POST, [](AsyncWebServerRequest *request) {
         if (vSt_mainConfig.vB_authEnabled) {
@@ -988,7 +1017,7 @@ void fV_setupWebServer() {
             return;
         }
         
-        uint8_t pin = request->arg("pin").toInt();
+        uint16_t pin = request->arg("pin").toInt();
         uint16_t value = request->arg("value").toInt(); // uint16_t para suportar valores analógicos 0-4095
         
         // Identificar módulo de origem (pode vir como parâmetro ou pelo IP)
@@ -1073,6 +1102,87 @@ void fV_setupWebServer() {
                 pin, vA_pinConfigs[pinIndex].tipo, vA_pinConfigs[pinIndex].modo);
             request->send(400, "text/plain", "Pin must be output or remote type");
         }
+    });
+
+    // Endpoint para solicitar sincronização de pinos (usado por módulo central)
+    SERVIDOR_WEB_ASYNC->on("/api/request_pin_sync", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // Não requer autenticação para facilitar comunicação inter-módulos
+
+        // Identificar módulo solicitante
+        String requestingModule = "Desconhecido";
+        if (request->hasArg("from")) {
+            requestingModule = request->arg("from");
+        } else {
+            IPAddress remoteIP = request->client()->remoteIP();
+            requestingModule = remoteIP.toString();
+        }
+
+        fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Recebida solicitação de sincronização de %s",
+                           requestingModule.c_str());
+
+        // Verificar se temos o módulo solicitante cadastrado (para saber IP/porta)
+        int moduleIndex = fI_findInterModIndex(requestingModule);
+        if (moduleIndex < 0) {
+            fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] AVISO: Módulo solicitante '%s' não está cadastrado",
+                               requestingModule.c_str());
+            request->send(404, "text/plain", "Requesting module not registered");
+            return;
+        }
+
+        // Se o módulo está marcado como offline, marca como online agora:
+        // ele acabou de nos enviar uma requisição HTTP, logo está acessível.
+        if (!vA_interModConfigs[moduleIndex].online) {
+            fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Módulo '%s' estava offline, marcando como online",
+                               requestingModule.c_str());
+            vA_interModConfigs[moduleIndex].online = true;
+            vA_interModConfigs[moduleIndex].falhas_consecutivas = 0;
+        }
+
+        // Responder imediatamente que vamos processar
+        request->send(202, "text/plain", "Sync request accepted, sending pin states...");
+
+        // Processar sincronização em background (não bloquear resposta)
+        // Percorre todas as ações para encontrar quais pinos devem ser enviados para este módulo
+        uint16_t sentCount = 0;
+
+        for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
+            // Verifica se esta ação envia para o módulo solicitante
+            if (vA_actionConfigs[i].envia_modulo == requestingModule &&
+                vA_actionConfigs[i].pino_remoto > 0) {
+
+                // Busca o pino de origem
+                uint8_t pinOrigemIndex = fU8_findPinIndex(vA_actionConfigs[i].pino_origem);
+
+                if (pinOrigemIndex == 255) {
+                    continue; // Pino não encontrado
+                }
+
+                // Lê o valor atual do pino de origem
+                uint16_t pinValue = vA_pinConfigs[pinOrigemIndex].status_atual;
+
+                // Envia para o módulo solicitante
+                fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Enviando pino %d (%s) = %d → módulo '%s'",
+                    vA_actionConfigs[i].pino_origem,
+                    vA_pinConfigs[pinOrigemIndex].nome.c_str(),
+                    pinValue,
+                    requestingModule.c_str());
+
+                bool success = fB_sendRemoteAction(
+                    requestingModule,
+                    vA_actionConfigs[i].pino_remoto,
+                    pinValue
+                );
+
+                if (success) {
+                    sentCount++;
+                }
+
+                delay(100); // Pequeno delay entre envios
+            }
+        }
+
+        fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Sincronização concluída: %d pinos enviados para '%s'",
+                           sentCount, requestingModule.c_str());
     });
 
     // ========================================
@@ -2696,17 +2806,20 @@ void fV_handlePinCreateApi(AsyncWebServerRequest *request) {
         return;
     }
     
-    // Adiciona o pino (apenas running config)
+    // Adiciona o pino
     int result = fI_addPinConfig(newPin);
     if (result < 0) {
         request->send(400, "application/json", "{\"error\": \"Erro ao adicionar pino ou limite atingido\"}");
         return;
     }
-    
+
     // Aplica configuração física se necessário
     fV_setupConfiguredPins();
-    
-    request->send(200, "application/json", "{\"success\": true, \"id\": " + String(result) + ", \"message\": \"Pino adicionado à running config\"}");
+
+    // Persiste imediatamente na flash
+    fB_savePinConfigs();
+
+    request->send(200, "application/json", "{\"success\": true, \"id\": " + String(result) + ", \"message\": \"Pino adicionado e salvo\"}");
 }
 
 // API: Atualizar pino existente
@@ -2721,8 +2834,8 @@ void fV_handlePinUpdateApi(AsyncWebServerRequest *request) {
         return;
     }
     
-    uint8_t pinNumber = url.substring(lastSlash + 1).toInt();
-    
+    uint16_t pinNumber = url.substring(lastSlash + 1).toInt();
+
     // Verifica se há dados no body
     if (request->_tempObject == nullptr) {
         request->send(400, "application/json", "{\"error\": \"Dados do pino não fornecidos\"}");
@@ -2752,7 +2865,7 @@ void fV_handlePinUpdateApi(AsyncWebServerRequest *request) {
     updatedPin.classe_mqtt = doc["classe_mqtt"] | "";
     updatedPin.icone_mqtt = doc["icone_mqtt"] | "";
 
-    uint8_t newPinNumber = updatedPin.pino;
+    uint16_t newPinNumber = updatedPin.pino;
     bool renamed = (newPinNumber != pinNumber);
     uint16_t updatedSourceActions = 0;
     uint16_t updatedDestinationActions = 0;
@@ -2825,8 +2938,8 @@ void fV_handlePinDeleteApi(AsyncWebServerRequest *request) {
         return;
     }
     
-    uint8_t pinNumber = url.substring(lastSlash + 1).toInt();
-    
+    uint16_t pinNumber = url.substring(lastSlash + 1).toInt();
+
     // *** VALIDAÇÃO: Verifica se pino está em uso por ações ***
     if (fB_isPinUsedByActions(pinNumber)) {
         fV_printSerialDebug(LOG_WEB, "[API] ERRO: Pino %d não pode ser excluído - está em uso por ações", pinNumber);
@@ -2836,17 +2949,20 @@ void fV_handlePinDeleteApi(AsyncWebServerRequest *request) {
         return;
     }
     
-    // Remove o pino (apenas running config)
+    // Remove o pino da running config
     bool success = fB_removePinConfig(pinNumber);
     if (!success) {
         request->send(404, "application/json", "{\"error\": \"Pino não encontrado\"}");
         return;
     }
-    
+
     // Reaplica configurações físicas
     fV_setupConfiguredPins();
-    
-    request->send(200, "application/json", "{\"success\": true, \"message\": \"Pino removido da running config\"}");
+
+    // Persiste imediatamente na flash
+    fB_savePinConfigs();
+
+    request->send(200, "application/json", "{\"success\": true, \"message\": \"Pino removido e salvo\"}");
 }
 
 // API: Salvar configurações de pinos na flash (startup config)
@@ -2987,7 +3103,7 @@ void fV_handleActionCreateApi(AsyncWebServerRequest *request) {
     
     if (isEdit) {
         // Modo edição: usa os valores originais dos campos hidden
-        uint8_t originalPinOrigem = request->arg("edit_pino_origem").toInt();
+        uint16_t originalPinOrigem = request->arg("edit_pino_origem").toInt();
         uint8_t originalNumeroAcao = request->arg("edit_numero_acao").toInt();
         
         // Remove a ação antiga
@@ -3020,7 +3136,7 @@ void fV_handleActionDeleteApi(AsyncWebServerRequest *request) {
         return;
     }
     
-    uint8_t pinOrigem = url.substring(secondLastSlash + 1, lastSlash).toInt();
+    uint16_t pinOrigem = url.substring(secondLastSlash + 1, lastSlash).toInt();
     uint8_t numeroAcao = url.substring(lastSlash + 1).toInt();
     
     bool success = fB_removeActionConfig(pinOrigem, numeroAcao);

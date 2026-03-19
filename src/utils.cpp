@@ -71,7 +71,7 @@ void fV_printSerialDebug(uint32_t vU32_messageFlag, const char *vC_format, ...) 
 /*========================================
 Registra comunicação inter-módulos RECEBIDA (circular buffer)
 */
-void fV_logInterModReceived(const String& module, uint8_t pin, uint16_t value) {
+void fV_logInterModReceived(const String& module, uint16_t pin, uint16_t value) {
   // Obter hora formatada
   extern String fS_getFormattedTime(void);
   String timeStr = fS_getFormattedTime();
@@ -99,7 +99,7 @@ void fV_logInterModReceived(const String& module, uint8_t pin, uint16_t value) {
 /*========================================
 Registra comunicação inter-módulos ENVIADA (circular buffer)
 */
-void fV_logInterModSent(const String& module, uint8_t pin, uint16_t value) {
+void fV_logInterModSent(const String& module, uint16_t pin, uint16_t value) {
   // Obter hora formatada
   extern String fS_getFormattedTime(void);
   String timeStr = fS_getFormattedTime();

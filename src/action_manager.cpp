@@ -160,7 +160,7 @@ void fV_loadActionConfigs(void) {
             break;
         }
         
-        uint8_t pinOrigem = action["pino_origem"] | 0;
+        uint16_t pinOrigem = action["pino_origem"] | 0;
         uint8_t numeroAcao = action["numero_acao"] | 0;
         
         if (pinOrigem == 0 || numeroAcao == 0 || numeroAcao > 4) {
@@ -285,7 +285,7 @@ void fV_clearActionConfigs(void) {
 //========================================
 // Encontra índice da ação no array
 //========================================
-uint8_t fU8_findActionIndex(uint8_t pinOrigem, uint8_t numeroAcao) {
+uint8_t fU8_findActionIndex(uint16_t pinOrigem, uint8_t numeroAcao) {
     for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
         if (vA_actionConfigs[i].pino_origem == pinOrigem && 
             vA_actionConfigs[i].numero_acao == numeroAcao) {
@@ -332,7 +332,7 @@ int fI_addActionConfig(const ActionConfig_t& config) {
 //========================================
 // Remove configuração de ação
 //========================================
-bool fB_removeActionConfig(uint8_t pinOrigem, uint8_t numeroAcao) {
+bool fB_removeActionConfig(uint16_t pinOrigem, uint8_t numeroAcao) {
     uint8_t index = fU8_findActionIndex(pinOrigem, numeroAcao);
     if (index == 255) {
         fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Ação não encontrada para remoção (origem=%d, num=%d)", 
@@ -360,7 +360,7 @@ bool fB_removeActionConfig(uint8_t pinOrigem, uint8_t numeroAcao) {
 //========================================
 // Atualiza configuração de ação
 //========================================
-bool fB_updateActionConfig(uint8_t pinOrigem, uint8_t numeroAcao, const ActionConfig_t& config) {
+bool fB_updateActionConfig(uint16_t pinOrigem, uint8_t numeroAcao, const ActionConfig_t& config) {
     uint8_t index = fU8_findActionIndex(pinOrigem, numeroAcao);
     if (index == 255) {
         fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Ação não encontrada para atualização");
@@ -386,7 +386,7 @@ bool fB_updateActionConfig(uint8_t pinOrigem, uint8_t numeroAcao, const ActionCo
 //========================================
 // Verifica se um pino está em uso por ações (origem ou destino)
 //========================================
-bool fB_isPinUsedByActions(uint8_t pinNumber) {
+bool fB_isPinUsedByActions(uint16_t pinNumber) {
     for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
         // Pula ações desabilitadas
         if (vA_actionConfigs[i].acao == ACTION_TYPE_NONE) {
@@ -483,21 +483,13 @@ void fV_executeActionsTask(void) {
                 
                 // Envia para módulo remoto se configurado
                 if (vA_actionConfigs[i].envia_modulo != "" && vA_actionConfigs[i].pino_remoto > 0) {
-                    // Verifica se pino de origem é analógico (tipo 192 ou 193)
-                    bool isAnalog = (vA_pinConfigs[pinOrigemIndex].tipo == 192 || vA_pinConfigs[pinOrigemIndex].tipo == 193);
-                    
-                    if (isAnalog) {
-                        // Envia valor analógico real (0-4095)
-                        uint16_t analogValue = vA_pinConfigs[pinOrigemIndex].status_atual;
-                        fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando valor analógico %d para módulo '%s', pino remoto %d", 
-                            analogValue, vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
-                        fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, analogValue);
-                    } else {
-                        // Envia estado digital ON (1) para pino remoto
-                        fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando ON (1) para módulo '%s', pino remoto %d", 
-                            vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
-                        fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, (uint16_t)1);
-                    }
+                    // Envia o valor REAL do pino de origem (status_atual)
+                    uint16_t pinValue = vA_pinConfigs[pinOrigemIndex].status_atual;
+
+                    fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando valor %d do pino origem %d para módulo '%s', pino remoto %d",
+                        pinValue, vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
+
+                    fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, pinValue);
                 }
                 
                 // Envia notificação Telegram se habilitado na ação
@@ -525,23 +517,15 @@ void fV_executeActionsTask(void) {
                         fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Desligando GPIO %d (origem desativada) - Ação tipo %d", 
                             vA_actionConfigs[i].pino_destino, vA_actionConfigs[i].acao);
                         
-                        // Se ação deve ser enviada para módulo remoto, envia estado OFF ou valor 0
+                        // Se ação deve ser enviada para módulo remoto, envia valor REAL do pino origem
                         if (vA_actionConfigs[i].envia_modulo != "" && vA_actionConfigs[i].pino_remoto > 0) {
-                            // Verifica se pino de origem é analógico
-                            bool isAnalog = (vA_pinConfigs[pinOrigemIndex].tipo == 192 || vA_pinConfigs[pinOrigemIndex].tipo == 193);
-                            
-                            if (isAnalog) {
-                                // Envia valor analógico real (pode ser 0 ou valor atual)
-                                uint16_t analogValue = vA_pinConfigs[pinOrigemIndex].status_atual;
-                                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando valor analógico %d (normalização) para módulo '%s', pino remoto %d", 
-                                    analogValue, vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
-                                fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, analogValue);
-                            } else {
-                                // Envia estado digital OFF (0) para pino remoto
-                                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando OFF (0) para módulo '%s', pino remoto %d", 
-                                    vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
-                                fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, (uint16_t)0);
-                            }
+                            // Envia o valor REAL do pino de origem (status_atual)
+                            uint16_t pinValue = vA_pinConfigs[pinOrigemIndex].status_atual;
+
+                            fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando valor %d do pino origem %d (normalização) para módulo '%s', pino remoto %d",
+                                pinValue, vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
+
+                            fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, pinValue);
                         }
                     }
                 }
@@ -722,7 +706,7 @@ void fV_executeAction(uint8_t actionIndex) {
 //========================================
 // Envia ação para módulo remoto via HTTP
 //========================================
-bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, bool state) {
+bool fB_sendRemoteAction(const String& moduleId, uint16_t remotePin, bool state) {
     // Busca o módulo na lista de módulos cadastrados
     uint8_t moduleIndex = 255;
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
@@ -786,7 +770,7 @@ bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, bool state) 
 }
 
 // Sobrecarga para enviar valor analógico (0-4095) ou qualquer valor numérico
-bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, uint16_t value) {
+bool fB_sendRemoteAction(const String& moduleId, uint16_t remotePin, uint16_t value) {
     // Busca o módulo na lista de módulos cadastrados
     uint8_t moduleIndex = 255;
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
@@ -845,6 +829,141 @@ bool fB_sendRemoteAction(const String& moduleId, uint8_t remotePin, uint16_t val
         fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Falha na conexão: %s", http.errorToString(httpCode).c_str());
     }
     
+    http.end();
+    return success;
+}
+
+//========================================
+// Sincroniza todos os pinos remotos após inicialização
+// Envia o estado atual de todos os pinos que têm ações com envio remoto
+//========================================
+void fV_syncRemotePinsOnBoot(void) {
+    fV_printSerialDebug(LOG_INTERMOD, "[SYNC] Iniciando sincronização de pinos remotos após boot...");
+
+    if (!vSt_mainConfig.vB_interModEnabled) {
+        fV_printSerialDebug(LOG_INTERMOD, "[SYNC] Inter-módulos desabilitado, sincronização cancelada");
+        return;
+    }
+
+    if (vU8_activeActionsCount == 0) {
+        fV_printSerialDebug(LOG_INTERMOD, "[SYNC] Nenhuma ação configurada");
+        return;
+    }
+
+    // Força healthcheck em todos os módulos offline antes de sincronizar
+    // (no boot todos iniciam como offline, mas podem estar acessíveis)
+    fV_printSerialDebug(LOG_INTERMOD, "[SYNC] Verificando disponibilidade dos módulos...");
+    for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+        if (!vA_interModConfigs[i].online) {
+            fV_printSerialDebug(LOG_INTERMOD, "[SYNC] Checando módulo '%s'...", vA_interModConfigs[i].hostname.c_str());
+            fB_checkModuleHealth(i);
+        }
+    }
+
+    uint16_t syncCount = 0;
+
+    // Percorre todas as ações
+    for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
+        // Verifica se a ação tem envio remoto configurado
+        if (vA_actionConfigs[i].envia_modulo != "" && vA_actionConfigs[i].pino_remoto > 0) {
+            // Busca o pino de origem
+            uint8_t pinOrigemIndex = fU8_findPinIndex(vA_actionConfigs[i].pino_origem);
+
+            if (pinOrigemIndex == 255) {
+                fV_printSerialDebug(LOG_INTERMOD, "[SYNC] AVISO: Pino origem %d não encontrado (ação #%d)",
+                    vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].numero_acao);
+                continue;
+            }
+
+            // Lê o valor atual do pino de origem
+            uint16_t pinValue = vA_pinConfigs[pinOrigemIndex].status_atual;
+
+            // Envia para o módulo remoto
+            fV_printSerialDebug(LOG_INTERMOD, "[SYNC] Enviando pino origem %d (%s) = %d → módulo '%s', pino remoto %d",
+                vA_actionConfigs[i].pino_origem,
+                vA_pinConfigs[pinOrigemIndex].nome.c_str(),
+                pinValue,
+                vA_actionConfigs[i].envia_modulo.c_str(),
+                vA_actionConfigs[i].pino_remoto);
+
+            bool success = fB_sendRemoteAction(
+                vA_actionConfigs[i].envia_modulo,
+                vA_actionConfigs[i].pino_remoto,
+                pinValue
+            );
+
+            if (success) {
+                syncCount++;
+            } else {
+                fV_printSerialDebug(LOG_INTERMOD, "[SYNC] ERRO: Falha ao sincronizar pino %d com módulo '%s'",
+                    vA_actionConfigs[i].pino_origem,
+                    vA_actionConfigs[i].envia_modulo.c_str());
+            }
+
+            // Delay entre envios para não sobrecarregar a rede
+            delay(200);
+        }
+    }
+
+    fV_printSerialDebug(LOG_INTERMOD, "[SYNC] Sincronização concluída: %d/%d pinos remotos sincronizados",
+        syncCount, vU8_activeActionsCount);
+}
+
+//========================================
+// Solicita sincronização de pinos de um módulo específico
+// O módulo receptor (central) chama esta função para pedir ao módulo transmissor
+// que envie o estado atual de todos os pinos configurados
+//========================================
+bool fB_requestPinSyncFromModule(const String& moduleId) {
+    fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Solicitando sincronização de pinos do módulo '%s'", moduleId.c_str());
+
+    if (!vSt_mainConfig.vB_interModEnabled) {
+        fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Inter-módulos desabilitado");
+        return false;
+    }
+
+    // Busca o módulo na lista de módulos cadastrados
+    int moduleIndex = fI_findInterModIndex(moduleId);
+    if (moduleIndex < 0) {
+        fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Módulo '%s' não encontrado", moduleId.c_str());
+        return false;
+    }
+
+    InterModConfig_t* module = &vA_interModConfigs[moduleIndex];
+
+    // Monta URL de requisição
+    String url = "http://" + module->ip + ":" + String(module->porta) + "/api/request_pin_sync";
+
+    fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Enviando requisição para: %s", url.c_str());
+
+    HTTPClient http;
+    http.setTimeout(5000); // Timeout de 5 segundos
+
+    if (!http.begin(url)) {
+        fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Erro ao iniciar HTTP para %s", module->hostname.c_str());
+        return false;
+    }
+
+    // Monta corpo da requisição com nosso ID
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    String postData = "from=" + vSt_mainConfig.vS_hostname;
+
+    int httpCode = http.POST(postData);
+    bool success = false;
+
+    if (httpCode > 0) {
+        if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_ACCEPTED) {
+            String response = http.getString();
+            fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Requisição aceita por %s: %s",
+                               module->hostname.c_str(), response.c_str());
+            success = true;
+        } else {
+            fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Erro HTTP %d ao solicitar sync", httpCode);
+        }
+    } else {
+        fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Falha na conexão: %s", http.errorToString(httpCode).c_str());
+    }
+
     http.end();
     return success;
 }

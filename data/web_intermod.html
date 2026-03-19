@@ -545,6 +545,7 @@
                     html += `<td>${origem}</td>`;
                     html += `<td>
                         <button class="btn action-btn btn-secondary" onclick="testModule('${escapeHtml(module.id)}')">🔍 Testar</button>
+                        <button class="btn action-btn btn-success" onclick="syncModule('${escapeHtml(module.id)}')">🔄 Sincronizar</button>
                         <button class="btn action-btn btn-danger" onclick="deleteModule('${escapeHtml(module.id)}')">🗑️ Remover</button>
                     </td>`;
                     html += '</tr>';
@@ -653,6 +654,32 @@
             } catch (error) {
                 console.error('Erro:', error);
                 showMessage('Erro ao testar módulo', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Solicita sincronização de pinos de um módulo
+        async function syncModule(moduleId) {
+            showLoading(true);
+
+            try {
+                const response = await fetch(`/api/intermod/modules/sync?id=${encodeURIComponent(moduleId)}`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage(`Sincronização solicitada para módulo "${moduleId}": ${data.message}`, 'success');
+                } else {
+                    showMessage(`Erro ao sincronizar módulo "${moduleId}": ${data.message}`, 'error');
+                }
+
+                loadModules(); // Atualiza lista com novo status
+            } catch (error) {
+                console.error('Erro:', error);
+                showMessage('Erro ao solicitar sincronização', 'error');
             } finally {
                 showLoading(false);
             }

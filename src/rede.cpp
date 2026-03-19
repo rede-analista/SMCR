@@ -16,17 +16,21 @@ void fV_setupMdns() {
     // Inicia o mDNS com o hostname configurado
     if (MDNS.begin(vSt_mainConfig.vS_hostname.c_str())) {
         fV_printSerialDebug(LOG_NETWORK, "mDNS iniciado com sucesso!");
-        fV_printSerialDebug(LOG_NETWORK, "Acesse o dispositivo em: http://%s.local:%d/", 
-                           vSt_mainConfig.vS_hostname.c_str(), 
+        fV_printSerialDebug(LOG_NETWORK, "Acesse o dispositivo em: http://%s.local:%d/",
+                           vSt_mainConfig.vS_hostname.c_str(),
                            vSt_mainConfig.vU16_webServerPort);
-        
+
         // Adiciona serviço HTTP para descoberta
         MDNS.addService("http", "tcp", vSt_mainConfig.vU16_webServerPort);
-        
+        fV_printSerialDebug(LOG_NETWORK, "Servico HTTP mDNS adicionado na porta %d", vSt_mainConfig.vU16_webServerPort);
+
         // Adiciona informações adicionais do serviço (device_type é usado para identificar módulos SMCR)
         MDNS.addServiceTxt("http", "tcp", "version", "2.1.2");
         MDNS.addServiceTxt("http", "tcp", "device_type", "smcr");
         MDNS.addServiceTxt("http", "tcp", "device", "SMCR");
+        fV_printSerialDebug(LOG_NETWORK, "TXT records mDNS adicionados: device_type=smcr, device=SMCR, version=2.1.2");
+
+        // ESP32 mDNS funciona automaticamente em background, não precisa de update() manual
     } else {
         fV_printSerialDebug(LOG_NETWORK, "Erro ao iniciar mDNS!");
     }
