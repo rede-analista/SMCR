@@ -371,10 +371,10 @@
                             <input type="number" id="editModulePort" name="modulePort" min="1" max="65535" required>
                         </div>
                         <div class="form-group">
-                            <label for="editPinsAlerta">GPIOs de Alerta (offline):</label>
+                            <label for="editPinsAlerta">GPIOs de Alerta (offline/HealthCheck):</label>
                             <input type="text" id="editPinsAlerta" name="pinsAlerta"
                                    placeholder="Ex: 2,4,5 (separe por vírgula)">
-                            <small style="color:#666">Pinos locais que piscam quando este módulo ficar offline</small>
+                            <small style="color:#666">Pinos locais que piscam relaciodanos ao módulo remoto</small>
                         </div>
                         <button type="submit" class="btn btn-success">💾 Salvar</button>
                         <button type="button" class="btn btn-secondary" onclick="hideEditModuleForm()">✖️ Cancelar</button>
