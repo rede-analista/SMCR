@@ -180,6 +180,7 @@ struct InterModConfig_t {
     uint8_t falhas_consecutivas; // Contador de falhas de healthcheck
     unsigned long ultimo_healthcheck; // Timestamp do último healthcheck bem-sucedido
     bool auto_descoberto;        // Se foi descoberto via mDNS ou cadastrado manualmente
+    String pins_alerta;          // GPIOs locais de alerta, separados por vírgula (ex: "3,4,5")
 };
 
 // --- Estrutura para Log de Comunicações Inter-Módulos ---
@@ -338,6 +339,8 @@ void fV_sendTelegramActionNotification(const ActionConfig_t* action, const Strin
 bool fB_sendRemoteAction(const String& moduleId, uint16_t remotePin, bool state); // Envia ação digital para módulo remoto
 bool fB_sendRemoteAction(const String& moduleId, uint16_t remotePin, uint16_t value); // Envia valor analógico para módulo remoto
 bool fB_requestPinSyncFromModule(const String& moduleId); // Solicita sincronização de pinos de um módulo específico
+extern bool vB_pendingModuleSyncRequest; // Flag para sincronização pendente (executada na loop)
+extern String vS_pendingModuleSyncId;   // ID do módulo aguardando sincronização
 
 /* Funções do Gerenciador de MQTT (mqtt_manager.cpp) */
 void fV_initMqtt(void);               // Inicializa sistema MQTT
@@ -360,6 +363,7 @@ bool fB_updateInterModConfig(const String& id, const InterModConfig_t& config); 
 int fI_findInterModIndex(const String& id);    // Encontra índice do módulo por ID
 void fV_interModHealthCheckTask(void);         // Task de healthcheck periódico
 void fV_interModDiscoveryTask(void);           // Task de descoberta automática via mDNS
+void fV_interModAlertFlashTask(void);          // Task de piscar LEDs de alerta quando módulo offline
 bool fB_checkModuleHealth(uint8_t moduleIndex); // Verifica saúde de um módulo específico
 String fS_getInterModStatus(void);             // Retorna resumo de status dos módulos
 

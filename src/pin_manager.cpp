@@ -342,8 +342,10 @@ void fV_setupConfiguredPins(void) {
                         break;
                 }
                 configurados++;
-            } else if (tipo == PIN_TYPE_REMOTE) {
-                fV_printSerialDebug(LOG_PINS, "[PIN] Pino remoto %d registrado (%s)", pinNumber, vA_pinConfigs[i].nome.c_str());
+            } else if (tipo == PIN_TYPE_REMOTE || tipo == 65533) {
+                // Inicializa pino remoto no estado "não alarmado" (inverso do nível de acionamento)
+                vA_pinConfigs[i].status_atual = (vA_pinConfigs[i].nivel_acionamento_min == 0) ? 1 : 0;
+                fV_printSerialDebug(LOG_PINS, "[PIN] Pino remoto %d registrado (%s), status inicial: %d", pinNumber, vA_pinConfigs[i].nome.c_str(), vA_pinConfigs[i].status_atual);
                 configurados++;
             }
         }

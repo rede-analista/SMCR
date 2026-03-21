@@ -19,6 +19,9 @@ const unsigned long vU32_mqttLoopInterval = 450; // Loop MQTT a cada 50ms (não 
 unsigned long vU32_lastInterModTaskTime = 0;
 const unsigned long vU32_interModTaskInterval = 15000; // Tasks inter-módulos a cada 15 segundos
 
+unsigned long vU32_lastAlertFlashTime = 0;
+const unsigned long vU32_alertFlashInterval = 200; // Flash de alerta a cada 200ms
+
 // Definição do objeto Preferences.
 Preferences preferences;
 
@@ -144,5 +147,17 @@ void loop() {
 
   // 6. LOOP TELEGRAM: Verificação periódica de mensagens
   fV_telegramLoop();
+
+  // 7. SINCRONIZAÇÃO MANUAL DE MÓDULO: Agendada pelo botão "Sincronizar" na interface web
+  if (vB_pendingModuleSyncRequest) {
+    vB_pendingModuleSyncRequest = false;
+    fB_requestPinSyncFromModule(vS_pendingModuleSyncId);
+  }
+
+  // 8. FLASH DE ALERTA: Pisca pinos associados a módulos offline (a cada 200ms)
+  if (vU32_currentTime - vU32_lastAlertFlashTime >= vU32_alertFlashInterval) {
+    vU32_lastAlertFlashTime = vU32_currentTime;
+    fV_interModAlertFlashTask();
+  }
  
 }

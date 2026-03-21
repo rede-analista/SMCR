@@ -856,6 +856,7 @@ void fV_setupWebServer() {
             module["falhas_consecutivas"] = vA_interModConfigs[i].falhas_consecutivas;
             module["ultimo_healthcheck"] = vA_interModConfigs[i].ultimo_healthcheck;
             module["auto_descoberto"] = vA_interModConfigs[i].auto_descoberto;
+            module["pins_alerta"] = vA_interModConfigs[i].pins_alerta;
         }
         
         String response;
@@ -883,6 +884,7 @@ void fV_setupWebServer() {
         newModule.ip = request->arg("moduleIp");
         newModule.porta = request->arg("modulePort").toInt();
         newModule.auto_descoberto = false;
+        newModule.pins_alerta = request->hasArg("pinsAlerta") ? request->arg("pinsAlerta") : "";
         
         int index = fI_addInterModConfig(newModule);
         if (index >= 0) {
@@ -965,12 +967,42 @@ void fV_setupWebServer() {
             return;
         }
 
-        bool success = fB_requestPinSyncFromModule(moduleId);
-        String response = success ?
-            "{\"success\": true, \"message\": \"Sincronizacao solicitada com sucesso\"}" :
-            "{\"success\": false, \"message\": \"Falha ao solicitar sincronizacao\"}";
+        // Agenda a sincronização para ser executada na loop() principal,
+        // evitando chamada HTTP bloqueante dentro da task do AsyncWebServer
+        vS_pendingModuleSyncId = moduleId;
+        vB_pendingModuleSyncRequest = true;
 
-        request->send(200, "application/json", response);
+        request->send(202, "application/json", "{\"success\": true, \"message\": \"Sincronizacao agendada\"}");
+    });
+
+    // API: Atualizar módulo existente
+    SERVIDOR_WEB_ASYNC->on("/api/intermod/modules/update", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+
+        if (!request->hasArg("moduleId")) {
+            request->send(400, "text/plain", "ID do modulo nao fornecido");
+            return;
+        }
+
+        String moduleId = request->arg("moduleId");
+        int index = fI_findInterModIndex(moduleId);
+
+        if (index < 0) {
+            request->send(404, "application/json", "{\"success\": false, \"message\": \"Modulo nao encontrado\"}");
+            return;
+        }
+
+        if (request->hasArg("moduleHostname")) vA_interModConfigs[index].hostname = request->arg("moduleHostname");
+        if (request->hasArg("moduleIp"))       vA_interModConfigs[index].ip       = request->arg("moduleIp");
+        if (request->hasArg("modulePort"))     vA_interModConfigs[index].porta     = request->arg("modulePort").toInt();
+        if (request->hasArg("pinsAlerta"))     vA_interModConfigs[index].pins_alerta = request->arg("pinsAlerta");
+
+        fB_saveInterModConfigs();
+        request->send(200, "application/json", "{\"success\": true}");
     });
 
     // API: Executar descoberta mDNS
