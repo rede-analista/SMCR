@@ -1,6 +1,6 @@
 SMCR Firmware v2.1.5
-Build Date: sáb 21 mar 2026 16:22:34 -03
-Git Commit: 79945e4d920d4df9bf66aa167f74a8abd22fb75f
+Build Date: sáb 21 mar 2026 17:41:20 -03
+Git Commit: 701bdaa4ccac06ea14a016fbb0ce2e5845c1dcf2
 Git Branch: main
 
 Files:

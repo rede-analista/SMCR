@@ -15,6 +15,7 @@ String vS_pendingModuleSyncId = "";
 
 // Estado do flash de alerta de módulos offline
 static bool vB_alertFlashState = false;
+static unsigned long vU32_healthCheckFlashUntil = 0; // Pisca durante healthcheck até este timestamp
 
 // Variáveis globais para log de comunicações
 InterModCommLog_t vSt_InterModCommReceived[MAX_INTERMOD_COMM_LOG];
@@ -425,7 +426,10 @@ void fV_interModHealthCheckTask(void) {
     }
     
     vU32_lastHealthCheck = now;
-    
+
+    // Ativa flash de indicação de healthcheck (~1 segundo = 5 piscadas a 200ms)
+    vU32_healthCheckFlashUntil = now + 1000;
+
     // Executa healthcheck para cada módulo
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
         fB_checkModuleHealth(i);
@@ -628,22 +632,56 @@ String fS_getInterModStatus(void) {
 void fV_interModAlertFlashTask(void) {
     if (!vSt_mainConfig.vB_interModEnabled || vU8_activeInterModCount == 0) return;
 
-    // Verifica se há algum módulo offline com pinos de alerta configurados
-    bool hasAlert = false;
+    bool hasOffline = false;
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
         if (!vA_interModConfigs[i].online && vA_interModConfigs[i].pins_alerta.length() > 0) {
-            hasAlert = true;
+            hasOffline = true;
             break;
         }
     }
-    if (!hasAlert) return;
+
+    bool inHealthCheckFlash = (millis() < vU32_healthCheckFlashUntil);
+    bool shouldFlash = hasOffline || inHealthCheckFlash;
+
+    if (!shouldFlash) {
+        // Garante que os pinos ficam desligados ao sair do estado de alerta
+        if (vB_alertFlashState) {
+            vB_alertFlashState = false;
+            for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+                if (vA_interModConfigs[i].pins_alerta.length() > 0) {
+                    String pinsStr = vA_interModConfigs[i].pins_alerta;
+                    int startPos = 0;
+                    while (startPos <= (int)pinsStr.length()) {
+                        int commaPos = pinsStr.indexOf(',', startPos);
+                        String pinStr = (commaPos == -1) ? pinsStr.substring(startPos) : pinsStr.substring(startPos, commaPos);
+                        pinStr.trim();
+                        if (pinStr.length() > 0) {
+                            uint16_t gpio = (uint16_t)pinStr.toInt();
+                            uint8_t idx = fU8_findPinIndex(gpio);
+                            if (idx != 255) {
+                                bool nivelInvertido = (vA_pinConfigs[idx].nivel_acionamento_min == 0);
+                                vA_pinConfigs[idx].status_atual = 0;
+                                digitalWrite(gpio, nivelInvertido ? HIGH : LOW);
+                            }
+                        }
+                        if (commaPos == -1) break;
+                        startPos = commaPos + 1;
+                    }
+                }
+            }
+        }
+        return;
+    }
 
     // Alterna estado do flash
     vB_alertFlashState = !vB_alertFlashState;
 
-    // Aplica a todos os pinos de alerta dos módulos offline
+    // Aplica aos pinos:
+    // - Módulo offline: pisca sempre até voltar online
+    // - Healthcheck ativo: pisca todos os pinos de alerta brevemente
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
-        if (!vA_interModConfigs[i].online && vA_interModConfigs[i].pins_alerta.length() > 0) {
+        bool applyFlash = !vA_interModConfigs[i].online || inHealthCheckFlash;
+        if (applyFlash && vA_interModConfigs[i].pins_alerta.length() > 0) {
             String pinsStr = vA_interModConfigs[i].pins_alerta;
             int startPos = 0;
             while (startPos <= (int)pinsStr.length()) {
