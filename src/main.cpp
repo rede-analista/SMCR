@@ -20,7 +20,9 @@ unsigned long vU32_lastInterModTaskTime = 0;
 const unsigned long vU32_interModTaskInterval = 15000; // Tasks inter-módulos a cada 15 segundos
 
 unsigned long vU32_lastAlertFlashTime = 0;
-const unsigned long vU32_alertFlashInterval = 200; // Flash de alerta a cada 200ms
+const unsigned long vU32_alertFlashInterval = 50; // Polling de flash a cada 50ms (cada módulo gerencia seu próprio intervalo)
+
+unsigned long vU32_lastCloudSyncTime = 0;
 
 // Definição do objeto Preferences.
 Preferences preferences;
@@ -159,5 +161,21 @@ void loop() {
     vU32_lastAlertFlashTime = vU32_currentTime;
     fV_interModAlertFlashTask();
   }
- 
+
+  // 9. CLOUD SYNC: Busca configurações na cloud SMCR (periódico ou forçado)
+  unsigned long vU32_cloudSyncIntervalMs = (unsigned long)vSt_mainConfig.vU16_cloudSyncIntervalMin * 60000UL;
+  if (vB_pendingCloudSync ||
+      (vSt_mainConfig.vB_cloudSyncEnabled && vB_wifiIsConnected &&
+       vU32_currentTime - vU32_lastCloudSyncTime >= vU32_cloudSyncIntervalMs)) {
+    vB_pendingCloudSync = false;
+    vU32_lastCloudSyncTime = vU32_currentTime;
+    fV_cloudSyncTask();
+  }
+
+  // 10. FETCH CLOUD FILES: Download de arquivos HTML da cloud para LittleFS (setup inicial)
+  if (vB_pendingFetchCloudFiles) {
+    vB_pendingFetchCloudFiles = false;
+    fV_fetchCloudFilesTask();
+  }
+
 }

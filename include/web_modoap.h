@@ -187,4 +187,113 @@ const char web_config_html[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
+// Página de setup inicial: baixar arquivos HTML da SMCR Cloud
+const char web_setup_files_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup - SMCR</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f0f0; margin: 0; padding: 20px;
+               display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .box { background: white; padding: 30px; border-radius: 8px;
+               box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
+        h1 { text-align: center; color: #333; font-size: 22px; margin-bottom: 6px; }
+        .sub { text-align: center; color: #28a745; font-size: 14px; margin-bottom: 24px; }
+        label { display: block; font-weight: bold; color: #444; margin-bottom: 6px; }
+        input[type=text] { width: 100%; padding: 9px 12px; border: 2px solid #ddd;
+                           border-radius: 4px; font-size: 14px; box-sizing: border-box; margin-bottom: 16px; }
+        input:focus { outline: none; border-color: #007bff; }
+        .btn { width: 100%; padding: 12px; background: #007bff; color: white; border: none;
+               border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .btn:hover { background: #0056b3; }
+        .btn:disabled { background: #999; cursor: not-allowed; }
+        .status { margin-top: 16px; padding: 12px; border-radius: 4px; text-align: center;
+                  font-size: 14px; display: none; }
+        .info  { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .ok    { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .err   { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .skip  { display: block; text-align: center; margin-top: 14px; font-size: 13px;
+                 color: #888; text-decoration: none; }
+        .skip:hover { color: #555; }
+    </style>
+</head>
+<body>
+<div class="box">
+    <h1>Setup Inicial - SMCR</h1>
+    <p class="sub">✔ Wi-Fi conectado com sucesso!</p>
+
+    <label for="cloudUrl">URL do servidor SMCR Cloud:</label>
+    <input type="text" id="cloudUrl" value="smcr.pensenet.com.br"
+           placeholder="smcr.pensenet.com.br">
+
+    <button class="btn" id="btnFetch" onclick="fetchFiles()">
+        ☁ Baixar arquivos HTML do servidor cloud
+    </button>
+
+    <div class="status info" id="statusBox" style="display:none;"></div>
+
+    <a href="/arquivos/littlefs" class="skip">Pular este passo (fazer upload manual dos arquivos)</a>
+</div>
+<script>
+    let polling = null;
+
+    async function fetchFiles() {
+        const url = document.getElementById('cloudUrl').value.trim();
+        if (!url) { showStatus('Informe a URL do servidor cloud.', 'err'); return; }
+
+        const btn = document.getElementById('btnFetch');
+        btn.disabled = true;
+        btn.textContent = 'Iniciando...';
+        showStatus('Conectando ao servidor cloud...', 'info');
+
+        try {
+            const r = await fetch('/api/fetch_cloud_files', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'cloud_url=' + encodeURIComponent(url)
+            });
+            const d = await r.json();
+            if (!d.ok) { showStatus('Erro: ' + d.error, 'err'); btn.disabled = false; btn.textContent = '☁ Baixar arquivos HTML do servidor cloud'; return; }
+            startPolling();
+        } catch(e) {
+            showStatus('Erro de comunicação: ' + e.message, 'err');
+            btn.disabled = false;
+            btn.textContent = '☁ Baixar arquivos HTML do servidor cloud';
+        }
+    }
+
+    function startPolling() {
+        polling = setInterval(async () => {
+            try {
+                const r = await fetch('/api/fetch_cloud_files_status');
+                const d = await r.json();
+                showStatus(d.status, d.done ? (d.error ? 'err' : 'ok') : 'info');
+                if (d.done) {
+                    clearInterval(polling);
+                    if (!d.error) {
+                        showStatus(d.status + '<br><strong>Redirecionando para o dashboard...</strong>', 'ok');
+                        setTimeout(() => window.location.href = '/', 2000);
+                    } else {
+                        document.getElementById('btnFetch').disabled = false;
+                        document.getElementById('btnFetch').textContent = '☁ Baixar arquivos HTML do servidor cloud';
+                    }
+                }
+            } catch(e) { /* ignora falha pontual de polling */ }
+        }, 800);
+    }
+
+    function showStatus(msg, type) {
+        const el = document.getElementById('statusBox');
+        el.innerHTML = msg;
+        el.className = 'status ' + type;
+        el.style.display = 'block';
+    }
+</script>
+</body>
+</html>
+)rawliteral";
+
 #endif

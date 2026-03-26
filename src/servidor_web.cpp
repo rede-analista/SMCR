@@ -79,12 +79,16 @@ void fV_setupWebServer() {
     }
     SERVIDOR_WEB_ASYNC = new AsyncWebServer(vSt_mainConfig.vU16_webServerPort);
 
-    // Rota da página principal (Dashboard ou Configuração Inicial)
+    // Rota da página principal (Dashboard, Configuração Inicial ou Setup de Arquivos)
     SERVIDOR_WEB_ASYNC->on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
          // Se nao estiver conectado, envia a pagina de configuracao inicial (AP)
          if (WiFi.status() != WL_CONNECTED) {
              fV_printSerialDebug(LOG_WEB, "Servindo pagina de CONFIGURACAO INICIAL...");
              request->send(200, "text/html", web_config_html);
+         } else if (!LittleFS.exists("/web_dashboard.html")) {
+             // WiFi conectado mas LittleFS sem arquivos HTML — setup inicial
+             fV_printSerialDebug(LOG_WEB, "Servindo pagina de SETUP DE ARQUIVOS...");
+             request->send(200, "text/html", web_setup_files_html);
          } else {
              // Verifica se o dashboard requer autenticação
              if (vSt_mainConfig.vB_authEnabled && vSt_mainConfig.vB_dashboardAuthRequired) {
@@ -110,6 +114,28 @@ void fV_setupWebServer() {
 
     // CORREÇÃO: Rota para salvar a configuracao inicial usa HTTP_POST e chama o handler
     SERVIDOR_WEB_ASYNC->on("/save_config", HTTP_POST, fV_handleSaveConfig);
+
+    // Rota: iniciar download de arquivos HTML da SMCR Cloud
+    SERVIDOR_WEB_ASYNC->on("/api/fetch_cloud_files", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (!request->hasArg("cloud_url") || request->arg("cloud_url").isEmpty()) {
+            request->send(400, "application/json", "{\"ok\":false,\"error\":\"cloud_url obrigatorio\"}");
+            return;
+        }
+        vS_fetchCloudFilesUrl    = request->arg("cloud_url");
+        vB_pendingFetchCloudFiles = true;
+        request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    // Rota: status do download de arquivos da cloud
+    SERVIDOR_WEB_ASYNC->on("/api/fetch_cloud_files_status", HTTP_GET, [](AsyncWebServerRequest *request) {
+        extern bool vB_fetchDone;
+        extern bool vB_fetchError;
+        String status = fS_getFetchCloudFilesStatus();
+        String json = "{\"status\":\"" + status + "\",\"done\":" +
+                      (vB_fetchDone  ? "true" : "false") + ",\"error\":" +
+                      (vB_fetchError ? "true" : "false") + "}";
+        request->send(200, "application/json", json);
+    });
 
     // Rota para APLICAR configurações (running-config) - sem salvar na flash
     SERVIDOR_WEB_ASYNC->on("/apply_config", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -772,7 +798,14 @@ void fV_setupWebServer() {
         doc["ap_ssid"] = vSt_mainConfig.vS_apSsid;
         doc["ap_pass"] = vSt_mainConfig.vS_apPass;
         doc["ap_fallback_enabled"] = vSt_mainConfig.vB_apFallbackEnabled;
-        
+
+        // Configurações SMCR Cloud
+        doc["cloud_url"] = vSt_mainConfig.vS_cloudUrl;
+        doc["cloud_sync_enabled"] = vSt_mainConfig.vB_cloudSyncEnabled;
+        doc["cloud_sync_interval_min"] = vSt_mainConfig.vU16_cloudSyncIntervalMin;
+        doc["cloud_api_token"] = vSt_mainConfig.vS_cloudApiToken;
+        doc["cloud_sync_status"] = fS_getCloudSyncStatus();
+
         String response;
         serializeJson(doc, response);
         
@@ -855,8 +888,13 @@ void fV_setupWebServer() {
             module["online"] = vA_interModConfigs[i].online;
             module["falhas_consecutivas"] = vA_interModConfigs[i].falhas_consecutivas;
             module["ultimo_healthcheck"] = vA_interModConfigs[i].ultimo_healthcheck;
-            module["auto_descoberto"] = vA_interModConfigs[i].auto_descoberto;
-            module["pins_alerta"] = vA_interModConfigs[i].pins_alerta;
+            module["auto_descoberto"]           = vA_interModConfigs[i].auto_descoberto;
+            module["pins_offline"]              = vA_interModConfigs[i].pins_offline;
+            module["offline_alert_enabled"]     = vA_interModConfigs[i].offline_alert_enabled;
+            module["offline_flash_ms"]          = vA_interModConfigs[i].offline_flash_ms;
+            module["pins_healthcheck"]          = vA_interModConfigs[i].pins_healthcheck;
+            module["healthcheck_alert_enabled"] = vA_interModConfigs[i].healthcheck_alert_enabled;
+            module["healthcheck_flash_ms"]      = vA_interModConfigs[i].healthcheck_flash_ms;
         }
         
         String response;
@@ -883,8 +921,13 @@ void fV_setupWebServer() {
         newModule.hostname = request->arg("moduleHostname");
         newModule.ip = request->arg("moduleIp");
         newModule.porta = request->arg("modulePort").toInt();
-        newModule.auto_descoberto = false;
-        newModule.pins_alerta = request->hasArg("pinsAlerta") ? request->arg("pinsAlerta") : "";
+        newModule.auto_descoberto           = false;
+        newModule.pins_offline              = request->hasArg("pinsOffline")            ? request->arg("pinsOffline")            : "";
+        newModule.offline_alert_enabled     = request->hasArg("offlineAlertEnabled")    && request->arg("offlineAlertEnabled") == "1";
+        newModule.offline_flash_ms          = request->hasArg("offlineFlashMs")         ? request->arg("offlineFlashMs").toInt() : 200;
+        newModule.pins_healthcheck          = request->hasArg("pinsHealthcheck")        ? request->arg("pinsHealthcheck")        : "";
+        newModule.healthcheck_alert_enabled = request->hasArg("healthcheckAlertEnabled") && request->arg("healthcheckAlertEnabled") == "1";
+        newModule.healthcheck_flash_ms      = request->hasArg("healthcheckFlashMs")     ? request->arg("healthcheckFlashMs").toInt() : 500;
         
         int index = fI_addInterModConfig(newModule);
         if (index >= 0) {
@@ -996,10 +1039,15 @@ void fV_setupWebServer() {
             return;
         }
 
-        if (request->hasArg("moduleHostname")) vA_interModConfigs[index].hostname = request->arg("moduleHostname");
-        if (request->hasArg("moduleIp"))       vA_interModConfigs[index].ip       = request->arg("moduleIp");
-        if (request->hasArg("modulePort"))     vA_interModConfigs[index].porta     = request->arg("modulePort").toInt();
-        if (request->hasArg("pinsAlerta"))     vA_interModConfigs[index].pins_alerta = request->arg("pinsAlerta");
+        if (request->hasArg("moduleHostname"))        vA_interModConfigs[index].hostname               = request->arg("moduleHostname");
+        if (request->hasArg("moduleIp"))              vA_interModConfigs[index].ip                     = request->arg("moduleIp");
+        if (request->hasArg("modulePort"))            vA_interModConfigs[index].porta                  = request->arg("modulePort").toInt();
+        if (request->hasArg("pinsOffline"))           vA_interModConfigs[index].pins_offline            = request->arg("pinsOffline");
+        if (request->hasArg("offlineAlertEnabled"))   vA_interModConfigs[index].offline_alert_enabled   = request->arg("offlineAlertEnabled") == "1";
+        if (request->hasArg("offlineFlashMs"))        vA_interModConfigs[index].offline_flash_ms        = request->arg("offlineFlashMs").toInt();
+        if (request->hasArg("pinsHealthcheck"))       vA_interModConfigs[index].pins_healthcheck        = request->arg("pinsHealthcheck");
+        if (request->hasArg("healthcheckAlertEnabled")) vA_interModConfigs[index].healthcheck_alert_enabled = request->arg("healthcheckAlertEnabled") == "1";
+        if (request->hasArg("healthcheckFlashMs"))    vA_interModConfigs[index].healthcheck_flash_ms    = request->arg("healthcheckFlashMs").toInt();
 
         fB_saveInterModConfigs();
         request->send(200, "application/json", "{\"success\": true}");
@@ -1229,6 +1277,31 @@ void fV_setupWebServer() {
             }
         }
         servePageWithFallback(request, "/web_assistentes.html", web_assistentes_html);
+    });
+
+    // Página SMCR Cloud
+    SERVIDOR_WEB_ASYNC->on("/cloud", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        if (LittleFS.exists("/web_cloud.html")) {
+            request->send(LittleFS, "/web_cloud.html", "text/html");
+        } else {
+            request->send(404, "text/plain", "Pagina nao encontrada. Envie web_cloud.html via LittleFS.");
+        }
+    });
+
+    // API: Forçar sync com a cloud SMCR
+    SERVIDOR_WEB_ASYNC->on("/api/cloud/sync", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        vB_pendingCloudSync = true;
+        request->send(200, "application/json", "{\"success\":true,\"message\":\"Sync agendado\"}");
     });
     
     // API: Obter configurações de assistentes
@@ -1485,7 +1558,23 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
         
         vSt_mainConfig.vB_apFallbackEnabled = request->hasArg("ap_fallback_enabled") && request->arg("ap_fallback_enabled") != "0";
         fV_printSerialDebug(LOG_WEB, "[CONFIG] ap_fallback_enabled = %d", vSt_mainConfig.vB_apFallbackEnabled);
-        
+
+        // SMCR Cloud
+        if (request->hasArg("cloud_url")) {
+            vSt_mainConfig.vS_cloudUrl = request->arg("cloud_url");
+            fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_url = %s", vSt_mainConfig.vS_cloudUrl.c_str());
+        }
+        vSt_mainConfig.vB_cloudSyncEnabled = request->hasArg("cloud_sync_enabled") && request->arg("cloud_sync_enabled") != "0";
+        fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_sync_enabled = %d", vSt_mainConfig.vB_cloudSyncEnabled);
+        if (request->hasArg("cloud_sync_interval_min")) {
+            vSt_mainConfig.vU16_cloudSyncIntervalMin = request->arg("cloud_sync_interval_min").toInt();
+            fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_sync_interval_min = %d", vSt_mainConfig.vU16_cloudSyncIntervalMin);
+        }
+        if (request->hasArg("cloud_api_token") && request->arg("cloud_api_token").length() > 0) {
+            vSt_mainConfig.vS_cloudApiToken = request->arg("cloud_api_token");
+            fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_api_token atualizado");
+        }
+
         fV_printSerialDebug(LOG_WEB, "Configuracoes avancadas completas recebidas via POST.");
     }
     

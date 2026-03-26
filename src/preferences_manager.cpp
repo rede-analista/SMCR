@@ -121,6 +121,12 @@ const char* KEY_TELEGRAM_TOKEN = "tg_token";
 const char* KEY_TELEGRAM_CHATID = "tg_chatid";
 const char* KEY_TELEGRAM_INTERVAL = "tg_intval";
 
+// Chaves SMCR Cloud
+const char* KEY_CLOUD_URL = "cloud_url";
+const char* KEY_CLOUD_SYNC_EN = "cloud_sync_en";
+const char* KEY_CLOUD_SYNC_INT = "cloud_sint";
+const char* KEY_CLOUD_API_TOKEN = "cloud_token";
+
 void fV_carregarMainConfig(void) {
 
     preferences.begin(NVS_NAMESPACE_MAIN_CONFIG, true); // Abre para leitura
@@ -198,6 +204,12 @@ void fV_carregarMainConfig(void) {
     vSt_mainConfig.vS_telegramToken = preferences.getString(KEY_TELEGRAM_TOKEN, "");
     vSt_mainConfig.vS_telegramChatId = preferences.getString(KEY_TELEGRAM_CHATID, "");
     vSt_mainConfig.vU16_telegramCheckInterval = preferences.getUInt(KEY_TELEGRAM_INTERVAL, 30); // 30 segundos
+
+    // 14. Configurações SMCR Cloud
+    vSt_mainConfig.vS_cloudUrl = preferences.getString(KEY_CLOUD_URL, "smcr.pensenet.com.br");
+    vSt_mainConfig.vB_cloudSyncEnabled = preferences.getBool(KEY_CLOUD_SYNC_EN, false); // Padrão desabilitado
+    vSt_mainConfig.vU16_cloudSyncIntervalMin = preferences.getUInt(KEY_CLOUD_SYNC_INT, 5); // 5 minutos
+    vSt_mainConfig.vS_cloudApiToken = preferences.getString(KEY_CLOUD_API_TOKEN, "");
 
     preferences.end();
 
@@ -288,6 +300,12 @@ void fV_salvarMainConfig(void) {
     preferences.putString(KEY_TELEGRAM_TOKEN, vSt_mainConfig.vS_telegramToken);
     preferences.putString(KEY_TELEGRAM_CHATID, vSt_mainConfig.vS_telegramChatId);
     preferences.putUInt(KEY_TELEGRAM_INTERVAL, vSt_mainConfig.vU16_telegramCheckInterval);
+
+    // 14. Configurações SMCR Cloud
+    preferences.putString(KEY_CLOUD_URL, vSt_mainConfig.vS_cloudUrl);
+    preferences.putBool(KEY_CLOUD_SYNC_EN, vSt_mainConfig.vB_cloudSyncEnabled);
+    preferences.putUInt(KEY_CLOUD_SYNC_INT, vSt_mainConfig.vU16_cloudSyncIntervalMin);
+    preferences.putString(KEY_CLOUD_API_TOKEN, vSt_mainConfig.vS_cloudApiToken);
 
     preferences.end();
 

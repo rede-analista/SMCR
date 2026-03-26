@@ -275,6 +275,7 @@
                     <a href="/mqtt" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">MQTT</a>
                     <a href="/intermod" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Inter-Módulos</a>
                     <a href="/assistentes" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Assistentes</a>
+                    <a href="/cloud" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">SMCR Cloud</a>
                 </div>
             </details>
             <details style="position:relative;">
@@ -370,11 +371,31 @@
                             <label for="editModulePort">Porta:</label>
                             <input type="number" id="editModulePort" name="modulePort" min="1" max="65535" required>
                         </div>
-                        <div class="form-group">
-                            <label for="editPinsAlerta">GPIOs de Alerta (offline/HealthCheck):</label>
-                            <input type="text" id="editPinsAlerta" name="pinsAlerta"
-                                   placeholder="Ex: 2,4,5 (separe por vírgula)">
-                            <small style="color:#666">Pinos locais que piscam relaciodanos ao módulo remoto</small>
+                        <div class="form-group" style="border:1px solid #f6a623;border-radius:6px;padding:12px;margin-top:8px;">
+                            <label style="font-weight:bold;color:#c47a00;">🔴 Alerta de Offline</label>
+                            <label style="display:flex;align-items:center;gap:8px;margin:8px 0;">
+                                <input type="checkbox" id="editOfflineAlertEnabled" name="offlineAlertEnabled" value="1">
+                                Habilitar piscar quando módulo ficar offline
+                            </label>
+                            <label for="editPinsOffline">GPIOs que piscam (offline):</label>
+                            <input type="text" id="editPinsOffline" name="pinsOffline"
+                                   placeholder="Ex: 2,4 (separe por vírgula)">
+                            <label for="editOfflineFlashMs" style="margin-top:6px;">Intervalo de piscada offline (ms):</label>
+                            <input type="number" id="editOfflineFlashMs" name="offlineFlashMs"
+                                   min="50" max="5000" value="500">
+                        </div>
+                        <div class="form-group" style="border:1px solid #667eea;border-radius:6px;padding:12px;margin-top:8px;">
+                            <label style="font-weight:bold;color:#667eea;">🔵 Alerta de HealthCheck</label>
+                            <label style="display:flex;align-items:center;gap:8px;margin:8px 0;">
+                                <input type="checkbox" id="editHealthcheckAlertEnabled" name="healthcheckAlertEnabled" value="1">
+                                Habilitar piscar durante healthcheck
+                            </label>
+                            <label for="editPinsHealthcheck">GPIOs que piscam (healthcheck):</label>
+                            <input type="text" id="editPinsHealthcheck" name="pinsHealthcheck"
+                                   placeholder="Ex: 5 (separe por vírgula)">
+                            <label for="editHealthcheckFlashMs" style="margin-top:6px;">Intervalo de piscada healthcheck (ms):</label>
+                            <input type="number" id="editHealthcheckFlashMs" name="healthcheckFlashMs"
+                                   min="50" max="5000" value="200">
                         </div>
                         <button type="submit" class="btn btn-success">💾 Salvar</button>
                         <button type="button" class="btn btn-secondary" onclick="hideEditModuleForm()">✖️ Cancelar</button>
@@ -409,11 +430,31 @@
                                    min="1" max="65535" value="8080" required>
                         </div>
 
-                        <div class="form-group">
-                            <label for="pinsAlerta">GPIOs de Alerta (offline):</label>
-                            <input type="text" id="pinsAlerta" name="pinsAlerta"
-                                   placeholder="Ex: 2,4,5 (separe por vírgula)">
-                            <small style="color:#666">Pinos locais que piscam quando este módulo ficar offline</small>
+                        <div class="form-group" style="border:1px solid #f6a623;border-radius:6px;padding:12px;margin-top:8px;">
+                            <label style="font-weight:bold;color:#c47a00;">🔴 Alerta de Offline</label>
+                            <label style="display:flex;align-items:center;gap:8px;margin:8px 0;">
+                                <input type="checkbox" id="offlineAlertEnabled" name="offlineAlertEnabled" value="1">
+                                Habilitar piscar quando módulo ficar offline
+                            </label>
+                            <label for="pinsOffline">GPIOs que piscam (offline):</label>
+                            <input type="text" id="pinsOffline" name="pinsOffline"
+                                   placeholder="Ex: 2,4 (separe por vírgula)">
+                            <label for="offlineFlashMs" style="margin-top:6px;">Intervalo de piscada offline (ms):</label>
+                            <input type="number" id="offlineFlashMs" name="offlineFlashMs"
+                                   min="50" max="5000" value="500">
+                        </div>
+                        <div class="form-group" style="border:1px solid #667eea;border-radius:6px;padding:12px;margin-top:8px;">
+                            <label style="font-weight:bold;color:#667eea;">🔵 Alerta de HealthCheck</label>
+                            <label style="display:flex;align-items:center;gap:8px;margin:8px 0;">
+                                <input type="checkbox" id="healthcheckAlertEnabled" name="healthcheckAlertEnabled" value="1">
+                                Habilitar piscar durante healthcheck
+                            </label>
+                            <label for="pinsHealthcheck">GPIOs que piscam (healthcheck):</label>
+                            <input type="text" id="pinsHealthcheck" name="pinsHealthcheck"
+                                   placeholder="Ex: 5 (separe por vírgula)">
+                            <label for="healthcheckFlashMs" style="margin-top:6px;">Intervalo de piscada healthcheck (ms):</label>
+                            <input type="number" id="healthcheckFlashMs" name="healthcheckFlashMs"
+                                   min="50" max="5000" value="200">
                         </div>
 
                         <button type="submit" class="btn btn-success">✔️ Adicionar</button>
@@ -571,16 +612,17 @@
                 html += '<th>Último Check</th>';
                 html += '<th>Origem</th>';
                 html += '<th>GPIOs Alerta</th>';
+                html += '<th>GPIOs Healthcheck</th>';
                 html += '<th>Ações</th>';
                 html += '</tr></thead><tbody>';
 
                 data.modules.forEach(module => {
-                    const statusClass = module.online ? 'status-online' : 
+                    const statusClass = module.online ? 'status-online' :
                                       (module.online === false ? 'status-offline' : 'status-unknown');
-                    const statusText = module.online ? '🟢 Online' : 
+                    const statusText = module.online ? '🟢 Online' :
                                      (module.online === false ? '🔴 Offline' : '⚪ Desconhecido');
-                    const lastCheck = module.ultimo_healthcheck > 0 ? 
-                                    new Date(module.ultimo_healthcheck).toLocaleString('pt-BR') : 
+                    const lastCheck = module.ultimo_healthcheck > 0 ?
+                                    new Date(module.ultimo_healthcheck).toLocaleString('pt-BR') :
                                     'Nunca';
                     const origem = module.auto_descoberto ? '🔍 Auto' : '✍️ Manual';
 
@@ -591,8 +633,10 @@
                     html += `<td><span class="status-badge ${statusClass}">${statusText}</span></td>`;
                     html += `<td>${lastCheck}</td>`;
                     html += `<td>${origem}</td>`;
-                    const alertPins = module.pins_alerta && module.pins_alerta.length > 0 ? escapeHtml(module.pins_alerta) : '<span style="color:#aaa">—</span>';
+                    const alertPins = module.pins_offline && module.pins_offline.length > 0 ? escapeHtml(module.pins_offline) : '<span style="color:#aaa">—</span>';
                     html += `<td>${alertPins}</td>`;
+                    const hcPins = module.pins_healthcheck && module.pins_healthcheck.length > 0 ? escapeHtml(module.pins_healthcheck) : '<span style="color:#aaa">—</span>';
+                    html += `<td>${hcPins}</td>`;
                     html += `<td>
                         <button class="btn action-btn btn-secondary" onclick="testModule('${escapeHtml(module.id)}')">🔍 Testar</button>
                         <button class="btn action-btn btn-success" onclick="syncModule('${escapeHtml(module.id)}')">🔄 Sincronizar</button>
@@ -639,7 +683,12 @@
             document.getElementById('editModuleHostname').value = module.hostname;
             document.getElementById('editModuleIp').value = module.ip;
             document.getElementById('editModulePort').value = module.porta;
-            document.getElementById('editPinsAlerta').value = module.pins_alerta || '';
+            document.getElementById('editPinsOffline').value = module.pins_offline || '';
+            document.getElementById('editOfflineAlertEnabled').checked = !!module.offline_alert_enabled;
+            document.getElementById('editOfflineFlashMs').value = module.offline_flash_ms || 200;
+            document.getElementById('editPinsHealthcheck').value = module.pins_healthcheck || '';
+            document.getElementById('editHealthcheckAlertEnabled').checked = !!module.healthcheck_alert_enabled;
+            document.getElementById('editHealthcheckFlashMs').value = module.healthcheck_flash_ms || 500;
             document.getElementById('editModuleForm').style.display = 'block';
             document.getElementById('addModuleForm').style.display = 'none';
             document.getElementById('editModuleForm').scrollIntoView({ behavior: 'smooth' });
@@ -656,6 +705,9 @@
             showLoading(true);
 
             const formData = new FormData(this);
+            // Garante envio explícito dos checkboxes (não enviados pelo FormData quando desmarcados)
+            formData.set('offlineAlertEnabled',     document.getElementById('editOfflineAlertEnabled').checked     ? '1' : '0');
+            formData.set('healthcheckAlertEnabled', document.getElementById('editHealthcheckAlertEnabled').checked ? '1' : '0');
 
             try {
                 const response = await fetch('/api/intermod/modules/update', {
@@ -685,6 +737,9 @@
             showLoading(true);
 
             const formData = new FormData(this);
+            // Garante envio explícito dos checkboxes
+            formData.set('offlineAlertEnabled',     document.getElementById('offlineAlertEnabled').checked     ? '1' : '0');
+            formData.set('healthcheckAlertEnabled', document.getElementById('healthcheckAlertEnabled').checked ? '1' : '0');
 
             try {
                 const response = await fetch('/api/intermod/modules/add', {

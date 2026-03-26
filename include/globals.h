@@ -125,6 +125,12 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
     String vS_telegramChatId;       // Chat ID do destinatário
     uint16_t vU16_telegramCheckInterval; // Intervalo de verificação de mensagens em segundos (padrão 30)
 
+    // 14. Configurações SMCR Cloud
+    String vS_cloudUrl;                  // URL da cloud SMCR (padrão: smcr.pensenet.com.br)
+    bool vB_cloudSyncEnabled;            // Habilita busca periódica de configurações na cloud
+    uint16_t vU16_cloudSyncIntervalMin;  // Intervalo de sync em minutos (padrão 5)
+    String vS_cloudApiToken;             // Token API para autenticação na cloud
+
 };
 
 // --- Estrutura para Configuração de Pinos ---
@@ -180,7 +186,19 @@ struct InterModConfig_t {
     uint8_t falhas_consecutivas; // Contador de falhas de healthcheck
     unsigned long ultimo_healthcheck; // Timestamp do último healthcheck bem-sucedido
     bool auto_descoberto;        // Se foi descoberto via mDNS ou cadastrado manualmente
-    String pins_alerta;          // GPIOs locais de alerta, separados por vírgula (ex: "3,4,5")
+    // Alerta de offline
+    String pins_offline;              // GPIOs que piscam quando módulo fica offline (ex: "3,4")
+    bool offline_alert_enabled;       // Habilitar piscar ao ficar offline
+    uint16_t offline_flash_ms;        // Intervalo de piscada offline em ms (padrão 500)
+    // Alerta de healthcheck
+    String pins_healthcheck;          // GPIOs que piscam durante healthcheck (ex: "5")
+    bool healthcheck_alert_enabled;   // Habilitar piscar durante healthcheck
+    uint16_t healthcheck_flash_ms;    // Intervalo de piscada healthcheck em ms (padrão 200)
+    // Controle de flash em runtime (não salvo)
+    unsigned long ultimo_offline_flash;   // Timestamp do último toggle offline
+    bool offline_flash_state;             // Estado atual do flash offline
+    unsigned long ultimo_hc_flash;        // Timestamp do último toggle healthcheck
+    bool hc_flash_state;                  // Estado atual do flash healthcheck
 };
 
 // --- Estrutura para Log de Comunicações Inter-Módulos ---
@@ -330,6 +348,15 @@ bool fB_isPinUsedByActions(uint16_t pinNumber); // Verifica se pino está em uso
 void fV_executeActionsTask(void); // Task periódica para execução de ações
 void fV_executeAction(uint8_t actionIndex); // Executa uma ação específica
 void fV_syncRemotePinsOnBoot(void); // Sincroniza todos os pinos remotos após inicialização
+
+/* Funções do SMCR Cloud (cloud_sync.cpp) */
+void fV_cloudSyncTask(void);               // Executa sincronização com a cloud SMCR
+String fS_getCloudSyncStatus(void);        // Retorna último status de sync
+extern bool vB_pendingCloudSync;           // Flag para forçar sync imediato
+void fV_fetchCloudFilesTask(void);         // Baixa arquivos HTML da cloud para LittleFS
+String fS_getFetchCloudFilesStatus(void);  // Retorna status do download
+extern bool vB_pendingFetchCloudFiles;     // Flag para iniciar download
+extern String vS_fetchCloudFilesUrl;       // URL do servidor para download
 
 /* Funções do Gerenciador de Telegram (telegram_manager.cpp) */
 void fV_initTelegram(void);
