@@ -801,10 +801,14 @@ void fV_setupWebServer() {
 
         // Configurações SMCR Cloud
         doc["cloud_url"] = vSt_mainConfig.vS_cloudUrl;
+        doc["cloud_port"] = vSt_mainConfig.vU16_cloudPort;
         doc["cloud_sync_enabled"] = vSt_mainConfig.vB_cloudSyncEnabled;
         doc["cloud_sync_interval_min"] = vSt_mainConfig.vU16_cloudSyncIntervalMin;
         doc["cloud_api_token"] = vSt_mainConfig.vS_cloudApiToken;
+        doc["cloud_heartbeat_enabled"] = vSt_mainConfig.vB_cloudHeartbeatEnabled;
+        doc["cloud_heartbeat_interval_min"] = vSt_mainConfig.vU16_cloudHeartbeatIntervalMin;
         doc["cloud_sync_status"] = fS_getCloudSyncStatus();
+        doc["cloud_heartbeat_status"] = fS_getCloudHeartbeatStatus();
 
         String response;
         serializeJson(doc, response);
@@ -1564,6 +1568,10 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
             vSt_mainConfig.vS_cloudUrl = request->arg("cloud_url");
             fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_url = %s", vSt_mainConfig.vS_cloudUrl.c_str());
         }
+        if (request->hasArg("cloud_port")) {
+            vSt_mainConfig.vU16_cloudPort = request->arg("cloud_port").toInt();
+            fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_port = %d", vSt_mainConfig.vU16_cloudPort);
+        }
         vSt_mainConfig.vB_cloudSyncEnabled = request->hasArg("cloud_sync_enabled") && request->arg("cloud_sync_enabled") != "0";
         fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_sync_enabled = %d", vSt_mainConfig.vB_cloudSyncEnabled);
         if (request->hasArg("cloud_sync_interval_min")) {
@@ -1573,6 +1581,12 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
         if (request->hasArg("cloud_api_token") && request->arg("cloud_api_token").length() > 0) {
             vSt_mainConfig.vS_cloudApiToken = request->arg("cloud_api_token");
             fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_api_token atualizado");
+        }
+        vSt_mainConfig.vB_cloudHeartbeatEnabled = request->hasArg("cloud_heartbeat_enabled") && request->arg("cloud_heartbeat_enabled") != "0";
+        fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_heartbeat_enabled = %d", vSt_mainConfig.vB_cloudHeartbeatEnabled);
+        if (request->hasArg("cloud_heartbeat_interval_min")) {
+            vSt_mainConfig.vU16_cloudHeartbeatIntervalMin = request->arg("cloud_heartbeat_interval_min").toInt();
+            fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_heartbeat_interval_min = %d", vSt_mainConfig.vU16_cloudHeartbeatIntervalMin);
         }
 
         fV_printSerialDebug(LOG_WEB, "Configuracoes avancadas completas recebidas via POST.");

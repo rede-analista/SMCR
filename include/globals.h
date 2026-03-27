@@ -127,9 +127,12 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
 
     // 14. Configurações SMCR Cloud
     String vS_cloudUrl;                  // URL da cloud SMCR (padrão: smcr.pensenet.com.br)
+    uint16_t vU16_cloudPort;             // Porta HTTP da cloud (padrão: 8765)
     bool vB_cloudSyncEnabled;            // Habilita busca periódica de configurações na cloud
     uint16_t vU16_cloudSyncIntervalMin;  // Intervalo de sync em minutos (padrão 5)
     String vS_cloudApiToken;             // Token API para autenticação na cloud
+    bool vB_cloudHeartbeatEnabled;       // Habilita envio periódico de heartbeat para a cloud
+    uint16_t vU16_cloudHeartbeatIntervalMin; // Intervalo do heartbeat em minutos (padrão 2)
 
 };
 
@@ -357,6 +360,8 @@ void fV_fetchCloudFilesTask(void);         // Baixa arquivos HTML da cloud para 
 String fS_getFetchCloudFilesStatus(void);  // Retorna status do download
 extern bool vB_pendingFetchCloudFiles;     // Flag para iniciar download
 extern String vS_fetchCloudFilesUrl;       // URL do servidor para download
+void fV_cloudHeartbeatTask(void);          // Envia heartbeat de status para a cloud SMCR
+String fS_getCloudHeartbeatStatus(void);   // Retorna último status do heartbeat
 
 /* Funções do Gerenciador de Telegram (telegram_manager.cpp) */
 void fV_initTelegram(void);

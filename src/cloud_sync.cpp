@@ -11,6 +11,22 @@ static String vS_cloudSyncStatus = "Nunca sincronizado";
 bool vB_pendingFetchCloudFiles = false;
 String vS_fetchCloudFilesUrl   = "smcr.pensenet.com.br";
 static String vS_fetchStatus = "Aguardando";
+
+// ── Heartbeat ─────────────────────────────────────────────────────────────────
+static String vS_heartbeatStatus = "Nunca enviado";
+
+String fS_getCloudHeartbeatStatus(void) {
+    return vS_heartbeatStatus;
+}
+
+// Monta base URL com porta: http://host:porta
+static String fS_cloudBaseUrl(void) {
+    String base = "http://" + vSt_mainConfig.vS_cloudUrl;
+    if (vSt_mainConfig.vU16_cloudPort > 0 && vSt_mainConfig.vU16_cloudPort != 80) {
+        base += ":" + String(vSt_mainConfig.vU16_cloudPort);
+    }
+    return base;
+}
 bool vB_fetchDone  = false;
 bool vB_fetchError = false;
 
@@ -60,7 +76,7 @@ void fV_cloudSyncTask(void) {
         return;
     }
 
-    String url = "http://" + vSt_mainConfig.vS_cloudUrl + "/api/get_config.php";
+    String url = fS_cloudBaseUrl() + "/api/get_config.php";
     if (vSt_mainConfig.vS_cloudApiToken.length() > 0)
         url += "?token=" + vSt_mainConfig.vS_cloudApiToken;
 
@@ -286,7 +302,7 @@ void fV_fetchCloudFilesTask(void) {
         return;
     }
 
-    String listUrl = "http://" + vS_fetchCloudFilesUrl + "/api/get_web_files.php";
+    String listUrl = "http://" + vS_fetchCloudFilesUrl + ":" + String(vSt_mainConfig.vU16_cloudPort) + "/api/get_web_files.php";
     fV_printSerialDebug(LOG_NETWORK, "[FETCH] Buscando lista: %s", listUrl.c_str());
 
     HTTPClient http;
@@ -331,7 +347,7 @@ void fV_fetchCloudFilesTask(void) {
 
     for (JsonVariant fv : files) {
         String filename = fv.as<String>();
-        String fileUrl  = "http://" + vS_fetchCloudFilesUrl + "/api/get_web_files.php?file=" + filename;
+        String fileUrl  = "http://" + vS_fetchCloudFilesUrl + ":" + String(vSt_mainConfig.vU16_cloudPort) + "/api/get_web_files.php?file=" + filename;
         vS_fetchStatus  = "Baixando " + filename + " (" + String(downloaded + errors + 1) + "/" + String(total) + ")";
         fV_printSerialDebug(LOG_NETWORK, "[FETCH] %s", vS_fetchStatus.c_str());
 
@@ -373,4 +389,58 @@ void fV_fetchCloudFilesTask(void) {
     }
     vB_fetchDone = true;
     fV_printSerialDebug(LOG_NETWORK, "[FETCH] %s", vS_fetchStatus.c_str());
+}
+
+/**
+ * @brief Envia heartbeat de status para o SMCR Cloud HA (POST /api/status.php).
+ * Mantém o dispositivo marcado como online no painel da cloud.
+ * Requer que vS_cloudApiToken esteja configurado (recebido no auto-registro).
+ */
+void fV_cloudHeartbeatTask(void) {
+    if (!vB_wifiIsConnected) {
+        vS_heartbeatStatus = "Erro: sem WiFi";
+        return;
+    }
+    if (vSt_mainConfig.vS_cloudApiToken.length() == 0) {
+        vS_heartbeatStatus = "Erro: token nao configurado";
+        fV_printSerialDebug(LOG_NETWORK, "[HB] Heartbeat abortado: api_token vazio");
+        return;
+    }
+
+    String url = fS_cloudBaseUrl() + "/api/status.php";
+
+    // Monta payload JSON com informações do dispositivo
+    JsonDocument doc;
+    doc["ip"]               = WiFi.localIP().toString();
+    doc["hostname"]         = vSt_mainConfig.vS_hostname;
+    doc["firmware_version"] = FIRMWARE_VERSION;
+    doc["free_heap"]        = ESP.getFreeHeap();
+    doc["uptime_ms"]        = millis();
+    doc["wifi_rssi"]        = WiFi.RSSI();
+
+    String body;
+    serializeJson(doc, body);
+
+    HTTPClient http;
+    http.setTimeout(8000);
+    if (!http.begin(url)) {
+        vS_heartbeatStatus = "Erro: falha ao conectar";
+        fV_printSerialDebug(LOG_NETWORK, "[HB] Falha ao iniciar HTTP: %s", url.c_str());
+        return;
+    }
+
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", "Bearer " + vSt_mainConfig.vS_cloudApiToken);
+
+    int httpCode = http.POST(body);
+    String response = http.getString();
+    http.end();
+
+    if (httpCode == 200) {
+        vS_heartbeatStatus = "OK (" + String(millis() / 1000) + "s uptime)";
+        fV_printSerialDebug(LOG_NETWORK, "[HB] Heartbeat enviado com sucesso");
+    } else {
+        vS_heartbeatStatus = "Erro HTTP: " + String(httpCode);
+        fV_printSerialDebug(LOG_NETWORK, "[HB] Erro heartbeat: HTTP %d", httpCode);
+    }
 }
