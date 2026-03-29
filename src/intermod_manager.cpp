@@ -432,8 +432,17 @@ void fV_interModHealthCheckTask(void) {
     
     vU32_lastHealthCheck = now;
 
-    // Ativa flash de indicação de healthcheck (~1 segundo = 5 piscadas a 200ms)
-    vU32_healthCheckFlashUntil = now + 1000;
+    // Calcula janela de flash: máximo healthcheck_flash_ms entre módulos habilitados × 3
+    // Garante pelo menos 1 ciclo completo visível (mínimo 1000ms)
+    unsigned long vU32_maxFlashMs = 1000;
+    for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+        if (vA_interModConfigs[i].healthcheck_alert_enabled &&
+            vA_interModConfigs[i].pins_healthcheck.length() > 0 &&
+            vA_interModConfigs[i].healthcheck_flash_ms > vU32_maxFlashMs) {
+            vU32_maxFlashMs = vA_interModConfigs[i].healthcheck_flash_ms;
+        }
+    }
+    vU32_healthCheckFlashUntil = now + (vU32_maxFlashMs * 3);
 
     // Executa healthcheck para cada módulo
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
