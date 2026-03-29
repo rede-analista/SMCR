@@ -3,7 +3,6 @@
 #ifndef WEB_LITTLEFS_H
 
 #define WEB_LITTLEFS_H
-
 #include <Arduino.h>
 
 const char web_littlefs_html[] PROGMEM = R"rawliteral(
@@ -202,6 +201,8 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
                 <div style="position:absolute;background:#fff;border:1px solid #e9ecef;box-shadow:0 8px 20px rgba(0,0,0,0.1);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:10;">
                     <a href="/mqtt" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">MQTT</a>
                     <a href="/intermod" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Inter-Módulos</a>
+                    <a href="/assistentes" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">Assistentes</a>
+                    <a href="/cloud" style="text-decoration:none;color:#333;padding:6px 8px;border-radius:4px;">SMCR Cloud</a>
                 </div>
             </details>
             <details style="position:relative;">
@@ -232,6 +233,16 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
             <div id="files-list" class="file-list" style="background: #f8f9fa;border: 1px solid #dee2e6;border-radius: 4px;padding: 15px;margin: 10px 0;">
                 <p style="text-align: center; color: #666;">Carregando arquivos...</p>
             </div>
+            <div style="margin-top:10px;background:#fff3cd;border:1px solid #ffbaba;color:#ff0000;padding:10px;border-radius:4px;font-size:12px;line-height:1.4;">
+                ⚠️ Aviso: Realizar uploads,downloads ou deleções de muitos arquivos em sequência pode aumentar uso de memória e provocar lentidão, travamento ou reinício automático do ESP32. Recomenda-se operar em lotes menores.
+            </div>
+            <div id="multi-actions" style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                <button type="button" class="btn btn-primary" onclick="selectAllFiles(true)">Selecionar Todos</button>
+                <button type="button" class="btn btn-warning" onclick="selectAllFiles(false)">Limpar Seleção</button>
+                <button type="button" class="btn btn-success" onclick="downloadSelectedFiles()">📥 Baixar Selecionados</button>
+                <button type="button" class="btn btn-danger" style="background:#dc3545;color:#fff;" onclick="deleteSelectedFiles()">🗑️ Deletar Selecionados</button>
+                <span id="selected-count" style="font-size:12px;color:#555;">Selecionados: 0</span>
+            </div>
         </div>
 
         <!-- Upload de Arquivos -->
@@ -244,7 +255,6 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
                     <strong>🖱️ Opção 1:</strong> Clique em "Escolher arquivos" e selecione múltiplos arquivos<br>
                     • Use Ctrl+Clique (Windows/Linux) ou Cmd+Clique (Mac) para seleção individual<br>
                     • Use Ctrl+A / Cmd+A para selecionar todos os arquivos de uma pasta<br>
-                    <strong>🎯 Opção 2:</strong> Arraste e solte múltiplos arquivos diretamente nesta área
                 </p>
                 <form id="upload-form" enctype="multipart/form-data">
                     <input type="file" id="file-input" name="file" multiple required>
@@ -265,6 +275,24 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
             </div>
         </div>
 
+        <!-- Buscar arquivos da Cloud -->
+        <div class="section">
+            <div class="section-title">☁️ Buscar Arquivos da Cloud</div>
+            <div class="info-box">
+                <strong>ℹ️ Informação:</strong> Baixa os arquivos HTML diretamente do servidor SMCR Cloud/HA configurado e os salva no LittleFS do ESP32.
+            </div>
+            <div id="cloud-fetch-url" style="margin-bottom:12px;padding:8px 12px;background:#f8f9fa;border:1px solid #dee2e6;border-radius:4px;font-size:13px;color:#555;">
+                Carregando URL da Cloud...
+            </div>
+            <button id="btn-fetch-cloud" onclick="fetchFromCloud()" class="btn btn-primary">☁️ Buscar arquivos da Cloud</button>
+            <div id="cloud-fetch-status" style="margin-top:12px;display:none;">
+                <div style="height:12px;background:#e9ecef;border-radius:6px;overflow:hidden;margin-bottom:6px;">
+                    <div id="cloud-fetch-bar" style="height:100%;width:0%;background:#007bff;transition:width .3s;"></div>
+                </div>
+                <div id="cloud-fetch-msg" style="font-size:12px;color:#555;"></div>
+            </div>
+        </div>
+
         <div id="status" class="status-message"></div>
     </div>
 
@@ -281,6 +309,7 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
         window.addEventListener('load', function() {
             hideLoading();
             loadFilesList();
+            loadCloudConfig();
             
             // Adiciona listener para mostrar contador de arquivos selecionados
             const fileInput = document.getElementById('file-input');
@@ -346,7 +375,8 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
                             const fileDiv = document.createElement('div');
                             fileDiv.style.cssText = 'padding:10px;margin:5px 0;background:white;border:1px solid #ddd;border-radius:4px;display:flex;justify-content:space-between;align-items:center;';
                             fileDiv.innerHTML = `
-                                <div>
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <input type="checkbox" class="file-select" data-name="${file.name}" onchange="updateSelectedCount()" />
                                     <strong>${file.name}</strong>
                                     <span style="margin-left: 10px; color: #666; font-size: 12px;">${formatBytes(file.size)}</span>
                                 </div>
@@ -361,7 +391,8 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
                         const infoDiv = document.createElement('div');
                         infoDiv.style.cssText = 'margin-top: 15px; padding: 10px; background: white; border-radius: 4px; font-size: 12px;';
                         infoDiv.innerHTML = `
-                            <strong>Espaço:</strong> 
+                            <strong>Resumo:</strong> 
+                            Arquivos: ${data.fileCount || data.files.length} | 
                             Usado: ${formatBytes(data.usedBytes)} | 
                             Total: ${formatBytes(data.totalBytes)} | 
                             Livre: ${formatBytes(data.freeBytes)}
@@ -379,6 +410,67 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
 
         function downloadFile(filename) {
             window.location.href = `/api/files/download?filename=${encodeURIComponent(filename)}`;
+        }
+
+        function updateSelectedCount() {
+            const boxes = document.querySelectorAll('.file-select:checked');
+            document.getElementById('selected-count').textContent = `Selecionados: ${boxes.length}`;
+        }
+
+        function selectAllFiles(state) {
+            const boxes = document.querySelectorAll('.file-select');
+            boxes.forEach(b => { b.checked = state; });
+            updateSelectedCount();
+        }
+
+        function downloadSelectedFiles() {
+            const boxes = Array.from(document.querySelectorAll('.file-select:checked'));
+            if (!boxes.length) {
+                showStatus('Nenhum arquivo selecionado para download', 'error');
+                return;
+            }
+            showStatus(`Iniciando download de ${boxes.length} arquivo(s)...`, 'success');
+            let i = 0;
+            function next() {
+                if (i >= boxes.length) {
+                    showStatus('Downloads disparados.', 'success');
+                    return;
+                }
+                const name = boxes[i].getAttribute('data-name');
+                window.open(`/api/files/download?filename=${encodeURIComponent(name)}`, '_blank');
+                i++;
+                setTimeout(next, 300); // pequeno intervalo para evitar saturar
+            }
+            next();
+        }
+
+        function deleteSelectedFiles() {
+            const boxes = Array.from(document.querySelectorAll('.file-select:checked'));
+            if (!boxes.length) {
+                showStatus('Nenhum arquivo selecionado para deletar', 'error');
+                return;
+            }
+            if (!confirm(`Confirmar deleção de ${boxes.length} arquivo(s)? Esta ação é irreversível.`)) {
+                return;
+            }
+            showLoading('Deletando arquivos...');
+            let i = 0; let ok = 0; let fail = 0;
+            function nextDel() {
+                if (i >= boxes.length) {
+                    hideLoading();
+                    showStatus(`Deleção concluída. Sucesso=${ok}, Falhas=${fail}`, fail ? 'error' : 'success');
+                    loadFilesList();
+                    updateSelectedCount();
+                    return;
+                }
+                const name = boxes[i].getAttribute('data-name');
+                const fd = new FormData(); fd.append('filename', name);
+                fetch('/api/files/delete', { method:'POST', body: fd })
+                    .then(r => r.json())
+                    .then(res => { if (res.success) ok++; else fail++; i++; nextDel(); })
+                    .catch(() => { fail++; i++; nextDel(); });
+            }
+            nextDel();
         }
 
         function deleteFile(filename) {
@@ -431,39 +523,117 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
             }
         }
 
-        document.getElementById('upload-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const fileInput = document.getElementById('file-input');
-            
-            if (!fileInput.files.length) {
-                showStatus('Selecione um arquivo', 'error');
-                return;
+        (function(){
+            let cancelRequested = false;
+            let currentXhr = null;
+            const cancelBtn = document.getElementById('cancel-upload-btn');
+            const overall = document.getElementById('upload-overall');
+            const overallBar = document.getElementById('upload-overall-bar');
+            const overallText = document.getElementById('upload-overall-text');
+            const progressDiv = document.getElementById('upload-progress');
+            const fileListUl = document.getElementById('upload-file-list');
+
+            function resetUI(){
+                cancelRequested = false;
+                cancelBtn.style.display = 'none';
+                overall.style.display = 'none';
+                progressDiv.style.display = 'none';
+                fileListUl.style.display = 'none';
+                fileListUl.innerHTML = '';
+                overallBar.style.width = '0%';
+                overallText.textContent = '0%';
             }
-            
-            showLoading('Fazendo upload...');
-            
-            fetch('/api/files/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(result => {
+
+            cancelBtn.addEventListener('click', function(){
+                cancelRequested = true;
+                if (currentXhr) currentXhr.abort();
                 hideLoading();
-                if (result.success) {
-                    showStatus('Upload realizado com sucesso!', 'success');
-                    fileInput.value = '';
-                    loadFilesList();
-                } else {
-                    showStatus('Erro no upload: ' + (result.message || 'Erro desconhecido'), 'error');
-                }
-            })
-            .catch(error => {
-                hideLoading();
-                showStatus('Erro de comunicação', 'error');
+                showStatus('Upload cancelado pelo usuário', 'error');
+                resetUI();
             });
-        });
+
+            document.getElementById('upload-form').addEventListener('submit', function(e){
+                e.preventDefault();
+                const fileInput = document.getElementById('file-input');
+                const files = fileInput.files;
+                if (!files.length){
+                    showStatus('Selecione pelo menos um arquivo', 'error');
+                    return;
+                }
+                cancelRequested = false;
+                cancelBtn.style.display = 'inline-block';
+                overall.style.display = 'block';
+                progressDiv.style.display = 'block';
+                fileListUl.style.display = 'block';
+                progressDiv.textContent = `Iniciando upload de ${files.length} arquivo(s)...`;
+                fileListUl.innerHTML = '';
+                let totalBytes = 0; for (const f of files) totalBytes += f.size;
+                let uploadedBytes = 0;
+                let currentIndex = 0;
+                showLoading('Enviando arquivos...');
+
+                [...files].forEach((f,i)=>{
+                    const li = document.createElement('li');
+                    li.id = 'upl-file-'+i;
+                    li.style.padding='6px 8px';
+                    li.style.borderBottom='1px solid #eee';
+                    li.innerHTML = `<strong>${f.name}</strong> <span style='color:#666'>(0%)</span>`;
+                    fileListUl.appendChild(li);
+                });
+
+                function updateOverall(){
+                    const percent = totalBytes ? Math.round((uploadedBytes/totalBytes)*100) : 0;
+                    overallBar.style.width = percent + '%';
+                    overallText.textContent = percent + '%';
+                }
+
+                function uploadNext(){
+                    if (cancelRequested){ return; }
+                    if (currentIndex >= files.length){
+                        hideLoading();
+                        showStatus('Uploads concluídos!', 'success');
+                        fileInput.value='';
+                        resetUI();
+                        loadFilesList();
+                        return;
+                    }
+                    const file = files[currentIndex];
+                    progressDiv.textContent = `Enviando (${currentIndex+1}/${files.length}): ${file.name}`;
+                    const xhr = new XMLHttpRequest();
+                    currentXhr = xhr;
+                    xhr.open('POST', '/api/files/upload');
+                    xhr.upload.onprogress = function(ev){
+                        if (ev.lengthComputable){
+                            const percent = Math.round((ev.loaded/ev.total)*100);
+                            const li = document.getElementById('upl-file-'+currentIndex);
+                            if (li){ li.querySelector('span').textContent = `(${percent}%)`; }
+                        }
+                    };
+                    xhr.onload = function(){
+                        if (cancelRequested) return;
+                        uploadedBytes += file.size;
+                        updateOverall();
+                        const li = document.getElementById('upl-file-'+currentIndex);
+                        if (li){ li.querySelector('span').textContent = '(100%) ✅'; }
+                        currentIndex++;
+                        uploadNext();
+                    };
+                    xhr.onerror = function(){
+                        const li = document.getElementById('upl-file-'+currentIndex);
+                        if (li){ li.querySelector('span').textContent = '(erro) ❌'; }
+                        uploadedBytes += file.size; // conta mesmo em erro
+                        updateOverall();
+                        currentIndex++;
+                        uploadNext();
+                    };
+                    const formData = new FormData();
+                    formData.append('file', file, file.name);
+                    xhr.send(formData);
+                }
+                updateOverall();
+                uploadNext();
+            });
+        })();
 
         function formatBytes(bytes) {
             if (bytes === 0) return '0 Bytes';
@@ -488,6 +658,94 @@ const char web_littlefs_html[] PROGMEM = R"rawliteral(
             setTimeout(() => {
                 statusDiv.style.display = 'none';
             }, 5000);
+        }
+
+        // === BUSCAR ARQUIVOS DA CLOUD ===
+        let vS_cloudUrlConfig = '';
+        let fetchCloudPollTimer = null;
+
+        function loadCloudConfig() {
+            fetch('/config/json')
+                .then(r => r.json())
+                .then(function(cfg) {
+                    vS_cloudUrlConfig = cfg.cloud_url || '';
+                    const port = cfg.cloud_port || 80;
+                    const urlBox = document.getElementById('cloud-fetch-url');
+                    if (vS_cloudUrlConfig) {
+                        urlBox.innerHTML = '<strong>Servidor configurado:</strong> ' + escapeHtml(vS_cloudUrlConfig) + ':' + port;
+                        urlBox.style.color = '#333';
+                    } else {
+                        urlBox.innerHTML = '⚠️ URL da Cloud não configurada. Acesse <a href="/cloud">Configurações &gt; SMCR Cloud</a> para definir.';
+                        urlBox.style.color = '#856404';
+                        document.getElementById('btn-fetch-cloud').disabled = true;
+                    }
+                })
+                .catch(function() {
+                    document.getElementById('cloud-fetch-url').textContent = 'Erro ao obter configuração.';
+                });
+        }
+
+        function fetchFromCloud() {
+            if (!vS_cloudUrlConfig) return;
+            const btn = document.getElementById('btn-fetch-cloud');
+            btn.disabled = true;
+            btn.textContent = '⏳ Buscando...';
+            const statusDiv = document.getElementById('cloud-fetch-status');
+            const msgDiv = document.getElementById('cloud-fetch-msg');
+            const bar = document.getElementById('cloud-fetch-bar');
+            statusDiv.style.display = 'block';
+            bar.style.width = '5%';
+            msgDiv.textContent = 'Iniciando download...';
+
+            const fd = new FormData();
+            fd.append('cloud_url', vS_cloudUrlConfig);
+            fetch('/api/fetch_cloud_files', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(function(res) {
+                    if (!res.ok) {
+                        msgDiv.textContent = 'Erro: ' + (res.error || 'desconhecido');
+                        btn.disabled = false;
+                        btn.textContent = '☁️ Buscar arquivos da Cloud';
+                        return;
+                    }
+                    bar.style.width = '15%';
+                    pollFetchStatus(btn, msgDiv, bar);
+                })
+                .catch(function(err) {
+                    msgDiv.textContent = 'Erro de comunicação: ' + err.message;
+                    btn.disabled = false;
+                    btn.textContent = '☁️ Buscar arquivos da Cloud';
+                });
+        }
+
+        function pollFetchStatus(btn, msgDiv, bar) {
+            let progress = 15;
+            clearInterval(fetchCloudPollTimer);
+            fetchCloudPollTimer = setInterval(function() {
+                fetch('/api/fetch_cloud_files_status')
+                    .then(r => r.json())
+                    .then(function(s) {
+                        msgDiv.textContent = s.status || '';
+                        if (!s.done) {
+                            progress = Math.min(progress + 5, 85);
+                            bar.style.width = progress + '%';
+                            return;
+                        }
+                        clearInterval(fetchCloudPollTimer);
+                        bar.style.width = '100%';
+                        if (s.error) {
+                            bar.style.background = '#dc3545';
+                            showStatus('Erro ao buscar arquivos: ' + s.status, 'error');
+                        } else {
+                            bar.style.background = '#28a745';
+                            showStatus('Arquivos baixados com sucesso!', 'success');
+                            loadFilesList();
+                        }
+                        btn.disabled = false;
+                        btn.textContent = '☁️ Buscar arquivos da Cloud';
+                    })
+                    .catch(function() { clearInterval(fetchCloudPollTimer); });
+            }, 1500);
         }
 
         // === SISTEMA DE MONITORAMENTO DE PERFORMANCE ===
