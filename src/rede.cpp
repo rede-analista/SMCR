@@ -25,10 +25,10 @@ void fV_setupMdns() {
         fV_printSerialDebug(LOG_NETWORK, "Servico HTTP mDNS adicionado na porta %d", vSt_mainConfig.vU16_webServerPort);
 
         // Adiciona informações adicionais do serviço (device_type é usado para identificar módulos SMCR)
-        MDNS.addServiceTxt("http", "tcp", "version", "2.1.2");
+        MDNS.addServiceTxt("http", "tcp", "version", FIRMWARE_VERSION);
         MDNS.addServiceTxt("http", "tcp", "device_type", "smcr");
         MDNS.addServiceTxt("http", "tcp", "device", "SMCR");
-        fV_printSerialDebug(LOG_NETWORK, "TXT records mDNS adicionados: device_type=smcr, device=SMCR, version=2.1.2");
+        fV_printSerialDebug(LOG_NETWORK, "TXT records mDNS adicionados: device_type=smcr, device=SMCR, version=%s", FIRMWARE_VERSION);
 
         // ESP32 mDNS funciona automaticamente em background, não precisa de update() manual
     } else {
