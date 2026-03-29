@@ -2,7 +2,8 @@
 #include "globals.h"
 
 // Variável para controle de tempo da checagem (interna a este módulo)
-static unsigned long vL_lastCheckTime = 0; 
+static unsigned long vL_lastCheckTime = 0;
+static uint16_t vU16_reconnectAttempts = 0; // Contador de tentativas de reconexão
 
 //=======================================
 // FV_SETUP_MDNS: Inicializa o mDNS
@@ -127,27 +128,37 @@ void fV_checkWifiConnection(void) {
     if (vL_currentStatus != vB_wifiIsConnected) {
         vB_wifiIsConnected = vL_currentStatus;
         if (vB_wifiIsConnected) {
+            vU16_reconnectAttempts = 0; // Reseta contador ao conectar
             fV_printSerialDebug(LOG_NETWORK, "Evento: Conectado ao Wi-Fi. IP: %s", WiFi.localIP().toString().c_str());
-            // Reinicia o mDNS após reconexão
             fV_setupMdns();
         } else {
             fV_printSerialDebug(LOG_NETWORK, "Evento: Desconectado do Wi-Fi.");
-            // Garante que a reconexão comece imediatamente
-            vL_lastCheckTime = millis() - vSt_mainConfig.vU32_wifiCheckInterval; 
+            vL_lastCheckTime = millis() - vSt_mainConfig.vU32_wifiCheckInterval;
         }
     }
 
     // 2. Lógica de Reconexão Periódica
-    // Só tenta reconectar se:
-    // a) Não estiver conectado
-    // b) Estiver em modo STA (para não tentar reconectar se estiver no AP de Fallback)
-    // c) E o tempo de intervalo (vU32_wifiCheckInterval) tiver passado
     if (!vB_wifiIsConnected && (WiFi.getMode() == WIFI_STA) && (millis() - vL_lastCheckTime >= vSt_mainConfig.vU32_wifiCheckInterval)) {
         vL_lastCheckTime = millis();
-        
-        fV_printSerialDebug(LOG_NETWORK, "Tentando reconexao automatica...");
-        
-        // A função WiFi.reconnect() é não-bloqueante
+        vU16_reconnectAttempts++;
+
+        fV_printSerialDebug(LOG_NETWORK, "Tentando reconexao automatica... (tentativa %d/%d)",
+                            vU16_reconnectAttempts, vSt_mainConfig.vU16_wifiConnectAttempts);
+
+        // Verifica se esgotou as tentativas configuradas
+        if (vU16_reconnectAttempts >= vSt_mainConfig.vU16_wifiConnectAttempts) {
+            if (vSt_mainConfig.vB_apFallbackEnabled) {
+                fV_printSerialDebug(LOG_NETWORK, "Limite de tentativas atingido. Ativando modo AP de fallback.");
+                fV_startWifiAp();
+                vU16_reconnectAttempts = 0;
+            } else {
+                fV_printSerialDebug(LOG_NETWORK, "Limite de tentativas atingido. Fallback AP desabilitado. Reiniciando...");
+                delay(1000);
+                ESP.restart();
+            }
+            return;
+        }
+
         WiFi.reconnect();
     }
     
