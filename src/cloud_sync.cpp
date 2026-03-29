@@ -83,7 +83,7 @@ void fV_cloudSyncTask(void) {
     fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Iniciando sync: %s", url.c_str());
 
     HTTPClient http;
-    http.setTimeout(10000);
+    http.setTimeout(5000);
     if (!http.begin(url)) {
         vS_cloudSyncStatus = "Erro: Falha ao conectar";
         fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Falha ao iniciar HTTP");
@@ -306,7 +306,7 @@ void fV_fetchCloudFilesTask(void) {
     fV_printSerialDebug(LOG_NETWORK, "[FETCH] Buscando lista: %s", listUrl.c_str());
 
     HTTPClient http;
-    http.setTimeout(10000);
+    http.setTimeout(5000);
     if (!http.begin(listUrl)) {
         vS_fetchStatus = "Erro: falha ao conectar ao servidor";
         vB_fetchDone = vB_fetchError = true;
@@ -422,7 +422,7 @@ void fV_cloudHeartbeatTask(void) {
     serializeJson(doc, body);
 
     HTTPClient http;
-    http.setTimeout(8000);
+    http.setTimeout(5000);
     if (!http.begin(url)) {
         vS_heartbeatStatus = "Erro: falha ao conectar";
         fV_printSerialDebug(LOG_NETWORK, "[HB] Falha ao iniciar HTTP: %s", url.c_str());
