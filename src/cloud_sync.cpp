@@ -13,11 +13,13 @@ String vS_fetchCloudFilesUrl   = "smcr.pensenet.com.br";
 static String vS_fetchStatus = "Aguardando";
 
 // ── Heartbeat ─────────────────────────────────────────────────────────────────
-static String vS_heartbeatStatus = "Nunca enviado";
+static String vS_heartbeatStatus   = "Nunca enviado";
+static String vS_heartbeatLastTime = "";
+static String vS_cloudSyncLastTime = "";
 
-String fS_getCloudHeartbeatStatus(void) {
-    return vS_heartbeatStatus;
-}
+String fS_getCloudHeartbeatStatus(void) { return vS_heartbeatStatus; }
+String fS_getCloudHeartbeatLastTime(void) { return vS_heartbeatLastTime; }
+String fS_getCloudSyncLastTime(void) { return vS_cloudSyncLastTime; }
 
 // Monta base URL com porta: http://host:porta
 static String fS_cloudBaseUrl(void) {
@@ -284,7 +286,8 @@ void fV_cloudSyncTask(void) {
     fB_saveActionConfigs();
     fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Acoes: %d sincronizadas.", vU8_actionsAdded);
 
-    vS_cloudSyncStatus = "Sincronizado: " + String(vU8_pinsAdded) + " pinos, " + String(vU8_actionsAdded) + " acoes";
+    vS_cloudSyncStatus  = "Sincronizado: " + String(vU8_pinsAdded) + " pinos, " + String(vU8_actionsAdded) + " acoes";
+    vS_cloudSyncLastTime = fS_getFormattedTime();
     fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Sync completo.");
 }
 
@@ -436,8 +439,9 @@ void fV_cloudHeartbeatTask(void) {
     String response = http.getString();
     http.end();
 
+    vS_heartbeatLastTime = fS_getFormattedTime();
     if (httpCode == 200) {
-        vS_heartbeatStatus = "OK (" + String(millis() / 1000) + "s uptime)";
+        vS_heartbeatStatus = "OK";
         fV_printSerialDebug(LOG_NETWORK, "[HB] Heartbeat enviado com sucesso");
     } else {
         vS_heartbeatStatus = "Erro HTTP: " + String(httpCode);

@@ -355,6 +355,7 @@ void fV_syncRemotePinsOnBoot(void); // Sincroniza todos os pinos remotos após i
 /* Funções do SMCR Cloud (cloud_sync.cpp) */
 void fV_cloudSyncTask(void);               // Executa sincronização com a cloud SMCR
 String fS_getCloudSyncStatus(void);        // Retorna último status de sync
+String fS_getCloudSyncLastTime(void);      // Retorna horário do último sync
 extern bool vB_pendingCloudSync;           // Flag para forçar sync imediato
 void fV_fetchCloudFilesTask(void);         // Baixa arquivos HTML da cloud para LittleFS
 String fS_getFetchCloudFilesStatus(void);  // Retorna status do download
@@ -362,6 +363,7 @@ extern bool vB_pendingFetchCloudFiles;     // Flag para iniciar download
 extern String vS_fetchCloudFilesUrl;       // URL do servidor para download
 void fV_cloudHeartbeatTask(void);          // Envia heartbeat de status para a cloud SMCR
 String fS_getCloudHeartbeatStatus(void);   // Retorna último status do heartbeat
+String fS_getCloudHeartbeatLastTime(void); // Retorna horário do último heartbeat
 
 /* Funções do Gerenciador de Telegram (telegram_manager.cpp) */
 void fV_initTelegram(void);

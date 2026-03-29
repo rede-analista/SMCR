@@ -1828,6 +1828,12 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
     sync_obj["ntp_status"] = vL_ntp_ok ? "Sincronizado" : "Desabilitado";
     sync_obj["mqtt_status"] = fS_getMqttStatus();
     sync_obj["telegram_status"] = vSt_mainConfig.vB_telegramEnabled ? "Ativo" : "Inativo";
+    sync_obj["cloud_sync_enabled"]       = vSt_mainConfig.vB_cloudSyncEnabled;
+    sync_obj["cloud_sync_status"]        = fS_getCloudSyncStatus();
+    sync_obj["cloud_sync_last"]          = fS_getCloudSyncLastTime();
+    sync_obj["cloud_heartbeat_enabled"]  = vSt_mainConfig.vB_cloudHeartbeatEnabled;
+    sync_obj["cloud_heartbeat_status"]   = fS_getCloudHeartbeatStatus();
+    sync_obj["cloud_heartbeat_last"]     = fS_getCloudHeartbeatLastTime();
     
     // Usa o tempo formatado se o NTP estiver OK, caso contrario, Uptime formatado
     sync_obj["last_update"] = vL_ntp_ok ? fS_getFormattedTime() : fS_formatUptime(millis()); 
