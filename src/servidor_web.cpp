@@ -1894,6 +1894,16 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
             comm_obj["pin"] = vSt_InterModCommSent[idx].pin;
             comm_obj["value"] = vSt_InterModCommSent[idx].value;
         }
+
+        // Array da fila de reenvio pendente
+        JsonArray queue_array = intermod_comm_obj["queue"].to<JsonArray>();
+        for (uint8_t i = 0; i < REMOTE_QUEUE_SIZE; i++) {
+            if (!vA_remoteQueue[i].active) continue;
+            JsonObject q_obj = queue_array.add<JsonObject>();
+            q_obj["module"] = vA_remoteQueue[i].moduleId;
+            q_obj["pin"]    = vA_remoteQueue[i].remotePin;
+            q_obj["value"]  = vA_remoteQueue[i].value;
+        }
     }
 
     // 6. Serializa o JSON para uma String

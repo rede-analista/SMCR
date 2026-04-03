@@ -9,6 +9,56 @@
 ActionConfig_t* vA_actionConfigs = nullptr;
 uint8_t vU8_activeActionsCount = 0;
 
+// Fila de reenvio para alertas inter-módulos que falharam
+RemoteQueueItem_t vA_remoteQueue[REMOTE_QUEUE_SIZE];
+
+//========================================
+// Enfileira alerta inter-módulo para reenvio
+//========================================
+void fV_enqueueRemoteAction(const String& moduleId, uint16_t remotePin, uint16_t value) {
+    // Procura slot vazio (cada falha é um evento independente na fila)
+    for (uint8_t i = 0; i < REMOTE_QUEUE_SIZE; i++) {
+        if (!vA_remoteQueue[i].active) {
+            vA_remoteQueue[i].moduleId  = moduleId;
+            vA_remoteQueue[i].remotePin = remotePin;
+            vA_remoteQueue[i].value     = value;
+            vA_remoteQueue[i].active    = true;
+            fV_printSerialDebug(LOG_INTERMOD, "[QUEUE] Alerta enfileirado (slot %d): modulo='%s', pino=%d, valor=%d",
+                i, moduleId.c_str(), remotePin, value);
+            return;
+        }
+    }
+    // Fila cheia: descarta o mais antigo (slot 0) e desloca
+    fV_printSerialDebug(LOG_INTERMOD, "[QUEUE] Fila cheia, descartando slot 0 (modulo='%s', pino=%d, valor=%d)",
+        vA_remoteQueue[0].moduleId.c_str(), vA_remoteQueue[0].remotePin, vA_remoteQueue[0].value);
+    for (uint8_t i = 0; i < REMOTE_QUEUE_SIZE - 1; i++) {
+        vA_remoteQueue[i] = vA_remoteQueue[i + 1];
+    }
+    vA_remoteQueue[REMOTE_QUEUE_SIZE - 1].moduleId  = moduleId;
+    vA_remoteQueue[REMOTE_QUEUE_SIZE - 1].remotePin = remotePin;
+    vA_remoteQueue[REMOTE_QUEUE_SIZE - 1].value     = value;
+    vA_remoteQueue[REMOTE_QUEUE_SIZE - 1].active    = true;
+}
+
+//========================================
+// Processa fila de reenvio (chamada periodicamente)
+//========================================
+void fV_processRemoteQueue(void) {
+    for (uint8_t i = 0; i < REMOTE_QUEUE_SIZE; i++) {
+        if (!vA_remoteQueue[i].active) continue;
+        fV_printSerialDebug(LOG_INTERMOD, "[QUEUE] Reenviando slot %d: modulo='%s', pino=%d, valor=%d",
+            i, vA_remoteQueue[i].moduleId.c_str(), vA_remoteQueue[i].remotePin, vA_remoteQueue[i].value);
+        bool success = fB_sendRemoteAction(vA_remoteQueue[i].moduleId,
+                                           vA_remoteQueue[i].remotePin,
+                                           vA_remoteQueue[i].value);
+        if (success) {
+            vA_remoteQueue[i].active   = false;
+            vA_remoteQueue[i].moduleId = "";
+            fV_printSerialDebug(LOG_INTERMOD, "[QUEUE] Slot %d reenviado com sucesso, removido da fila", i);
+        }
+    }
+}
+
 // Constantes para tipos de ação
 const uint16_t ACTION_TYPE_NONE = 0;
 const uint16_t ACTION_TYPE_LIGA = 1;
@@ -489,7 +539,9 @@ void fV_executeActionsTask(void) {
                     fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando valor %d do pino origem %d para módulo '%s', pino remoto %d",
                         pinValue, vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
 
-                    fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, pinValue);
+                    if (!fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, pinValue)) {
+                        fV_enqueueRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, pinValue);
+                    }
                 }
                 
                 // Envia notificação Telegram se habilitado na ação
@@ -525,7 +577,9 @@ void fV_executeActionsTask(void) {
                             fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando valor %d do pino origem %d (normalização) para módulo '%s', pino remoto %d",
                                 pinValue, vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
 
-                            fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, pinValue);
+                            if (!fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, pinValue)) {
+                                fV_enqueueRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, pinValue);
+                            }
                         }
                     }
                 }

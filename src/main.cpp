@@ -24,6 +24,8 @@ const unsigned long vU32_alertFlashInterval = 50; // Polling de flash a cada 50m
 
 unsigned long vU32_lastCloudSyncTime = 0;
 unsigned long vU32_lastHeartbeatTime = 0;
+unsigned long vU32_lastRemoteQueueTime = 0;
+const unsigned long vU32_remoteQueueInterval = 5000; // Reenvio da fila a cada 5s
 
 // Definição do objeto Preferences.
 Preferences preferences;
@@ -179,7 +181,13 @@ void loop() {
     fV_fetchCloudFilesTask();
   }
 
-  // 11. CLOUD HEARTBEAT: Envia status periódico para manter dispositivo online no SMCR Cloud HA
+  // 11. FILA DE REENVIO: Retenta alertas inter-módulos que falharam (a cada 5s)
+  if (vU32_currentTime - vU32_lastRemoteQueueTime >= vU32_remoteQueueInterval) {
+    vU32_lastRemoteQueueTime = vU32_currentTime;
+    fV_processRemoteQueue();
+  }
+
+  // 12. CLOUD HEARTBEAT: Envia status periódico para manter dispositivo online no SMCR Cloud HA
   if (vSt_mainConfig.vB_cloudHeartbeatEnabled && vB_wifiIsConnected &&
       vSt_mainConfig.vS_cloudApiToken.length() > 0) {
     unsigned long vU32_hbIntervalMs = (unsigned long)vSt_mainConfig.vU16_cloudHeartbeatIntervalMin * 60000UL;

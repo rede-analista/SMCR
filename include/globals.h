@@ -9,7 +9,7 @@ Inclusão de bibliotecas
 #include "include.h"
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.1.6"
+#define FIRMWARE_VERSION "2.1.7"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -204,6 +204,18 @@ struct InterModConfig_t {
     bool hc_flash_state;                  // Estado atual do flash healthcheck
 };
 
+// --- Fila de reenvio para alertas inter-módulos ---
+#define REMOTE_QUEUE_SIZE 10
+
+struct RemoteQueueItem_t {
+    String   moduleId;   // ID do módulo destino
+    uint16_t remotePin;  // Pino no módulo remoto
+    uint16_t value;      // Valor a enviar (0/1 digital ou 0-4095 analógico)
+    bool     active;     // Slot em uso
+};
+
+extern RemoteQueueItem_t vA_remoteQueue[REMOTE_QUEUE_SIZE];
+
 // --- Estrutura para Log de Comunicações Inter-Módulos ---
 struct InterModCommLog_t {
     String time;                 // Horário da comunicação (HH:MM:SS)
@@ -215,6 +227,10 @@ struct InterModCommLog_t {
 
 // Instância global da sua configuração em memória (sua running-config)
 extern MainConfig_t vSt_mainConfig; // vSt_ para variável do tipo Struct
+
+// --- Constante e latch de interrupção para detecção de pulsos rápidos ---
+#define MAX_GPIO_NUM 40  // ESP32 clássico: GPIO 0-39
+extern volatile bool vB_gpioActivationLatch[MAX_GPIO_NUM];
 
 // --- Variáveis globais para gerenciamento de pinos ---
 extern PinConfig_t* vA_pinConfigs;   // Array dinâmico de configurações de pinos
@@ -239,6 +255,10 @@ extern uint8_t vU8_InterModCommSentIndex;     // Índice do próximo slot (circu
 // Funções de gerenciamento do log
 void fV_logInterModReceived(const String& module, uint16_t pin, uint16_t value);
 void fV_logInterModSent(const String& module, uint16_t pin, uint16_t value);
+
+// Funções da fila de reenvio
+void fV_enqueueRemoteAction(const String& moduleId, uint16_t remotePin, uint16_t value);
+void fV_processRemoteQueue(void);
 
 // --- Novas funções para carregar e salvar a estrutura MainConfig_t ---
 // Estas serão as funções de interface para a sua "startup-config"

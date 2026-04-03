@@ -7,6 +7,18 @@
 PinConfig_t* vA_pinConfigs = nullptr;
 uint8_t vU8_activePinsCount = 0;
 
+// Latch de interrupção para detecção de pulsos rápidos (indexado por número do GPIO)
+volatile bool vB_gpioActivationLatch[MAX_GPIO_NUM] = {false};
+
+// Array estático com GPIO numbers persistentes para uso como arg das ISRs
+static uint8_t vA_isrGpioArg[254];
+
+// ISR: marca latch quando GPIO é ativado brevemente
+void IRAM_ATTR fV_pinActivationISR(void* arg) {
+    uint8_t gpio = *((uint8_t*)arg);
+    vB_gpioActivationLatch[gpio] = true;
+}
+
 // Constantes para tipos de pino
 const uint16_t PIN_TYPE_UNUSED = 0;
 const uint16_t PIN_TYPE_DIGITAL = 1; 
@@ -342,6 +354,21 @@ void fV_setupConfiguredPins(void) {
                         break;
                 }
                 configurados++;
+
+                // Configura interrupção para pinos digitais de entrada (detecção de pulsos rápidos)
+                if (tipo == PIN_TYPE_DIGITAL && pinNumber < MAX_GPIO_NUM &&
+                    (modo == PIN_MODE_INPUT || modo == PIN_MODE_INPUT_PULLUP || modo == PIN_MODE_INPUT_PULLDOWN)) {
+                    uint8_t nivelAtivacao = (uint8_t)vA_pinConfigs[i].nivel_acionamento_min;
+                    uint8_t xorLogic = vA_pinConfigs[i].xor_logic;
+                    // Borda física de ativação (XOR inverte a relação lógica/física)
+                    uint8_t edge = (nivelAtivacao == 1) ? ((xorLogic == 1) ? FALLING : RISING)
+                                                        : ((xorLogic == 1) ? RISING  : FALLING);
+                    vA_isrGpioArg[i] = (uint8_t)pinNumber;
+                    detachInterrupt(digitalPinToInterrupt(pinNumber));
+                    attachInterruptArg(digitalPinToInterrupt(pinNumber), fV_pinActivationISR, &vA_isrGpioArg[i], edge);
+                    fV_printSerialDebug(LOG_PINS, "[PIN] GPIO %d interrupção configurada (%s)",
+                        pinNumber, (edge == RISING) ? "RISING" : "FALLING");
+                }
             } else if (tipo == PIN_TYPE_REMOTE || tipo == 65533) {
                 // Inicializa pino remoto no estado "não alarmado" (inverso do nível de acionamento)
                 vA_pinConfigs[i].status_atual = (vA_pinConfigs[i].nivel_acionamento_min == 0) ? 1 : 0;
@@ -604,8 +631,9 @@ void fV_readPinsTask(void) {
         if (tempoRetencao > 0 && vA_pinConfigs[i].ultimo_acionamento_ms > 0) {
             unsigned long tempoDecorrido = currentTime - vA_pinConfigs[i].ultimo_acionamento_ms;
             if (tempoDecorrido < tempoRetencao) {
-                // Ainda em período de retenção, ignora leitura
-                fV_printSerialDebug(LOG_PINS, "[PIN TASK] GPIO %d em retenção (%lu/%lu ms)", 
+                // Ainda em período de retenção, ignora leitura e descarta latch
+                if (pinNumber < MAX_GPIO_NUM) vB_gpioActivationLatch[pinNumber] = false;
+                fV_printSerialDebug(LOG_PINS, "[PIN TASK] GPIO %d em retenção (%lu/%lu ms)",
                     pinNumber, tempoDecorrido, tempoRetencao);
                 continue;
             }
@@ -659,6 +687,24 @@ void fV_readPinsTask(void) {
                     // *** PUBLICAR STATUS NO MQTT SE HABILITADO ***
                     if (vSt_mainConfig.vB_mqttEnabled) {
                         fV_publishPinStatus(i);
+                    }
+                }
+
+                // *** DETECÇÃO DE PULSO RÁPIDO VIA ISR ***
+                // Se a leitura normal não detectou mudança mas a ISR capturou um pulso,
+                // força o status para o nível de ativação para que action_manager dispare.
+                if (pinNumber < MAX_GPIO_NUM && vB_gpioActivationLatch[pinNumber]) {
+                    vB_gpioActivationLatch[pinNumber] = false;
+                    uint16_t nivelAtivacao = vA_pinConfigs[i].nivel_acionamento_min;
+                    if (vA_pinConfigs[i].status_atual != nivelAtivacao) {
+                        vA_pinConfigs[i].status_atual = nivelAtivacao;
+                        vA_pinConfigs[i].historico_digital[vA_pinConfigs[i].historico_index] = (uint8_t)nivelAtivacao;
+                        vA_pinConfigs[i].historico_index = (vA_pinConfigs[i].historico_index + 1) % 8;
+                        if (vA_pinConfigs[i].historico_count < 8) vA_pinConfigs[i].historico_count++;
+                        if (tempoRetencao > 0) vA_pinConfigs[i].ultimo_acionamento_ms = currentTime;
+                        if (vSt_mainConfig.vB_mqttEnabled) fV_publishPinStatus(i);
+                        fV_printSerialDebug(LOG_PINS, "[PIN TASK] GPIO %d (%s) pulso rapido detectado via ISR",
+                            pinNumber, vA_pinConfigs[i].nome.c_str());
                     }
                 }
             } else if (modo == PIN_MODE_OUTPUT) {
