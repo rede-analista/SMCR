@@ -138,8 +138,12 @@
                     <td><strong id="dl-version">Carregando...</strong></td>
                 </tr>
                 <tr>
+                    <td style="padding:6px 12px 6px 0;color:#555;white-space:nowrap;">Última disponível:</td>
+                    <td><strong id="dl-latest">Verificando...</strong></td>
+                </tr>
+                <tr>
                     <td style="padding:6px 12px 6px 0;color:#555;white-space:nowrap;">Download:</td>
-                    <td id="dl-link-cell"><span style="color:#999;">Aguardando versão...</span></td>
+                    <td id="dl-link-cell"><span style="color:#999;">Aguardando...</span></td>
                 </tr>
             </table>
         </div>
@@ -169,19 +173,46 @@
     <script>
         // === DOWNLOAD DO FIRMWARE ===
         window.addEventListener('load', function() {
+            var currentVer = '';
+
+            // 1. Busca versão atual do dispositivo
             fetch('/status/json')
                 .then(function(r){ return r.json(); })
                 .then(function(cfg) {
-                    var ver = ((cfg.system && cfg.system.fw_version) ? cfg.system.fw_version : '').trim();
-                    document.getElementById('dl-version').textContent = ver || '—';
-                    if (!ver) return;
-                    var fname = 'SMCR_v' + ver + '_firmware.bin';
-                    var url   = 'https://raw.githubusercontent.com/rede-analista/SMCR/v' + ver + '/firmware/v' + ver + '/' + fname;
+                    currentVer = ((cfg.system && cfg.system.fw_version) ? cfg.system.fw_version : '').trim();
+                    document.getElementById('dl-version').textContent = currentVer || '—';
+                })
+                .catch(function(){
+                    document.getElementById('dl-version').textContent = 'Erro';
+                });
+
+            // 2. Busca a última versão disponível no GitHub
+            fetch('https://api.github.com/repos/rede-analista/SMCR/releases/latest')
+                .then(function(r){ return r.json(); })
+                .then(function(release) {
+                    var tag = (release.tag_name || '').trim();          // ex: "v2.1.7"
+                    var latestVer = tag.replace(/^v/, '');              // ex: "2.1.7"
+                    document.getElementById('dl-latest').textContent = tag || '—';
+
+                    if (!latestVer) {
+                        document.getElementById('dl-link-cell').innerHTML = '<span style="color:#999;">Não foi possível obter a versão.</span>';
+                        return;
+                    }
+
+                    var fname = 'SMCR_v' + latestVer + '_firmware.bin';
+                    var url   = 'https://raw.githubusercontent.com/rede-analista/SMCR/' + tag + '/firmware/v' + latestVer + '/' + fname;
+
+                    // Indica se há atualização disponível
+                    var isNewer = currentVer && latestVer && latestVer !== currentVer;
+                    var badge   = isNewer ? ' <span style="background:#28a745;color:#fff;font-size:11px;padding:2px 6px;border-radius:10px;vertical-align:middle;">NOVO</span>' : '';
+                    document.getElementById('dl-latest').innerHTML = '<strong>' + tag + '</strong>' + badge;
+
                     document.getElementById('dl-link-cell').innerHTML =
                         '<a href="' + url + '" target="_blank" class="btn btn-primary" style="font-size:13px;padding:6px 14px;">⬇️ ' + fname + '</a>';
                 })
                 .catch(function(){
-                    document.getElementById('dl-version').textContent = 'Erro ao obter versão';
+                    document.getElementById('dl-latest').textContent = 'Erro ao consultar GitHub';
+                    document.getElementById('dl-link-cell').innerHTML = '<span style="color:#999;">Indisponível.</span>';
                 });
         });
 
