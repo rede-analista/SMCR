@@ -519,18 +519,24 @@ void fV_executeActionsTask(void) {
         bool pinoAcionado = fB_isPinActivated(pinOrigemIndex);
         
         // Detecta mudança de estado do pino origem
+        bool executedLocally = false;
         if (pinoAcionado != vA_actionConfigs[i].ultimo_estado_origem) {
             vA_actionConfigs[i].ultimo_estado_origem = pinoAcionado;
-            
+
             // Se pino foi acionado, inicia/reseta a ação
             if (pinoAcionado) {
                 vA_actionConfigs[i].contador_on = 0;
                 vA_actionConfigs[i].contador_off = 0;
                 vA_actionConfigs[i].estado_acao = true;
-                
-                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Ação iniciada: Origem=%d, Ação#%d", 
+
+                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Ação iniciada: Origem=%d, Ação#%d",
                     vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].numero_acao);
-                
+
+                // Executa ação local ANTES do envio remoto para garantir independência:
+                // chamadas HTTP bloqueantes (timeout de até 3s) não devem atrasar a execução local.
+                fV_executeAction(i);
+                executedLocally = true;
+
                 // Envia para módulo remoto se configurado
                 if (vA_actionConfigs[i].envia_modulo != "" && vA_actionConfigs[i].pino_remoto > 0) {
                     // Envia o valor REAL do pino de origem (status_atual)
@@ -639,8 +645,9 @@ void fV_executeActionsTask(void) {
             }
         }
         
-        // Se pino está acionado, executa a ação
-        if (pinoAcionado && vA_actionConfigs[i].estado_acao) {
+        // Se pino está acionado, executa a ação (iterações subsequentes: PISCA, PULSO contínuo, etc.)
+        // Pula se já foi executado nesta iteração (primeira ativação)
+        if (!executedLocally && pinoAcionado && vA_actionConfigs[i].estado_acao) {
             fV_executeAction(i);
         }
     }
