@@ -933,7 +933,11 @@ void fV_setupWebServer() {
         newModule.healthcheck_alert_enabled = request->hasArg("healthcheckAlertEnabled") && request->arg("healthcheckAlertEnabled") == "1";
         newModule.healthcheck_flash_ms      = request->hasArg("healthcheckFlashMs")     ? request->arg("healthcheckFlashMs").toInt() : 500;
         
-        int index = fI_addInterModConfig(newModule);
+        int index = -1;
+        if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            index = fI_addInterModConfig(newModule);
+            xSemaphoreGive(vO_pinActionMutex);
+        }
         if (index >= 0) {
             fB_saveInterModConfigs();
             request->send(200, "application/json", "{\"success\": true}");
@@ -956,7 +960,12 @@ void fV_setupWebServer() {
         }
         
         String moduleId = request->arg("id");
-        if (fB_removeInterModConfig(moduleId)) {
+        bool removed = false;
+        if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            removed = fB_removeInterModConfig(moduleId);
+            xSemaphoreGive(vO_pinActionMutex);
+        }
+        if (removed) {
             fB_saveInterModConfigs();
             request->send(200, "application/json", "{\"success\": true}");
         } else {
@@ -1043,16 +1052,18 @@ void fV_setupWebServer() {
             return;
         }
 
-        if (request->hasArg("moduleHostname"))        vA_interModConfigs[index].hostname               = request->arg("moduleHostname");
-        if (request->hasArg("moduleIp"))              vA_interModConfigs[index].ip                     = request->arg("moduleIp");
-        if (request->hasArg("modulePort"))            vA_interModConfigs[index].porta                  = request->arg("modulePort").toInt();
-        if (request->hasArg("pinsOffline"))           vA_interModConfigs[index].pins_offline            = request->arg("pinsOffline");
-        if (request->hasArg("offlineAlertEnabled"))   vA_interModConfigs[index].offline_alert_enabled   = request->arg("offlineAlertEnabled") == "1";
-        if (request->hasArg("offlineFlashMs"))        vA_interModConfigs[index].offline_flash_ms        = request->arg("offlineFlashMs").toInt();
-        if (request->hasArg("pinsHealthcheck"))       vA_interModConfigs[index].pins_healthcheck        = request->arg("pinsHealthcheck");
-        if (request->hasArg("healthcheckAlertEnabled")) vA_interModConfigs[index].healthcheck_alert_enabled = request->arg("healthcheckAlertEnabled") == "1";
-        if (request->hasArg("healthcheckFlashMs"))    vA_interModConfigs[index].healthcheck_flash_ms    = request->arg("healthcheckFlashMs").toInt();
-
+        if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            if (request->hasArg("moduleHostname"))        vA_interModConfigs[index].hostname               = request->arg("moduleHostname");
+            if (request->hasArg("moduleIp"))              vA_interModConfigs[index].ip                     = request->arg("moduleIp");
+            if (request->hasArg("modulePort"))            vA_interModConfigs[index].porta                  = request->arg("modulePort").toInt();
+            if (request->hasArg("pinsOffline"))           vA_interModConfigs[index].pins_offline            = request->arg("pinsOffline");
+            if (request->hasArg("offlineAlertEnabled"))   vA_interModConfigs[index].offline_alert_enabled   = request->arg("offlineAlertEnabled") == "1";
+            if (request->hasArg("offlineFlashMs"))        vA_interModConfigs[index].offline_flash_ms        = request->arg("offlineFlashMs").toInt();
+            if (request->hasArg("pinsHealthcheck"))       vA_interModConfigs[index].pins_healthcheck        = request->arg("pinsHealthcheck");
+            if (request->hasArg("healthcheckAlertEnabled")) vA_interModConfigs[index].healthcheck_alert_enabled = request->arg("healthcheckAlertEnabled") == "1";
+            if (request->hasArg("healthcheckFlashMs"))    vA_interModConfigs[index].healthcheck_flash_ms    = request->arg("healthcheckFlashMs").toInt();
+            xSemaphoreGive(vO_pinActionMutex);
+        }
         fB_saveInterModConfigs();
         request->send(200, "application/json", "{\"success\": true}");
     });
@@ -2859,11 +2870,14 @@ void fV_handlePinAdd(AsyncWebServerRequest *request) {
         newPin.icone_mqtt = request->hasArg("icone_mqtt") ? request->arg("icone_mqtt") : "";
     
     // Tenta adicionar o pino
-    int result = fI_addPinConfig(newPin);
-    
+    int result = -1;
+    if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        result = fI_addPinConfig(newPin);
+        xSemaphoreGive(vO_pinActionMutex);
+    }
+
     if (result >= 0) {
-        // === CONCEITO CONF-INIT: SALVAR AUTOMATICAMENTE ===
-        fB_savePinConfigs();  // Salva configurações na flash automaticamente
+        fB_savePinConfigs();
         fV_printSerialDebug(LOG_WEB, "[PINS] Pino %d adicionado com sucesso (indice %d) e salvo na flash", newPin.pino, result);
         request->send(200, "text/plain", "OK");
     } else if (result == -1) {
@@ -2958,16 +2972,17 @@ void fV_handlePinCreateApi(AsyncWebServerRequest *request) {
     }
     
     // Adiciona o pino
-    int result = fI_addPinConfig(newPin);
+    int result = -1;
+    if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        result = fI_addPinConfig(newPin);
+        xSemaphoreGive(vO_pinActionMutex);
+    }
     if (result < 0) {
         request->send(400, "application/json", "{\"error\": \"Erro ao adicionar pino ou limite atingido\"}");
         return;
     }
 
-    // Aplica configuração física se necessário
     fV_setupConfiguredPins();
-
-    // Persiste imediatamente na flash
     fB_savePinConfigs();
 
     request->send(200, "application/json", "{\"success\": true, \"id\": " + String(result) + ", \"message\": \"Pino adicionado e salvo\"}");
@@ -3021,36 +3036,37 @@ void fV_handlePinUpdateApi(AsyncWebServerRequest *request) {
     uint16_t updatedSourceActions = 0;
     uint16_t updatedDestinationActions = 0;
 
-    // Se for rename, validar que novo número não existe
-    if (renamed) {
-        if (fU8_findPinIndex(newPinNumber) != 255) {
-            fV_printSerialDebug(LOG_WEB, "[API] ERRO: Novo número de pino %d já existente", newPinNumber);
-            request->send(409, "application/json", "{\"error\": \"Novo número de pino já existe\"}");
-            return;
-        }
-        fV_printSerialDebug(LOG_WEB, "[API] Renomeando pino %d -> %d (atualizando ações)", pinNumber, newPinNumber);
-        // Atualiza referências nas ações (origem e destino)
-        for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
-            if (vA_actionConfigs[i].acao == 0) continue; // Ignora ações vazias
-            if (vA_actionConfigs[i].pino_origem == pinNumber) {
-                vA_actionConfigs[i].pino_origem = newPinNumber;
-                updatedSourceActions++;
+    bool success = false;
+    if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        // Se for rename, validar que novo número não existe
+        if (renamed) {
+            if (fU8_findPinIndex(newPinNumber) != 255) {
+                xSemaphoreGive(vO_pinActionMutex);
+                fV_printSerialDebug(LOG_WEB, "[API] ERRO: Novo número de pino %d já existente", newPinNumber);
+                request->send(409, "application/json", "{\"error\": \"Novo número de pino já existe\"}");
+                return;
             }
-            if (vA_actionConfigs[i].pino_destino == pinNumber) {
-                vA_actionConfigs[i].pino_destino = newPinNumber;
-                updatedDestinationActions++;
+            fV_printSerialDebug(LOG_WEB, "[API] Renomeando pino %d -> %d (atualizando ações)", pinNumber, newPinNumber);
+            for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
+                if (vA_actionConfigs[i].acao == 0) continue;
+                if (vA_actionConfigs[i].pino_origem == pinNumber) {
+                    vA_actionConfigs[i].pino_origem = newPinNumber;
+                    updatedSourceActions++;
+                }
+                if (vA_actionConfigs[i].pino_destino == pinNumber) {
+                    vA_actionConfigs[i].pino_destino = newPinNumber;
+                    updatedDestinationActions++;
+                }
             }
         }
+        success = fB_updatePinConfig(pinNumber, updatedPin);
+        xSemaphoreGive(vO_pinActionMutex);
     }
-
-    // Atualiza o pino original com nova config (inclui rename)
-    bool success = fB_updatePinConfig(pinNumber, updatedPin);
     if (!success) {
         request->send(404, "application/json", "{\"error\": \"Pino não encontrado\"}");
         return;
     }
 
-    // Aplica configuração física se necessário
     fV_setupConfiguredPins();
 
     // Monta resposta detalhada
@@ -3101,16 +3117,17 @@ void fV_handlePinDeleteApi(AsyncWebServerRequest *request) {
     }
     
     // Remove o pino da running config
-    bool success = fB_removePinConfig(pinNumber);
+    bool success = false;
+    if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        success = fB_removePinConfig(pinNumber);
+        xSemaphoreGive(vO_pinActionMutex);
+    }
     if (!success) {
         request->send(404, "application/json", "{\"error\": \"Pino não encontrado\"}");
         return;
     }
 
-    // Reaplica configurações físicas
     fV_setupConfiguredPins();
-
-    // Persiste imediatamente na flash
     fB_savePinConfigs();
 
     request->send(200, "application/json", "{\"success\": true, \"message\": \"Pino removido e salvo\"}");
@@ -3135,30 +3152,27 @@ void fV_handlePinsSaveApi(AsyncWebServerRequest *request) {
 void fV_handlePinsReloadApi(AsyncWebServerRequest *request) {
     fV_printSerialDebug(LOG_WEB, "[API] Recarregando configurações de pinos da flash");
     
-    // Limpa configurações atuais na memória
-    if (vA_pinConfigs != nullptr) {
-        uint8_t maxPins = vSt_mainConfig.vU8_quantidadePinos;
-        for (uint8_t i = 0; i < maxPins; i++) {
-            vA_pinConfigs[i].nome = "";
-            vA_pinConfigs[i].pino = 0;
-            vA_pinConfigs[i].tipo = 0;
-            vA_pinConfigs[i].modo = 0;
-            vA_pinConfigs[i].xor_logic = 0;
-            vA_pinConfigs[i].tempo_retencao = 0;
-            vA_pinConfigs[i].nivel_acionamento_min = 0;
-            vA_pinConfigs[i].nivel_acionamento_max = 0;
-            vA_pinConfigs[i].status_atual = 0;
-            vA_pinConfigs[i].ignore_contador = 0;
+    if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+        if (vA_pinConfigs != nullptr) {
+            uint8_t maxPins = vSt_mainConfig.vU8_quantidadePinos;
+            for (uint8_t i = 0; i < maxPins; i++) {
+                vA_pinConfigs[i].nome = "";
+                vA_pinConfigs[i].pino = 0;
+                vA_pinConfigs[i].tipo = 0;
+                vA_pinConfigs[i].modo = 0;
+                vA_pinConfigs[i].xor_logic = 0;
+                vA_pinConfigs[i].tempo_retencao = 0;
+                vA_pinConfigs[i].nivel_acionamento_min = 0;
+                vA_pinConfigs[i].nivel_acionamento_max = 0;
+                vA_pinConfigs[i].status_atual = 0;
+                vA_pinConfigs[i].ignore_contador = 0;
+            }
         }
+        vU8_activePinsCount = 0;
+        fV_loadPinConfigs();
+        xSemaphoreGive(vO_pinActionMutex);
     }
-    vU8_activePinsCount = 0;
-    
-    // Recarrega da flash
-    fV_loadPinConfigs();
-    
-    // Reaplica configurações físicas
     fV_setupConfiguredPins();
-    
     request->send(200, "application/json", "{\"success\": true, \"message\": \"Configurações recarregadas da flash\"}");
 }
 
@@ -3166,25 +3180,25 @@ void fV_handlePinsReloadApi(AsyncWebServerRequest *request) {
 void fV_handlePinsClearApi(AsyncWebServerRequest *request) {
     fV_printSerialDebug(LOG_WEB, "[API] Limpando configurações de pinos da running config");
     
-    // Limpa apenas na memória (running config)
-    if (vA_pinConfigs != nullptr) {
-        uint8_t maxPins = vSt_mainConfig.vU8_quantidadePinos;
-        for (uint8_t i = 0; i < maxPins; i++) {
-            vA_pinConfigs[i].nome = "";
-            vA_pinConfigs[i].pino = 0;
-            vA_pinConfigs[i].tipo = 0;
-            vA_pinConfigs[i].modo = 0;
-            vA_pinConfigs[i].xor_logic = 0;
-            vA_pinConfigs[i].tempo_retencao = 0;
-            vA_pinConfigs[i].nivel_acionamento_min = 0;
-            vA_pinConfigs[i].nivel_acionamento_max = 0;
-            vA_pinConfigs[i].status_atual = 0;
-            vA_pinConfigs[i].ignore_contador = 0;
+    if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+        if (vA_pinConfigs != nullptr) {
+            uint8_t maxPins = vSt_mainConfig.vU8_quantidadePinos;
+            for (uint8_t i = 0; i < maxPins; i++) {
+                vA_pinConfigs[i].nome = "";
+                vA_pinConfigs[i].pino = 0;
+                vA_pinConfigs[i].tipo = 0;
+                vA_pinConfigs[i].modo = 0;
+                vA_pinConfigs[i].xor_logic = 0;
+                vA_pinConfigs[i].tempo_retencao = 0;
+                vA_pinConfigs[i].nivel_acionamento_min = 0;
+                vA_pinConfigs[i].nivel_acionamento_max = 0;
+                vA_pinConfigs[i].status_atual = 0;
+                vA_pinConfigs[i].ignore_contador = 0;
+            }
         }
+        vU8_activePinsCount = 0;
+        xSemaphoreGive(vO_pinActionMutex);
     }
-    vU8_activePinsCount = 0;
-    
-    // Reaplica configurações físicas (limpa GPIOs)
     fV_setupConfiguredPins();
     
     request->send(200, "application/json", "{\"success\": true, \"message\": \"Running config de pinos limpa\"}");
@@ -3252,20 +3266,20 @@ void fV_handleActionCreateApi(AsyncWebServerRequest *request) {
     bool isEdit = request->hasArg("edit_pino_origem") && request->hasArg("edit_numero_acao") &&
                   request->arg("edit_pino_origem") != "" && request->arg("edit_numero_acao") != "";
     
-    if (isEdit) {
-        // Modo edição: usa os valores originais dos campos hidden
-        uint16_t originalPinOrigem = request->arg("edit_pino_origem").toInt();
-        uint8_t originalNumeroAcao = request->arg("edit_numero_acao").toInt();
-        
-        // Remove a ação antiga
-        fB_removeActionConfig(originalPinOrigem, originalNumeroAcao);
-        fV_printSerialDebug(LOG_WEB, "[API] Editando ação: Origem=%d, Ação#%d", originalPinOrigem, originalNumeroAcao);
+    int result = -1;
+    if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (isEdit) {
+            uint16_t originalPinOrigem = request->arg("edit_pino_origem").toInt();
+            uint8_t originalNumeroAcao = request->arg("edit_numero_acao").toInt();
+            fB_removeActionConfig(originalPinOrigem, originalNumeroAcao);
+            fV_printSerialDebug(LOG_WEB, "[API] Editando ação: Origem=%d, Ação#%d", originalPinOrigem, originalNumeroAcao);
+        }
+        result = fI_addActionConfig(newAction);
+        xSemaphoreGive(vO_pinActionMutex);
     }
-    
-    int result = fI_addActionConfig(newAction);
-    
+
     if (result >= 0) {
-        fB_saveActionConfigs(); // Salva automaticamente
+        fB_saveActionConfigs();
         fV_printSerialDebug(LOG_WEB, "[API] Ação %s com sucesso (índice %d)", isEdit ? "editada" : "adicionada", result);
         request->send(200, "application/json", "{\"success\": true, \"message\": \"Ação salva\"}");
     } else {
@@ -3290,13 +3304,17 @@ void fV_handleActionDeleteApi(AsyncWebServerRequest *request) {
     uint16_t pinOrigem = url.substring(secondLastSlash + 1, lastSlash).toInt();
     uint8_t numeroAcao = url.substring(lastSlash + 1).toInt();
     
-    bool success = fB_removeActionConfig(pinOrigem, numeroAcao);
+    bool success = false;
+    if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        success = fB_removeActionConfig(pinOrigem, numeroAcao);
+        xSemaphoreGive(vO_pinActionMutex);
+    }
     if (!success) {
         request->send(404, "application/json", "{\"error\": \"Ação não encontrada\"}");
         return;
     }
-    
-    fB_saveActionConfigs(); // Salva automaticamente
+
+    fB_saveActionConfigs();
     request->send(200, "application/json", "{\"success\": true, \"message\": \"Ação removida\"}");
 }
 

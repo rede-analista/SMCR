@@ -7,6 +7,9 @@
 Inclusão de bibliotecas
 */
 #include "include.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#include <freertos/task.h>
 
 // Versão do firmware atual
 #define FIRMWARE_VERSION "2.1.9"
@@ -285,6 +288,9 @@ String fS_idModulo();
 void fV_printSerialDebug(uint32_t vU32_messageFlag, const char *vC_format, ...);
 
 
+// --- Mutex para proteção de vA_pinConfigs e vA_actionConfigs entre cores ---
+extern SemaphoreHandle_t vO_pinActionMutex;
+
 // Sinaliza se o Wi-Fi está atualmente conectado (true/false)
 extern bool vB_wifiIsConnected;
 // Ponteiro global para o Servidor Web Assíncrono
@@ -371,6 +377,7 @@ bool fB_isPinUsedByActions(uint16_t pinNumber); // Verifica se pino está em uso
 void fV_executeActionsTask(void); // Task periódica para execução de ações
 void fV_executeAction(uint8_t actionIndex); // Executa uma ação específica
 void fV_syncRemotePinsOnBoot(void); // Sincroniza todos os pinos remotos após inicialização
+void fV_processPendingRemoteSends(void); // Processa envios HTTP pendentes (chamado fora do mutex)
 
 /* Funções do SMCR Cloud (cloud_sync.cpp) */
 void fV_cloudSyncTask(void);               // Executa sincronização com a cloud SMCR

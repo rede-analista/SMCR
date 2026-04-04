@@ -12,6 +12,11 @@ uint8_t vU8_activeActionsCount = 0;
 // Fila de reenvio para alertas inter-módulos que falharam
 RemoteQueueItem_t vA_remoteQueue[REMOTE_QUEUE_SIZE];
 
+// Buffer de envios remotos pendentes (preenchido dentro do mutex, processado fora)
+#define PENDING_SENDS_SIZE 8
+static RemoteQueueItem_t vA_pendingRemoteSends[PENDING_SENDS_SIZE];
+static uint8_t vU8_pendingSendsCount = 0;
+
 //========================================
 // Enfileira alerta inter-módulo para reenvio
 //========================================
@@ -502,6 +507,8 @@ void fV_executeActionsTask(void) {
     if (vU8_activeActionsCount == 0) {
         return;
     }
+    // Reseta buffer de envios pendentes a cada ciclo
+    vU8_pendingSendsCount = 0;
     
     for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
         // Pula ações desabilitadas
@@ -542,14 +549,18 @@ void fV_executeActionsTask(void) {
                     // Envia o valor REAL do pino de origem (status_atual)
                     uint16_t pinValue = vA_pinConfigs[pinOrigemIndex].status_atual;
 
-                    fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando valor %d do pino origem %d para módulo '%s', pino remoto %d",
+                    fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Agendando envio: valor %d do pino origem %d para módulo '%s', pino remoto %d",
                         pinValue, vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
 
-                    if (!fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, pinValue)) {
-                        fV_enqueueRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, pinValue);
+                    if (vU8_pendingSendsCount < PENDING_SENDS_SIZE) {
+                        vA_pendingRemoteSends[vU8_pendingSendsCount].moduleId  = vA_actionConfigs[i].envia_modulo;
+                        vA_pendingRemoteSends[vU8_pendingSendsCount].remotePin = vA_actionConfigs[i].pino_remoto;
+                        vA_pendingRemoteSends[vU8_pendingSendsCount].value     = pinValue;
+                        vA_pendingRemoteSends[vU8_pendingSendsCount].active    = true;
+                        vU8_pendingSendsCount++;
                     }
                 }
-                
+
                 // Envia notificação Telegram se habilitado na ação
                 if (vA_actionConfigs[i].telegram) {
                     String pinOrigemNome = vA_pinConfigs[pinOrigemIndex].nome;
@@ -580,11 +591,15 @@ void fV_executeActionsTask(void) {
                             // Envia o valor REAL do pino de origem (status_atual)
                             uint16_t pinValue = vA_pinConfigs[pinOrigemIndex].status_atual;
 
-                            fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Enviando valor %d do pino origem %d (normalização) para módulo '%s', pino remoto %d",
+                            fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Agendando normalização: valor %d do pino origem %d para módulo '%s', pino remoto %d",
                                 pinValue, vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].envia_modulo.c_str(), vA_actionConfigs[i].pino_remoto);
 
-                            if (!fB_sendRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, pinValue)) {
-                                fV_enqueueRemoteAction(vA_actionConfigs[i].envia_modulo, vA_actionConfigs[i].pino_remoto, pinValue);
+                            if (vU8_pendingSendsCount < PENDING_SENDS_SIZE) {
+                                vA_pendingRemoteSends[vU8_pendingSendsCount].moduleId  = vA_actionConfigs[i].envia_modulo;
+                                vA_pendingRemoteSends[vU8_pendingSendsCount].remotePin = vA_actionConfigs[i].pino_remoto;
+                                vA_pendingRemoteSends[vU8_pendingSendsCount].value     = pinValue;
+                                vA_pendingRemoteSends[vU8_pendingSendsCount].active    = true;
+                                vU8_pendingSendsCount++;
                             }
                         }
                     }
@@ -689,12 +704,18 @@ void fV_executeAction(uint8_t actionIndex) {
             // Alterna entre ON e OFF (tempos em ms, task roda a cada 100ms)
             uint16_t ciclos_on_pisca = action->tempo_on / 100;
             uint16_t ciclos_off_pisca = action->tempo_off / 100;
-            
+
             if (vA_pinConfigs[pinDestinoIndex].status_atual == 0) {
-                action->contador_off++;
-                if (action->contador_off >= ciclos_off_pisca) {
+                // Primeira chamada (ambos contadores zerados): liga imediatamente
+                // Garante ativação antes de qualquer chamada HTTP bloqueante
+                if (action->contador_off == 0 && action->contador_on == 0) {
                     fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
-                    action->contador_off = 0;
+                } else {
+                    action->contador_off++;
+                    if (action->contador_off >= ciclos_off_pisca) {
+                        fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
+                        action->contador_off = 0;
+                    }
                 }
             } else {
                 action->contador_on++;
@@ -763,6 +784,30 @@ void fV_executeAction(uint8_t actionIndex) {
 
 // NOTA: O envio para módulo remoto agora é feito apenas na mudança de estado do pino origem,
 // não a cada execução da ação, para evitar envios repetidos em ações tipo PISCA
+
+//========================================
+// Processa envios remotos pendentes fora do mutex
+// Chamada pela task FreeRTOS após liberar vO_pinActionMutex
+//========================================
+void fV_processPendingRemoteSends(void) {
+    if (vU8_pendingSendsCount == 0) return;
+
+    for (uint8_t i = 0; i < vU8_pendingSendsCount; i++) {
+        if (!vA_pendingRemoteSends[i].active) continue;
+        if (!fB_sendRemoteAction(vA_pendingRemoteSends[i].moduleId,
+                                 vA_pendingRemoteSends[i].remotePin,
+                                 vA_pendingRemoteSends[i].value)) {
+            if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+                fV_enqueueRemoteAction(vA_pendingRemoteSends[i].moduleId,
+                                       vA_pendingRemoteSends[i].remotePin,
+                                       vA_pendingRemoteSends[i].value);
+                xSemaphoreGive(vO_pinActionMutex);
+            }
+        }
+        vA_pendingRemoteSends[i].active = false;
+    }
+    vU8_pendingSendsCount = 0;
+}
 
 //========================================
 // Envia ação para módulo remoto via HTTP

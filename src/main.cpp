@@ -6,13 +6,11 @@
 // Inicialização de Variáveis globais
 bool vB_wifiIsConnected = false;
 
+// Mutex e task FreeRTOS para leitura de pinos e execução de ações (Core 1)
+SemaphoreHandle_t vO_pinActionMutex = nullptr;
+TaskHandle_t vO_pinActionTaskHandle = nullptr;
+
 // Variáveis de controle de tempo para tasks periódicas
-unsigned long vU32_lastPinReadTime = 0;
-const unsigned long vU32_pinReadInterval = 500; // Leitura a cada 500ms
-
-unsigned long vU32_lastActionExecTime = 0;
-const unsigned long vU32_actionExecInterval = 100; // Execução de ações a cada 100ms
-
 unsigned long vU32_lastMqttLoopTime = 0;
 const unsigned long vU32_mqttLoopInterval = 450; // Loop MQTT a cada 50ms (não bloqueante)
 
@@ -34,8 +32,44 @@ Preferences preferences;
 MainConfig_t vSt_mainConfig;
 AsyncWebServer* SERVIDOR_WEB_ASYNC = nullptr;
 
+//========================================
+// Task FreeRTOS: leitura de pinos + execução de ações (Core 1, 100ms)
+// Isolada do loop principal para não ser afetada por chamadas HTTP bloqueantes
+//========================================
+void fV_pinActionTask(void* pvParameters) {
+    const TickType_t xFrequency = pdMS_TO_TICKS(100);
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    uint8_t vU8_pinReadCycle = 0;
+
+    fV_printSerialDebug(LOG_INIT, "[TASK] Task pinos/acoes iniciada no Core %d", xPortGetCoreID());
+
+    for (;;) {
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+
+        if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            // Leitura de pinos a cada 500ms (5 ciclos de 100ms)
+            vU8_pinReadCycle++;
+            if (vU8_pinReadCycle >= 5) {
+                vU8_pinReadCycle = 0;
+                fV_readPinsTask();
+            }
+            // Execução de ações a cada 100ms
+            fV_executeActionsTask();
+            xSemaphoreGive(vO_pinActionMutex);
+        } else {
+            fV_printSerialDebug(LOG_ACTIONS, "[TASK] Mutex nao obtido, ciclo ignorado");
+        }
+
+        // Processa envios HTTP pendentes FORA do mutex (evita bloquear a task)
+        fV_processPendingRemoteSends();
+    }
+}
+
 void setup() {
-  // 0. Inicializa LittleFS
+  // 0. Cria mutex antes de qualquer inicialização que acesse arrays compartilhados
+  vO_pinActionMutex = xSemaphoreCreateMutex();
+
+  // 0b. Inicializa LittleFS
   if (!LittleFS.begin(true)) {
     Serial.println("ERRO: Falha ao montar LittleFS");
   }
@@ -112,28 +146,28 @@ void setup() {
   }
 
   fV_printSerialDebug(LOG_INIT, "Hostname: %s", vSt_mainConfig.vS_hostname.c_str());
+
+  // 14. CRIA TASK FREERTOS: leitura de pinos + execução de ações no Core 1
+  xTaskCreatePinnedToCore(
+    fV_pinActionTask,       // Função da task
+    "PinActionTask",        // Nome para debug
+    4096,                   // Stack em words (16KB)
+    nullptr,                // Parâmetro
+    2,                      // Prioridade (acima do loop=1, abaixo do WiFi)
+    &vO_pinActionTaskHandle,// Handle
+    1                       // Core 1
+  );
   fV_printSerialDebug(LOG_INIT, "--- Fim da inicializacao SMCR ---");
-  // Use vSt_mainConfig.vS_hostname aqui se precisar
 }
 
 void loop() {
   // 1. CHECAGEM E RECONEXAO: Mantém a conexao Wi-Fi ativa (checa a cada 15s)
   fV_checkWifiConnection();
 
-  // 2. LEITURA PERIODICA DE PINOS: Atualiza status de pinos físicos (exceto remotos)
+  // 2. Leitura de pinos e execução de ações movidas para fV_pinActionTask (Core 1)
   unsigned long vU32_currentTime = millis();
-  if (vU32_currentTime - vU32_lastPinReadTime >= vU32_pinReadInterval) {
-    vU32_lastPinReadTime = vU32_currentTime;
-    fV_readPinsTask();
-  }
-  
-  // 3. EXECUÇÃO DE AÇÕES: Processa ações automáticas (a cada 100ms)
-  if (vU32_currentTime - vU32_lastActionExecTime >= vU32_actionExecInterval) {
-    vU32_lastActionExecTime = vU32_currentTime;
-    fV_executeActionsTask();
-  }
 
-  // 4. LOOP MQTT: Mantém conexão MQTT ativa e processa mensagens (não bloqueante)
+  // 3. LOOP MQTT: Mantém conexão MQTT ativa e processa mensagens (não bloqueante)
   if (vU32_currentTime - vU32_lastMqttLoopTime >= vU32_mqttLoopInterval) {
     vU32_lastMqttLoopTime = vU32_currentTime;
     fV_mqttLoop();
@@ -184,7 +218,10 @@ void loop() {
   // 11. FILA DE REENVIO: Retenta alertas inter-módulos que falharam (a cada 5s)
   if (vU32_currentTime - vU32_lastRemoteQueueTime >= vU32_remoteQueueInterval) {
     vU32_lastRemoteQueueTime = vU32_currentTime;
-    fV_processRemoteQueue();
+    if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+      fV_processRemoteQueue();
+      xSemaphoreGive(vO_pinActionMutex);
+    }
   }
 
   // 12. CLOUD HEARTBEAT: Envia status periódico para manter dispositivo online no SMCR Cloud HA
