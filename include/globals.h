@@ -195,7 +195,7 @@ struct InterModConfig_t {
     // Alerta de offline
     String pins_offline;              // GPIOs que piscam quando módulo fica offline (ex: "3,4")
     bool offline_alert_enabled;       // Habilitar piscar ao ficar offline
-    uint16_t offline_flash_ms;        // Intervalo de piscada offline em ms (padrão 500)
+    uint16_t offline_flash_ms;        // Intervalo de piscada offline em ms (padrão 200)
     // Alerta de healthcheck
     String pins_healthcheck;          // GPIOs que piscam durante healthcheck (ex: "5")
     bool healthcheck_alert_enabled;   // Habilitar piscar durante healthcheck
