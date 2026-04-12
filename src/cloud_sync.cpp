@@ -6,6 +6,17 @@
 
 bool vB_pendingCloudSync = false;
 static String vS_cloudSyncStatus = "Nunca sincronizado";
+static uint32_t vU32_lastSyncHash = 0;
+
+// Hash FNV-1a 32-bit do payload — leve e sem dependências
+static uint32_t fU32_hashPayload(const String& s) {
+    uint32_t hash = 2166136261UL;
+    for (unsigned int i = 0; i < s.length(); i++) {
+        hash ^= (uint8_t)s[i];
+        hash *= 16777619UL;
+    }
+    return hash;
+}
 
 // ── Download de arquivos HTML da cloud ────────────────────────────────────────
 bool vB_pendingFetchCloudFiles = false;
@@ -110,6 +121,17 @@ void fV_cloudSyncTask(void) {
         fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Erro ao parsear JSON");
         return;
     }
+
+    // ── Verifica se houve alteração ───────────────────────────────────
+    uint32_t newHash = fU32_hashPayload(payload);
+    if (newHash == vU32_lastSyncHash) {
+        vS_cloudSyncStatus  = "OK: sem alterações";
+        vS_cloudSyncLastTime = fS_getFormattedTime();
+        fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Sync: payload idêntico ao anterior, nenhuma alteração aplicada.");
+        return;
+    }
+    vU32_lastSyncHash = newHash;
+    fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Sync: alteração detectada (hash %u), aplicando configurações.", newHash);
 
     // ── Rede ──────────────────────────────────────────────────────────
     if (doc["hostname"].is<const char*>())
