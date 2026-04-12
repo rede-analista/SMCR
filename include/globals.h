@@ -381,6 +381,7 @@ void fV_processPendingRemoteSends(void); // Processa envios HTTP pendentes (cham
 
 /* Funções do SMCR Cloud (cloud_sync.cpp) */
 void fV_cloudSyncTask(void);               // Executa sincronização com a cloud SMCR
+void fV_cloudOtaFromGitHub(void);          // Baixa e instala firmware mais recente do GitHub via OTA
 String fS_getCloudSyncStatus(void);        // Retorna último status de sync
 String fS_getCloudSyncLastTime(void);      // Retorna horário do último sync
 extern bool vB_pendingCloudSync;           // Flag para forçar sync imediato

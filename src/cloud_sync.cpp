@@ -3,6 +3,8 @@
 
 #include "globals.h"
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <Update.h>
 
 bool vB_pendingCloudSync = false;
 static String vS_cloudSyncStatus = "Nunca sincronizado";
@@ -73,9 +75,108 @@ String fS_getCloudSyncStatus(void) {
 // PINOS:          pins[] (array de objetos com campos do PinConfig_t)
 // AÇÕES:          actions[] (array de objetos com campos do ActionConfig_t)
 // =============================================================================
+// AÇÕES (executadas após sync completo, auto-desativadas pela cloud):
+//   reboot_on_sync      — reinicia o ESP32 após aplicar as configurações
+//   ota_update_on_sync  — baixa e instala o firmware mais recente do GitHub via OTA
 // NÃO SINCRONIZAR (configurações locais do ESP32, não devem vir da cloud):
 //   cloud_url, cloud_sync_enabled, cloud_sync_interval_min, cloud_api_token
 // =============================================================================
+
+// =============================================================================
+// OTA via GitHub — busca o firmware mais recente e instala via streaming
+// =============================================================================
+void fV_cloudOtaFromGitHub(void) {
+    fV_printSerialDebug(LOG_NETWORK, "[OTA] Iniciando update via GitHub...");
+
+    // ── 1. Busca a versão mais recente na API do GitHub ───────────────
+    WiFiClientSecure secClient;
+    secClient.setInsecure();  // Sem verificação de certificado (ESP32 sem CA bundle)
+
+    HTTPClient http;
+    http.setTimeout(10000);
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    http.addHeader("User-Agent", "ESP32-SMCR");
+
+    if (!http.begin(secClient, "https://api.github.com/repos/rede-analista/SMCR/releases/latest")) {
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao conectar na API GitHub");
+        return;
+    }
+
+    int apiCode = http.GET();
+    if (apiCode != HTTP_CODE_OK) {
+        http.end();
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Erro HTTP na API GitHub: %d", apiCode);
+        return;
+    }
+
+    // Parse somente tag_name para economizar memória
+    JsonDocument apiDoc;
+    JsonDocument filter;
+    filter["tag_name"] = true;
+    WiFiClient* apiStream = http.getStreamPtr();
+    DeserializationError err = deserializeJson(apiDoc, *apiStream, DeserializationOption::Filter(filter));
+    http.end();
+
+    if (err) {
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Erro ao parsear API GitHub: %s", err.c_str());
+        return;
+    }
+
+    String tag = apiDoc["tag_name"] | "";
+    if (tag.length() == 0) {
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] tag_name vazio na resposta da API GitHub");
+        return;
+    }
+
+    // tag = "v2.2.4"  →  version = "2.2.4"
+    String version = tag.startsWith("v") ? tag.substring(1) : tag;
+    String binUrl  = "https://raw.githubusercontent.com/rede-analista/SMCR/" + tag
+                   + "/firmware/v" + version + "/SMCR_v" + version + "_firmware.bin";
+
+    fV_printSerialDebug(LOG_NETWORK, "[OTA] Release: %s | URL: %s", tag.c_str(), binUrl.c_str());
+
+    // ── 2. Download e gravação em streaming ───────────────────────────
+    WiFiClientSecure secClient2;
+    secClient2.setInsecure();
+
+    HTTPClient http2;
+    http2.setTimeout(60000);
+    http2.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+    if (!http2.begin(secClient2, binUrl)) {
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao conectar para download do firmware");
+        return;
+    }
+
+    int binCode = http2.GET();
+    if (binCode != HTTP_CODE_OK) {
+        http2.end();
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Erro HTTP no download do firmware: %d", binCode);
+        return;
+    }
+
+    int contentLen = http2.getSize();
+    fV_printSerialDebug(LOG_NETWORK, "[OTA] Tamanho: %d bytes. Gravando...", contentLen);
+
+    if (!Update.begin(contentLen > 0 ? (size_t)contentLen : UPDATE_SIZE_UNKNOWN)) {
+        http2.end();
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao iniciar Update (sem espaço?)");
+        return;
+    }
+
+    WiFiClient* binStream = http2.getStreamPtr();
+    size_t written = Update.writeStream(*binStream);
+    http2.end();
+
+    if (!Update.end(true)) {
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao finalizar Update (%d bytes gravados)", written);
+        return;
+    }
+
+    fV_printSerialDebug(LOG_NETWORK, "[OTA] Firmware %s instalado (%d bytes). Reiniciando...", tag.c_str(), written);
+    delay(500);
+    ESP.restart();
+}
 
 void fV_cloudSyncTask(void) {
     if (!vB_wifiIsConnected) {
@@ -253,6 +354,12 @@ void fV_cloudSyncTask(void) {
     // Isso evita que a cloud desabilite o próprio sincronismo ou altere
     // a URL/token de onde o ESP32 busca as configurações.
 
+    // ── Flags de ação ─────────────────────────────────────────────────
+    // Lidas antes de salvar/reiniciar para que o reboot_on_sync e ota_update_on_sync
+    // atuem após aplicar toda a configuração.
+    bool vB_rebootOnSync = !doc["reboot_on_sync"].isNull() && doc["reboot_on_sync"].as<bool>();
+    bool vB_otaOnSync    = !doc["ota_update_on_sync"].isNull() && doc["ota_update_on_sync"].as<bool>();
+
     fV_salvarMainConfig();
     fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Config geral aplicada e salva.");
 
@@ -311,6 +418,20 @@ void fV_cloudSyncTask(void) {
     vS_cloudSyncStatus  = "Sincronizado: " + String(vU8_pinsAdded) + " pinos, " + String(vU8_actionsAdded) + " acoes";
     vS_cloudSyncLastTime = fS_getFormattedTime();
     fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Sync completo.");
+
+    // ── Executa flags de ação (após sync completo) ────────────────────
+    if (vB_otaOnSync) {
+        fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Flag ota_update_on_sync ativo — iniciando OTA via GitHub...");
+        fV_cloudOtaFromGitHub();
+        // Se chegou aqui, OTA falhou (sucesso chama ESP.restart() internamente)
+        fV_printSerialDebug(LOG_NETWORK, "[CLOUD] OTA falhou, continuando operacao normal.");
+        return;
+    }
+    if (vB_rebootOnSync) {
+        fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Flag reboot_on_sync ativo — reiniciando...");
+        delay(200);
+        ESP.restart();
+    }
 }
 
 /**
