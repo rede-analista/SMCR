@@ -210,6 +210,12 @@ const char web_setup_files_html[] PROGMEM = R"rawliteral(
                border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; }
         .btn:hover { background: #0056b3; }
         .btn:disabled { background: #999; cursor: not-allowed; }
+        .btn-gh { width: 100%; padding: 12px; background: #24292e; color: white; border: none;
+                  border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-gh:hover { background: #444d56; }
+        .btn-gh:disabled { background: #999; cursor: not-allowed; }
+        .separator { text-align: center; margin: 14px 0 4px; font-size: 13px; color: #aaa; }
+        .gh-version { font-size: 12px; color: #888; text-align: center; margin-bottom: 6px; min-height: 16px; }
         .status { margin-top: 16px; padding: 12px; border-radius: 4px; text-align: center;
                   font-size: 14px; display: none; }
         .info  { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
@@ -231,6 +237,12 @@ const char web_setup_files_html[] PROGMEM = R"rawliteral(
 
     <button class="btn" id="btnFetch" onclick="fetchFiles()">
         ☁ Baixar arquivos HTML do servidor cloud
+    </button>
+
+    <div class="separator">— ou —</div>
+    <div class="gh-version" id="ghVersion">Verificando versão no GitHub...</div>
+    <button class="btn-gh" id="btnGithub" onclick="fetchFromGitHub()" disabled>
+        🐙 Baixar arquivos do GitHub
     </button>
 
     <div class="status info" id="statusBox" style="display:none;"></div>
@@ -290,6 +302,55 @@ const char web_setup_files_html[] PROGMEM = R"rawliteral(
         el.innerHTML = msg;
         el.className = 'status ' + type;
         el.style.display = 'block';
+    }
+
+    // === GITHUB ===
+    let ghTag = '';
+    (async function loadGhVersion() {
+        try {
+            const r = await fetch('https://api.github.com/repos/rede-analista/SMCR/releases/latest');
+            const d = await r.json();
+            ghTag = (d.tag_name || '').trim();
+            const el = document.getElementById('ghVersion');
+            if (ghTag) {
+                el.textContent = 'Versão disponível: ' + ghTag;
+                document.getElementById('btnGithub').disabled = false;
+            } else {
+                el.textContent = 'Versão não encontrada no GitHub.';
+            }
+        } catch(e) {
+            document.getElementById('ghVersion').textContent = 'GitHub indisponível.';
+        }
+    })();
+
+    async function fetchFromGitHub() {
+        if (!ghTag) return;
+        const btn = document.getElementById('btnGithub');
+        btn.disabled = true;
+        btn.textContent = '⏳ Buscando...';
+        showStatus('Obtendo lista de arquivos do GitHub...', 'info');
+        try {
+            const r = await fetch('https://api.github.com/repos/rede-analista/SMCR/contents/data?ref=' + encodeURIComponent(ghTag));
+            const files = await r.json();
+            const htmlFiles = files.filter(f => f.type === 'file' && f.name.endsWith('.html'));
+            if (!htmlFiles.length) throw new Error('Nenhum arquivo HTML encontrado.');
+            for (let i = 0; i < htmlFiles.length; i++) {
+                const f = htmlFiles[i];
+                showStatus('(' + (i+1) + '/' + htmlFiles.length + ') Baixando ' + f.name + '...', 'info');
+                const blob = await fetch(f.download_url).then(res => { if (!res.ok) throw new Error('Erro ao baixar ' + f.name); return res.blob(); });
+                showStatus('(' + (i+1) + '/' + htmlFiles.length + ') Enviando ' + f.name + '...', 'info');
+                const form = new FormData();
+                form.append('file', blob, f.name);
+                const up = await fetch('/api/files/upload', { method: 'POST', body: form });
+                if (!up.ok) throw new Error('Erro ao salvar ' + f.name);
+            }
+            showStatus('Arquivos instalados com sucesso!<br><strong>Redirecionando para o dashboard...</strong>', 'ok');
+            setTimeout(() => window.location.href = '/', 2000);
+        } catch(e) {
+            showStatus('Erro: ' + e.message, 'err');
+            btn.disabled = false;
+            btn.textContent = '🐙 Baixar arquivos do GitHub';
+        }
     }
 </script>
 </body>
