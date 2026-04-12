@@ -131,7 +131,7 @@ void fV_sendTelegramActionNotification(const ActionConfig_t* action, const Strin
         default: tipoAcao = "DESCONHECIDO"; break;
     }
     
-    String message = "🔔 <b>Alerta SMCR</b>\n\n";
+    String message = "🔔 <b>Notificação SMCR (alerta)</b>\n\n";
     message += "📌 <b>Módulo:</b> " + vSt_mainConfig.vS_hostname + "\n";
     
     // Pino de origem (sensor)

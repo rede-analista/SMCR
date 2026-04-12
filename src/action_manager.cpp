@@ -630,7 +630,7 @@ void fV_executeActionsTask(void) {
                         default: tipoAcao = "DESCONHECIDO"; break;
                     }
                     
-                    String message = "✅ <b>Normalização SMCR</b>\n\n";
+                    String message = "✅ <b>Notificação SMCR (normalizado)</b>\n\n";
                     message += "📌 <b>Módulo:</b> " + vSt_mainConfig.vS_hostname + "\n";
                     
                     // Pino de origem
@@ -706,8 +706,10 @@ void fV_executeAction(uint8_t actionIndex) {
             uint16_t ciclos_off_pisca = action->tempo_off / 100;
 
             if (vA_pinConfigs[pinDestinoIndex].status_atual == 0) {
-                // Primeira chamada (ambos contadores zerados): liga imediatamente
-                // Garante ativação antes de qualquer chamada HTTP bloqueante
+                // Primeira ativação (ambos contadores zerados): liga imediatamente.
+                // Garante ativação antes de qualquer chamada HTTP bloqueante.
+                // Nos ciclos seguintes, contador_off começa em 1 (vide turn-off abaixo),
+                // impedindo que esta condição seja reutilizada erroneamente.
                 if (action->contador_off == 0 && action->contador_on == 0) {
                     fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
                 } else {
@@ -722,6 +724,10 @@ void fV_executeAction(uint8_t actionIndex) {
                 if (action->contador_on >= ciclos_on_pisca) {
                     fV_writeActionPin(pinDestinoIndex, action->pino_destino, false);
                     action->contador_on = 0;
+                    // Inicia o período OFF em 1 para que a condição de primeira ativação
+                    // (contador_off==0 && contador_on==0) não seja reutilizada, o que
+                    // causaria religamento imediato sem aguardar tempo_off.
+                    action->contador_off = 1;
                 }
             }
             break;
