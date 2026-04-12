@@ -60,8 +60,9 @@ void fV_pinActionTask(void* pvParameters) {
             fV_printSerialDebug(LOG_ACTIONS, "[TASK] Mutex nao obtido, ciclo ignorado");
         }
 
-        // Processa envios HTTP pendentes FORA do mutex (evita bloquear a task)
+        // Processa envios HTTP/HTTPS pendentes FORA do mutex (evita bloquear a task)
         fV_processPendingRemoteSends();
+        fV_processPendingTelegramSend();
     }
 }
 
@@ -151,7 +152,7 @@ void setup() {
   xTaskCreatePinnedToCore(
     fV_pinActionTask,       // Função da task
     "PinActionTask",        // Nome para debug
-    4096,                   // Stack em words (16KB)
+    12288,                  // Stack em bytes (12KB) - necessário para chamadas HTTPS (WiFiClientSecure)
     nullptr,                // Parâmetro
     2,                      // Prioridade (acima do loop=1, abaixo do WiFi)
     &vO_pinActionTaskHandle,// Handle

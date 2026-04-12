@@ -108,17 +108,9 @@ void fV_telegramLoop(void) {
 }
 
 /**
- * Envia notificação de ação acionada
- * @param pinOrigem Número do pino que disparou a ação
- * @param pinNome Nome do pino origem
- * @param numeroAcao Número da ação (1-4)
+ * Constrói mensagem de notificação de ação acionada (sem enviar)
  */
-void fV_sendTelegramActionNotification(const ActionConfig_t* action, const String& pinOrigemNome, const String& pinDestinoNome) {
-    if (!vSt_mainConfig.vB_telegramEnabled) {
-        return;
-    }
-    
-    // Determinar texto do tipo de ação
+String fS_buildTelegramActionMessage(const ActionConfig_t* action, const String& pinOrigemNome, const String& pinDestinoNome) {
     String tipoAcao;
     switch(action->acao) {
         case 1: tipoAcao = "LIGA"; break;
@@ -130,28 +122,24 @@ void fV_sendTelegramActionNotification(const ActionConfig_t* action, const Strin
         case 65535: tipoAcao = "SINCRONISMO"; break;
         default: tipoAcao = "DESCONHECIDO"; break;
     }
-    
+
     String message = "🔔 <b>Notificação SMCR (alerta)</b>\n\n";
     message += "📌 <b>Módulo:</b> " + vSt_mainConfig.vS_hostname + "\n";
-    
-    // Pino de origem (sensor)
+
     message += "📍 <b>Pino Origem:</b> " + String(action->pino_origem);
     if (!pinOrigemNome.isEmpty()) {
         message += " (" + pinOrigemNome + ")";
     }
     message += "\n";
-    
-    // Pino de destino (atuador)
+
     message += "🎯 <b>Pino Destino:</b> " + String(action->pino_destino);
     if (!pinDestinoNome.isEmpty()) {
         message += " (" + pinDestinoNome + ")";
     }
     message += "\n";
-    
-    // Informações da ação
+
     message += "⚡ <b>Ação:</b> #" + String(action->numero_acao) + " - " + tipoAcao + "\n";
-    
-    // Tempos (se aplicável)
+
     if (action->acao == 2 || action->acao == 3 || action->acao == 4 || action->acao == 5) {
         if (action->tempo_on > 0) {
             message += "⏱️ <b>Tempo ON:</b> " + String(action->tempo_on) + " ciclos\n";
@@ -160,13 +148,57 @@ void fV_sendTelegramActionNotification(const ActionConfig_t* action, const Strin
             message += "⏱️ <b>Tempo OFF:</b> " + String(action->tempo_off) + " ciclos\n";
         }
     }
-    
-    // Módulo remoto (se configurado)
+
     if (action->envia_modulo != "" && action->pino_remoto > 0) {
         message += "🌐 <b>Módulo Remoto:</b> " + action->envia_modulo + " (Pino " + String(action->pino_remoto) + ")\n";
     }
-    
+
     message += "🕐 <b>Horário:</b> " + fS_getFormattedTime();
-    
-    fB_sendTelegramMessage(message);
+    return message;
+}
+
+/**
+ * Constrói mensagem de normalização de ação (sem enviar)
+ */
+String fS_buildTelegramNormalizationMessage(const ActionConfig_t* action, const String& pinOrigemNome, const String& pinDestinoNome) {
+    String tipoAcao;
+    switch(action->acao) {
+        case 1: tipoAcao = "LIGA"; break;
+        case 2: tipoAcao = "LIGA COM DELAY"; break;
+        case 3: tipoAcao = "PISCA"; break;
+        case 4: tipoAcao = "PULSO"; break;
+        case 5: tipoAcao = "PULSO COM DELAY"; break;
+        case 65534: tipoAcao = "STATUS"; break;
+        case 65535: tipoAcao = "SINCRONISMO"; break;
+        default: tipoAcao = "DESCONHECIDO"; break;
+    }
+
+    String message = "✅ <b>Notificação SMCR (normalizado)</b>\n\n";
+    message += "📌 <b>Módulo:</b> " + vSt_mainConfig.vS_hostname + "\n";
+
+    message += "📍 <b>Pino Origem:</b> " + String(action->pino_origem);
+    if (!pinOrigemNome.isEmpty()) {
+        message += " (" + pinOrigemNome + ")";
+    }
+    message += "\n";
+
+    message += "🎯 <b>Pino Destino:</b> " + String(action->pino_destino);
+    if (!pinDestinoNome.isEmpty()) {
+        message += " (" + pinDestinoNome + ")";
+    }
+    message += "\n";
+
+    message += "⚡ <b>Ação:</b> #" + String(action->numero_acao) + " - " + tipoAcao + " normalizada\n";
+    message += "🕐 <b>Horário:</b> " + fS_getFormattedTime();
+    return message;
+}
+
+/**
+ * Envia notificação de ação acionada (uso direto fora de tasks críticas)
+ */
+void fV_sendTelegramActionNotification(const ActionConfig_t* action, const String& pinOrigemNome, const String& pinDestinoNome) {
+    if (!vSt_mainConfig.vB_telegramEnabled) {
+        return;
+    }
+    fB_sendTelegramMessage(fS_buildTelegramActionMessage(action, pinOrigemNome, pinDestinoNome));
 }

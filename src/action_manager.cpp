@@ -17,6 +17,29 @@ RemoteQueueItem_t vA_remoteQueue[REMOTE_QUEUE_SIZE];
 static RemoteQueueItem_t vA_pendingRemoteSends[PENDING_SENDS_SIZE];
 static uint8_t vU8_pendingSendsCount = 0;
 
+// Mensagem Telegram pendente (preenchida dentro do mutex, processada fora)
+static String vS_pendingTelegramMsg = "";
+static bool vB_pendingTelegramMsg = false;
+
+//========================================
+// Enfileira mensagem Telegram para envio fora do mutex
+//========================================
+void fV_queueTelegramMessage(const String& msg) {
+    vS_pendingTelegramMsg = msg;
+    vB_pendingTelegramMsg = true;
+}
+
+//========================================
+// Processa mensagem Telegram pendente fora do mutex
+// Chamada pela task FreeRTOS após liberar vO_pinActionMutex
+//========================================
+void fV_processPendingTelegramSend(void) {
+    if (!vB_pendingTelegramMsg) return;
+    vB_pendingTelegramMsg = false;
+    fB_sendTelegramMessage(vS_pendingTelegramMsg);
+    vS_pendingTelegramMsg = "";
+}
+
 //========================================
 // Enfileira alerta inter-módulo para reenvio
 //========================================
@@ -561,7 +584,7 @@ void fV_executeActionsTask(void) {
                     }
                 }
 
-                // Envia notificação Telegram se habilitado na ação
+                // Enfileira notificação Telegram se habilitado na ação (processada fora do mutex)
                 if (vA_actionConfigs[i].telegram) {
                     String pinOrigemNome = vA_pinConfigs[pinOrigemIndex].nome;
                     uint8_t pinDestinoIndex = fU8_findPinIndex(vA_actionConfigs[i].pino_destino);
@@ -569,10 +592,8 @@ void fV_executeActionsTask(void) {
                     if (pinDestinoIndex != 255) {
                         pinDestinoNome = vA_pinConfigs[pinDestinoIndex].nome;
                     }
-                    fV_sendTelegramActionNotification(
-                        &vA_actionConfigs[i],
-                        pinOrigemNome,
-                        pinDestinoNome
+                    fV_queueTelegramMessage(
+                        fS_buildTelegramActionMessage(&vA_actionConfigs[i], pinOrigemNome, pinDestinoNome)
                     );
                 }
             } else {
@@ -605,52 +626,20 @@ void fV_executeActionsTask(void) {
                     }
                 }
                 
-                // Envia notificação Telegram de normalização se habilitado na ação
+                // Enfileira notificação Telegram de normalização (processada fora do mutex)
                 if (vA_actionConfigs[i].telegram) {
-                    fV_printSerialDebug(LOG_ACTIONS, "[TELEGRAM] Enviando notificação de normalização - Pino %d, Ação #%d", 
+                    fV_printSerialDebug(LOG_ACTIONS, "[TELEGRAM] Agendando notificação de normalização - Pino %d, Ação #%d",
                         vA_actionConfigs[i].pino_origem, vA_actionConfigs[i].numero_acao);
-                    
+
                     String pinOrigemNome = vA_pinConfigs[pinOrigemIndex].nome;
                     uint8_t pinDestinoIndex = fU8_findPinIndex(vA_actionConfigs[i].pino_destino);
                     String pinDestinoNome = "";
                     if (pinDestinoIndex != 255) {
                         pinDestinoNome = vA_pinConfigs[pinDestinoIndex].nome;
                     }
-                    
-                    // Determinar texto do tipo de ação
-                    String tipoAcao;
-                    switch(vA_actionConfigs[i].acao) {
-                        case 1: tipoAcao = "LIGA"; break;
-                        case 2: tipoAcao = "LIGA COM DELAY"; break;
-                        case 3: tipoAcao = "PISCA"; break;
-                        case 4: tipoAcao = "PULSO"; break;
-                        case 5: tipoAcao = "PULSO COM DELAY"; break;
-                        case 65534: tipoAcao = "STATUS"; break;
-                        case 65535: tipoAcao = "SINCRONISMO"; break;
-                        default: tipoAcao = "DESCONHECIDO"; break;
-                    }
-                    
-                    String message = "✅ <b>Notificação SMCR (normalizado)</b>\n\n";
-                    message += "📌 <b>Módulo:</b> " + vSt_mainConfig.vS_hostname + "\n";
-                    
-                    // Pino de origem
-                    message += "📍 <b>Pino Origem:</b> " + String(vA_actionConfigs[i].pino_origem);
-                    if (!pinOrigemNome.isEmpty()) {
-                        message += " (" + pinOrigemNome + ")";
-                    }
-                    message += "\n";
-                    
-                    // Pino de destino
-                    message += "🎯 <b>Pino Destino:</b> " + String(vA_actionConfigs[i].pino_destino);
-                    if (!pinDestinoNome.isEmpty()) {
-                        message += " (" + pinDestinoNome + ")";
-                    }
-                    message += "\n";
-                    
-                    message += "⚡ <b>Ação:</b> #" + String(vA_actionConfigs[i].numero_acao) + " - " + tipoAcao + " normalizada\n";
-                    message += "🕐 <b>Horário:</b> " + fS_getFormattedTime();
-                    
-                    fB_sendTelegramMessage(message);
+                    fV_queueTelegramMessage(
+                        fS_buildTelegramNormalizationMessage(&vA_actionConfigs[i], pinOrigemNome, pinDestinoNome)
+                    );
                 }
                 
                 // Reseta contadores e estado da ação

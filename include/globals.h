@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.2.3"
+#define FIRMWARE_VERSION "2.2.4"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -397,6 +397,12 @@ void fV_initTelegram(void);
 void fV_telegramLoop(void);
 bool fB_sendTelegramMessage(const String& message);
 void fV_sendTelegramActionNotification(const ActionConfig_t* action, const String& pinOrigemNome, const String& pinDestinoNome);
+String fS_buildTelegramActionMessage(const ActionConfig_t* action, const String& pinOrigemNome, const String& pinDestinoNome);
+String fS_buildTelegramNormalizationMessage(const ActionConfig_t* action, const String& pinOrigemNome, const String& pinDestinoNome);
+
+/* Fila de Telegram em actions (action_manager.cpp) */
+void fV_queueTelegramMessage(const String& msg);
+void fV_processPendingTelegramSend(void); // Processa mensagem Telegram pendente (chamado fora do mutex)
 bool fB_sendRemoteAction(const String& moduleId, uint16_t remotePin, bool state); // Envia ação digital para módulo remoto
 bool fB_sendRemoteAction(const String& moduleId, uint16_t remotePin, uint16_t value); // Envia valor analógico para módulo remoto
 bool fB_requestPinSyncFromModule(const String& moduleId); // Solicita sincronização de pinos de um módulo específico
