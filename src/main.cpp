@@ -162,31 +162,33 @@ void setup() {
 }
 
 void loop() {
-  // 1. CHECAGEM E RECONEXAO: Mantém a conexao Wi-Fi ativa (checa a cada 15s)
+  // 1. CHECAGEM E RECONEXAO: Mantém a conexao Wi-Fi ativa (intervalo configurável, default 32s)
   fV_checkWifiConnection();
 
   // 2. Leitura de pinos e execução de ações movidas para fV_pinActionTask (Core 1)
   unsigned long vU32_currentTime = millis();
 
   // 3. LOOP MQTT: Mantém conexão MQTT ativa e processa mensagens (não bloqueante)
-  if (vU32_currentTime - vU32_lastMqttLoopTime >= vU32_mqttLoopInterval) {
+  if (vB_wifiIsConnected && vU32_currentTime - vU32_lastMqttLoopTime >= vU32_mqttLoopInterval) {
     vU32_lastMqttLoopTime = vU32_currentTime;
     fV_mqttLoop();
   }
   
   // 5. TASKS DE INTER-MÓDULOS: Healthcheck e descoberta automática
-  if (vU32_currentTime - vU32_lastInterModTaskTime >= vU32_interModTaskInterval) {
+  if (vB_wifiIsConnected && vU32_currentTime - vU32_lastInterModTaskTime >= vU32_interModTaskInterval) {
     vU32_lastInterModTaskTime = vU32_currentTime;
-    
+
     // Executa healthcheck se inter-módulos estiver habilitado
     fV_interModHealthCheckTask();
-    
+
     // Executa descoberta automática se habilitada
     fV_interModDiscoveryTask();
   }
 
   // 6. LOOP TELEGRAM: Verificação periódica de mensagens
-  fV_telegramLoop();
+  if (vB_wifiIsConnected) {
+    fV_telegramLoop();
+  }
 
   // 7. SINCRONIZAÇÃO MANUAL DE MÓDULO: Agendada pelo botão "Sincronizar" na interface web
   if (vB_pendingModuleSyncRequest) {
@@ -202,7 +204,7 @@ void loop() {
 
   // 9. CLOUD SYNC: Busca configurações na cloud SMCR (periódico ou forçado)
   unsigned long vU32_cloudSyncIntervalMs = (unsigned long)vSt_mainConfig.vU16_cloudSyncIntervalMin * 60000UL;
-  if (vB_pendingCloudSync ||
+  if ((vB_pendingCloudSync && vB_wifiIsConnected) ||
       (vSt_mainConfig.vB_cloudSyncEnabled && vB_wifiIsConnected &&
        vU32_currentTime - vU32_lastCloudSyncTime >= vU32_cloudSyncIntervalMs)) {
     vB_pendingCloudSync = false;
@@ -211,13 +213,13 @@ void loop() {
   }
 
   // 10. FETCH CLOUD FILES: Download de arquivos HTML da cloud para LittleFS (setup inicial)
-  if (vB_pendingFetchCloudFiles) {
+  if (vB_pendingFetchCloudFiles && vB_wifiIsConnected) {
     vB_pendingFetchCloudFiles = false;
     fV_fetchCloudFilesTask();
   }
 
   // 11. FILA DE REENVIO: Retenta alertas inter-módulos que falharam (a cada 5s)
-  if (vU32_currentTime - vU32_lastRemoteQueueTime >= vU32_remoteQueueInterval) {
+  if (vB_wifiIsConnected && vU32_currentTime - vU32_lastRemoteQueueTime >= vU32_remoteQueueInterval) {
     vU32_lastRemoteQueueTime = vU32_currentTime;
     if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
       fV_processRemoteQueue();

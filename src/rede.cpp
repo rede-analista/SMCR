@@ -3,7 +3,8 @@
 
 // Variável para controle de tempo da checagem (interna a este módulo)
 static unsigned long vL_lastCheckTime = 0;
-static uint16_t vU16_reconnectAttempts = 0; // Contador de tentativas de reconexão
+static uint16_t vU16_reconnectAttempts = 0;  // Contador de tentativas de reconexão
+static unsigned long vL_stableConnectedSince = 0; // Tempo desde que ficou conectado (0 = instável)
 
 //=======================================
 // FV_SETUP_MDNS: Inicializa o mDNS
@@ -128,16 +129,28 @@ void fV_checkWifiConnection(void) {
     if (vL_currentStatus != vB_wifiIsConnected) {
         vB_wifiIsConnected = vL_currentStatus;
         if (vB_wifiIsConnected) {
-            vU16_reconnectAttempts = 0; // Reseta contador ao conectar
+            vL_stableConnectedSince = millis(); // Inicia contagem de estabilidade (não reseta contador ainda)
             fV_printSerialDebug(LOG_NETWORK, "Evento: Conectado ao Wi-Fi. IP: %s", WiFi.localIP().toString().c_str());
             fV_setupMdns();
         } else {
+            vL_stableConnectedSince = 0; // Perdeu conexão antes de estabilizar
             fV_printSerialDebug(LOG_NETWORK, "Evento: Desconectado do Wi-Fi.");
             vL_lastCheckTime = millis() - vSt_mainConfig.vU32_wifiCheckInterval;
         }
     }
 
-    // 2. Lógica de Reconexão Periódica
+    // 2a. Reseta contador somente após 60s de conexão estável
+    //     Evita que reconexões instáveis (flapping) impeçam a ativação do AP de fallback
+    if (vB_wifiIsConnected && vL_stableConnectedSince > 0 &&
+        (millis() - vL_stableConnectedSince >= 60000UL)) {
+        if (vU16_reconnectAttempts > 0) {
+            vU16_reconnectAttempts = 0;
+            fV_printSerialDebug(LOG_NETWORK, "Conexao estavel por 60s. Contador de reconexao resetado.");
+        }
+        vL_stableConnectedSince = 0; // Marca como estabilizado, não verifica mais
+    }
+
+    // 2b. Lógica de Reconexão Periódica
     if (!vB_wifiIsConnected && (WiFi.getMode() == WIFI_STA) && (millis() - vL_lastCheckTime >= vSt_mainConfig.vU32_wifiCheckInterval)) {
         vL_lastCheckTime = millis();
         vU16_reconnectAttempts++;
