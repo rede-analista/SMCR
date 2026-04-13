@@ -71,6 +71,9 @@ String fS_getCloudSyncStatus(void) {
 //                 mqtt_ha_batch, mqtt_ha_interval_ms, mqtt_ha_repeat_sec
 // INTER-MÓDULOS:  intermod_enabled, intermod_healthcheck, intermod_max_failures,
 //                 intermod_auto_discovery
+// MÓDULOS:        intermod_modules[] (module_id, hostname, ip, porta,
+//                 pins_offline, offline_alert_enabled, offline_flash_ms,
+//                 pins_healthcheck, healthcheck_alert_enabled, healthcheck_flash_ms)
 // TELEGRAM:       telegram_enabled, telegram_token, telegram_chatid, telegram_interval
 // PINOS:          pins[] (array de objetos com campos do PinConfig_t)
 // AÇÕES:          actions[] (array de objetos com campos do ActionConfig_t)
@@ -79,7 +82,7 @@ String fS_getCloudSyncStatus(void) {
 //   reboot_on_sync      — reinicia o ESP32 após aplicar as configurações
 //   ota_update_on_sync  — baixa e instala o firmware mais recente do GitHub via OTA
 // NÃO SINCRONIZAR (configurações locais do ESP32, não devem vir da cloud):
-//   cloud_url, cloud_sync_enabled, cloud_sync_interval_min, cloud_api_token
+//   cloud_url, cloud_port, cloud_sync_enabled, cloud_sync_interval_min, cloud_api_token
 // =============================================================================
 
 // =============================================================================
@@ -349,10 +352,15 @@ void fV_cloudSyncTask(void) {
         vSt_mainConfig.vU16_telegramCheckInterval = doc["telegram_interval"].as<int>();
 
     // ── SMCR Cloud ────────────────────────────────────────────────────
-    // NOTA: cloud_url, cloud_sync_enabled, cloud_sync_interval_min e cloud_api_token
-    // são configurações locais e NÃO são sobrescritas pelo sync da cloud.
+    // NOTA: cloud_url, cloud_port, cloud_sync_enabled, cloud_sync_interval_min e
+    // cloud_api_token são configurações locais e NÃO são sobrescritas pelo sync.
     // Isso evita que a cloud desabilite o próprio sincronismo ou altere
     // a URL/token de onde o ESP32 busca as configurações.
+    // Heartbeat pode ser controlado pela cloud pois não afeta o sync.
+    if (!doc["cloud_heartbeat_enabled"].isNull())
+        vSt_mainConfig.vB_cloudHeartbeatEnabled = doc["cloud_heartbeat_enabled"].as<bool>();
+    if (!doc["cloud_heartbeat_interval_min"].isNull())
+        vSt_mainConfig.vU16_cloudHeartbeatIntervalMin = doc["cloud_heartbeat_interval_min"].as<int>();
 
     // ── Flags de ação ─────────────────────────────────────────────────
     // Lidas antes de salvar/reiniciar para que o reboot_on_sync e ota_update_on_sync
@@ -414,6 +422,33 @@ void fV_cloudSyncTask(void) {
     }
     fB_saveActionConfigs();
     fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Acoes: %d sincronizadas.", vU8_actionsAdded);
+
+    // ── Inter-módulos: atualiza campos de alerta dos módulos cadastrados ─
+    // Apenas atualiza campos configuráveis (alerta offline / healthcheck).
+    // Preserva estado de runtime (online, falhas, timestamps).
+    uint8_t vU8_interModUpdated = 0;
+    JsonArray intermodModules = doc["intermod_modules"].as<JsonArray>();
+    if (!intermodModules.isNull()) {
+        for (JsonObject m : intermodModules) {
+            const char* moduleId = m["module_id"] | "";
+            if (moduleId[0] == '\0') continue;
+            for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+                if (vA_interModConfigs[i].id != moduleId) continue;
+                vA_interModConfigs[i].pins_offline             = m["pins_offline"]              | vA_interModConfigs[i].pins_offline;
+                vA_interModConfigs[i].offline_alert_enabled    = m["offline_alert_enabled"]     | vA_interModConfigs[i].offline_alert_enabled;
+                vA_interModConfigs[i].offline_flash_ms         = m["offline_flash_ms"]          | vA_interModConfigs[i].offline_flash_ms;
+                vA_interModConfigs[i].pins_healthcheck         = m["pins_healthcheck"]          | vA_interModConfigs[i].pins_healthcheck;
+                vA_interModConfigs[i].healthcheck_alert_enabled= m["healthcheck_alert_enabled"] | vA_interModConfigs[i].healthcheck_alert_enabled;
+                vA_interModConfigs[i].healthcheck_flash_ms     = m["healthcheck_flash_ms"]      | vA_interModConfigs[i].healthcheck_flash_ms;
+                vU8_interModUpdated++;
+                break;
+            }
+        }
+        if (vU8_interModUpdated > 0) {
+            fB_saveInterModConfigs();
+            fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Inter-modulos: %d modulos atualizados.", vU8_interModUpdated);
+        }
+    }
 
     vS_cloudSyncStatus  = "Sincronizado: " + String(vU8_pinsAdded) + " pinos, " + String(vU8_actionsAdded) + " acoes";
     vS_cloudSyncLastTime = fS_getFormattedTime();
