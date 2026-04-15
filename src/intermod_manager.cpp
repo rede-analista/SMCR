@@ -16,8 +16,10 @@ String vS_pendingModuleSyncId = "";
 // Estado do flash de alerta de módulos offline
 static unsigned long vU32_healthCheckFlashUntil = 0; // Pisca durante healthcheck até este timestamp
 
-// Protótipo interno (definido mais abaixo em fV_interModAlertFlashTask)
+// Protótipos internos
 static void fV_applyPinsFlash(const String& pinsStr, bool state);
+static bool fB_isPinInString(const String& pinsStr, uint16_t gpio);
+static bool fB_pinsStringHasConflict(const String& pinsStr);
 
 // Variáveis globais para log de comunicações
 InterModCommLog_t vSt_InterModCommReceived[MAX_INTERMOD_COMM_LOG];
@@ -666,6 +668,62 @@ static void fV_applyPinsFlash(const String& pinsStr, bool state) {
 }
 
 /**
+ * @brief Verifica se um GPIO está presente em uma string de pinos separados por vírgula
+ */
+static bool fB_isPinInString(const String& pinsStr, uint16_t gpio) {
+    if (pinsStr.length() == 0) return false;
+    String str = pinsStr;
+    int startPos = 0;
+    while (startPos <= (int)str.length()) {
+        int commaPos = str.indexOf(',', startPos);
+        String pinStr = (commaPos == -1) ? str.substring(startPos) : str.substring(startPos, commaPos);
+        pinStr.trim();
+        if (pinStr.length() > 0 && (uint16_t)pinStr.toInt() == gpio) return true;
+        if (commaPos == -1) break;
+        startPos = commaPos + 1;
+    }
+    return false;
+}
+
+/**
+ * @brief Retorna true se algum módulo offline tem alerta ativo para este GPIO
+ * Prioridade 1 (máxima): bloqueia ações e healthcheck no mesmo pino
+ */
+bool fB_isPinBlockedByOffline(uint16_t gpio) {
+    for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+        InterModConfig_t* m = &vA_interModConfigs[i];
+        if (m->offline_alert_enabled && !m->online && fB_isPinInString(m->pins_offline, gpio)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * @brief Verifica se qualquer GPIO da string tem conflito de prioridade para o healthcheck
+ * Conflito: pino bloqueado por alerta offline (P1) ou com ação ativa (P2)
+ */
+static bool fB_pinsStringHasConflict(const String& pinsStr) {
+    if (pinsStr.length() == 0) return false;
+    String str = pinsStr;
+    int startPos = 0;
+    while (startPos <= (int)str.length()) {
+        int commaPos = str.indexOf(',', startPos);
+        String pinStr = (commaPos == -1) ? str.substring(startPos) : str.substring(startPos, commaPos);
+        pinStr.trim();
+        if (pinStr.length() > 0) {
+            uint16_t gpio = (uint16_t)pinStr.toInt();
+            if (fB_isPinBlockedByOffline(gpio) || fB_isPinUsedByActiveAction(gpio)) {
+                return true;
+            }
+        }
+        if (commaPos == -1) break;
+        startPos = commaPos + 1;
+    }
+    return false;
+}
+
+/**
  * @brief Task de flash dos pinos de alerta — offline e healthcheck separados por módulo
  * Deve ser chamada na loop() a cada ~50ms para suportar intervalos curtos
  */
@@ -692,14 +750,16 @@ void fV_interModAlertFlashTask(void) {
         }
 
         // ── Alerta de HealthCheck ────────────────────────────────────────
-        if (m->healthcheck_alert_enabled && inHealthCheckFlash && m->pins_healthcheck.length() > 0) {
+        // Prioridade 3 (menor): cede para offline (P1) e ação ativa (P2)
+        bool hcConflict = fB_pinsStringHasConflict(m->pins_healthcheck);
+        if (m->healthcheck_alert_enabled && inHealthCheckFlash && m->pins_healthcheck.length() > 0 && !hcConflict) {
             if (now - m->ultimo_hc_flash >= m->healthcheck_flash_ms) {
                 m->ultimo_hc_flash = now;
                 m->hc_flash_state = !m->hc_flash_state;
                 fV_applyPinsFlash(m->pins_healthcheck, m->hc_flash_state);
             }
         } else if (m->hc_flash_state) {
-            // Healthcheck terminou ou desabilitado: desliga pinos
+            // Healthcheck terminou, desabilitado ou bloqueado por prioridade: desliga pinos
             m->hc_flash_state = false;
             fV_applyPinsFlash(m->pins_healthcheck, false);
         }

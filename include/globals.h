@@ -373,7 +373,8 @@ uint8_t fU8_findActionIndex(uint16_t pinOrigem, uint8_t numeroAcao);
 int fI_addActionConfig(const ActionConfig_t& config);
 bool fB_removeActionConfig(uint16_t pinOrigem, uint8_t numeroAcao);
 bool fB_updateActionConfig(uint16_t pinOrigem, uint8_t numeroAcao, const ActionConfig_t& config);
-bool fB_isPinUsedByActions(uint16_t pinNumber); // Verifica se pino está em uso por ações
+bool fB_isPinUsedByActions(uint16_t pinNumber);     // Verifica se pino está em uso por ações
+bool fB_isPinUsedByActiveAction(uint16_t gpio);     // Retorna true se alguma ação com estado_acao=true usa este GPIO como destino
 void fV_executeActionsTask(void); // Task periódica para execução de ações
 void fV_executeAction(uint8_t actionIndex); // Executa uma ação específica
 void fV_syncRemotePinsOnBoot(void); // Sincroniza todos os pinos remotos após inicialização
@@ -434,5 +435,6 @@ void fV_interModDiscoveryTask(void);           // Task de descoberta automática
 void fV_interModAlertFlashTask(void);          // Task de piscar LEDs de alerta quando módulo offline
 bool fB_checkModuleHealth(uint8_t moduleIndex); // Verifica saúde de um módulo específico
 String fS_getInterModStatus(void);             // Retorna resumo de status dos módulos
+bool fB_isPinBlockedByOffline(uint16_t gpio);  // Retorna true se algum módulo offline usa este GPIO para alerta offline
 
 #endif // GLOBALS_H

@@ -462,6 +462,21 @@ bool fB_updateActionConfig(uint16_t pinOrigem, uint8_t numeroAcao, const ActionC
 }
 
 //========================================
+// Verifica se alguma ação ATIVA (estado_acao=true) usa este GPIO como destino
+// Usado pelo sistema de prioridades: ação tem precedência sobre healthcheck
+//========================================
+bool fB_isPinUsedByActiveAction(uint16_t gpio) {
+    for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
+        if (vA_actionConfigs[i].acao != ACTION_TYPE_NONE &&
+            vA_actionConfigs[i].estado_acao &&
+            vA_actionConfigs[i].pino_destino == gpio) {
+            return true;
+        }
+    }
+    return false;
+}
+
+//========================================
 // Verifica se um pino está em uso por ações (origem ou destino)
 //========================================
 bool fB_isPinUsedByActions(uint16_t pinNumber) {
@@ -487,9 +502,16 @@ bool fB_isPinUsedByActions(uint16_t pinNumber) {
 
 //========================================
 // Helper: Escreve no pino respeitando nível de acionamento
+// Prioridade 1 (máxima): alerta de offline bloqueia a escrita
 //========================================
 void fV_writeActionPin(uint8_t pinIndex, uint8_t pinGpio, bool ligar) {
     if (pinIndex == 255) return;
+
+    // Prioridade 1: alerta de offline tem precedência sobre ações
+    if (fB_isPinBlockedByOffline(pinGpio)) {
+        fV_printSerialDebug(LOG_ACTIONS, "[ACTION] GPIO %d bloqueado por alerta de offline, ação ignorada", pinGpio);
+        return;
+    }
     
     // Verifica se pino tem nível de acionamento invertido (nivel_acionamento_min == 0)
     bool nivelInvertido = (vA_pinConfigs[pinIndex].nivel_acionamento_min == 0);
