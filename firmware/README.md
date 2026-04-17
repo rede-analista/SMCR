@@ -1,155 +1,116 @@
-# 📦 SMCR - Firmware Pré-Compilado
+# SMCR - Firmware Pré-Compilado
 
 Este diretório contém os arquivos de firmware pré-compilados do sistema SMCR para ESP32, prontos para gravação direta.
 
-## 🔧 **Arquivos Necessários**
+## Arquivos de cada versão
 
-### **Opção 1: Gravação Simples (Recomendada)**
-- **`SMCR_v2.0.0_firmware.bin`** - Arquivo principal do firmware (878 KB)
+Cada pasta de versão contém 3 arquivos necessários para gravação completa em ESP32 novo:
 
-### **Opção 2: Gravação Completa (Para ESP32 novo/limpo)**  
-- **`SMCR_v2.0.0_bootloader.bin`** - Bootloader do ESP32 (17 KB)
-- **`SMCR_v2.0.0_partitions.bin`** - Tabela de partições (3 KB)  
-- **`SMCR_v2.0.0_firmware.bin`** - Firmware principal (878 KB)
+| Arquivo | Endereço | Descrição |
+|---------|----------|-----------|
+| `SMCR_vX.X.X_bootloader.bin` | `0x1000` | Bootloader do ESP32 |
+| `SMCR_vX.X.X_partitions.bin` | `0x8000` | Tabela de partições |
+| `SMCR_vX.X.X_firmware.bin` | `0x10000` | Firmware principal |
 
-## 🚀 **Métodos de Instalação**
+> Para atualizar um ESP32 que já tem o SMCR gravado, use apenas o `firmware.bin` via OTA pela interface web (`/arquivos/firmware`). Os 3 arquivos são necessários apenas na primeira gravação.
 
-### **Método 1: ESP32 Flash Download Tool (Windows)**
+---
 
-1. **Baixe a ferramenta oficial**: [ESP32 Flash Download Tool](https://www.espressif.com/en/support/download/other-tools)
+## Método recomendado: esptool-js (navegador, sem instalação)
 
-2. **Configure os endereços**:
+Funciona em Chrome ou Edge. Não precisa instalar nada.
 
-#### **Gravação Simples** (ESP32 já tem bootloader):
-```
-Arquivo: SMCR_v2.0.0_firmware.bin
-Endereço: 0x10000
-```
+**Acesse:** https://espressif.github.io/esptool-js/
 
-#### **Gravação Completa** (ESP32 novo/limpo):
-```
-SMCR_v2.0.0_bootloader.bin  → 0x1000
-SMCR_v2.0.0_partitions.bin  → 0x8000  
-SMCR_v2.0.0_firmware.bin    → 0x10000
-```
+### Passo a passo
 
-3. **Configurações**:
-   - **SPI SPEED**: 40MHz
-   - **SPI MODE**: DIO
-   - **FLASH SIZE**: 4MB
+**1. Preparar o ESP32 para gravação (modo download)**
 
-### **Método 2: esptool (Linux/Mac/Windows)**
+1. Mantenha o botão **BOOT** pressionado
+2. Pressione e solte o botão **RESET**
+3. Solte o botão **BOOT**
+4. O ESP32 está pronto para receber firmware
 
-#### **Instalação do esptool**:
+> Alguns modelos entram em modo download automaticamente ao conectar. Se falhar, repita os passos acima.
+
+**2. Conectar ao esptool-js**
+
+1. Abra https://espressif.github.io/esptool-js/ no Chrome ou Edge
+2. Clique em **Connect**
+3. Selecione a porta USB do ESP32 na lista e clique em **Connect**
+
+**3. Configurar os arquivos**
+
+Na seção **Flash**, configure os 3 arquivos com seus respectivos endereços:
+
+| Campo "Flash Address" | Arquivo |
+|-----------------------|---------|
+| `0x1000` | `SMCR_vX.X.X_bootloader.bin` |
+| `0x8000` | `SMCR_vX.X.X_partitions.bin` |
+| `0x10000` | `SMCR_vX.X.X_firmware.bin` |
+
+Use o botão **Add File** para adicionar as 3 linhas. Substitua `X.X.X` pela versão desejada (use sempre a mais recente).
+
+**4. Gravar**
+
+1. Clique em **Program**
+2. Aguarde a conclusão (acompanhe o log na tela)
+3. Ao concluir, pressione **RESET** no ESP32
+
+---
+
+## Outros métodos
+
+### esptool.py (linha de comando)
+
 ```bash
 pip install esptool
+
+esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 write_flash \
+  0x1000  SMCR_vX.X.X_bootloader.bin \
+  0x8000  SMCR_vX.X.X_partitions.bin \
+  0x10000 SMCR_vX.X.X_firmware.bin
 ```
 
-#### **Gravação Simples**:
-```bash
-esptool.py --chip esp32 --port COM3 --baud 921600 write_flash 0x10000 SMCR_v2.0.0_firmware.bin
-```
+> No Windows substitua `/dev/ttyUSB0` por `COM3` (ou a porta correspondente).
 
-#### **Gravação Completa**:
-```bash
-esptool.py --chip esp32 --port COM3 --baud 921600 write_flash \
-  0x1000 SMCR_v2.0.0_bootloader.bin \
-  0x8000 SMCR_v2.0.0_partitions.bin \
-  0x10000 SMCR_v2.0.0_firmware.bin
-```
+### PlatformIO (desenvolvedores)
 
-**⚠️ Substitua `COM3` pela porta correta do seu ESP32**
-
-### **Método 3: PlatformIO (Para desenvolvedores)**
-
-1. Clone o repositório:
 ```bash
 git clone https://github.com/rede-analista/SMCR.git
 cd SMCR
-```
-
-2. Compile e grave:
-```bash
 platformio run --target upload
 ```
 
-## 🔌 **Preparação do ESP32**
+---
 
-### **Modo Download**:
-1. Mantenha **BOOT** pressionado
-2. Pressione **RESET** 
-3. Solte **RESET**
-4. Solte **BOOT**
-5. ESP32 estará pronto para receber firmware
+## Primeiro acesso após gravação
 
-### **Identificação da Porta**:
-- **Windows**: `COM3`, `COM4`, etc.
-- **Linux**: `/dev/ttyUSB0`, `/dev/ttyACM0`
-- **Mac**: `/dev/cu.usbserial-*`
+1. O ESP32 inicia em **Modo AP**
+2. Conecte-se à rede WiFi: `SMCR_AP_SETUP` — senha: `senha12345678`
+3. Acesse no navegador: `http://192.168.4.1:8080`
+4. Configure o nome da rede WiFi (SSID) e a senha
+5. O ESP32 reinicia e conecta na sua rede
+6. Acesse pelo hostname: `http://esp32modularx.local:8080`
 
-## ⚙️ **Configuração Inicial**
-
-### **Primeira Inicialização**:
-1. O ESP32 iniciará em **Modo AP** (primeira vez)
-2. Conecte-se à rede: `SMCR_AP_SETUP`
-3. Senha: `senha12345678`
-4. Acesse: `http://192.168.4.1:8080`
-5. Configure WiFi e hostname
-
-### **Configuração Avançada**:
-- Acesse: `http://[IP_DO_MODULO]:8080/configuracao`
-- Configure autenticação, pinos, watchdog, etc.
-
-## 📋 **Especificações da Versão 2.0.0**
-
-### **Funcionalidades**:
-- ✅ **Interface Web Responsiva** (Tailwind CSS)
-- ✅ **Sistema de Autenticação** HTTP Basic
-- ✅ **Configuração Dual** (Ativa/Persistente)
-- ✅ **NTP Automático** com fuso horário
-- ✅ **Fallback AP** automático
-- ✅ **Menu de Reset** abrangente
-- ✅ **Watchdog Timer** configurável
-- ✅ **Debug Serial** com flags
-- ✅ **mDNS** para acesso por nome
-
-### **Limites Técnicos**:
-- **Pinos**: Até 254 configuráveis
-- **Memória Flash**: ~890 KB utilizados
-- **RAM**: ~46 KB utilizados  
-- **Porta Web**: Configurável (padrão 8080)
-
-### **Configurações Padrão**:
-- **WiFi**: Modo AP inicial
-- **Usuário**: admin
-- **Senha**: admin123
-- **Autenticação**: Desabilitada
-- **Debug**: Habilitado
-- **Watchdog**: Desabilitado
-
-## 🆘 **Troubleshooting**
-
-### **Erro de Gravação**:
-- Verifique se ESP32 está em modo download
-- Teste velocidades menores: 115200 baud
-- Use cabos USB de boa qualidade
-
-### **Não Conecta WiFi**:
-- Acesse modo AP: `SMCR_AP_SETUP`
-- Reconfigure credenciais WiFi
-- Verifique força do sinal
-
-### **Erro de Autenticação**:
-- Use credenciais: `admin` / `admin123`
-- Ou desabilite autenticação via configuração
-
-## 📞 **Suporte**
-
-- **Repositório**: [github.com/rede-analista/SMCR](https://github.com/rede-analista/SMCR)
-- **Issues**: Reporte problemas via GitHub Issues
-- **Documentação**: Veja pasta `/manual/` do repositório
+Após isso, faça upload dos arquivos HTML pela interface web em **Arquivos > LittleFS**.
 
 ---
-**SMCR v2.0.0** - Sistema Modular de Controle e Recursos  
-Desenvolvido para ESP32 - Framework Arduino  
-© 2025 - Licença MIT
+
+## Troubleshooting
+
+**Porta não aparece na lista do esptool-js**
+- Verifique se o cabo USB suporta dados (não apenas carga)
+- Instale o driver CP210x ou CH340 conforme o chip USB do seu ESP32
+- Tente outra porta USB do computador
+
+**Erro durante a gravação**
+- Repita o procedimento de entrar em modo download (BOOT + RESET)
+- Tente velocidade menor: altere o campo **Baud Rate** para `115200`
+
+**ESP32 não conecta no WiFi após gravação**
+- Conecte no AP `SMCR_AP_SETUP` e reconfigure as credenciais
+
+---
+
+Repositório: https://github.com/rede-analista/SMCR
