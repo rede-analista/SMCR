@@ -622,7 +622,7 @@
                     const statusText = module.online ? '🟢 Online' :
                                      (module.online === false ? '🔴 Offline' : '⚪ Desconhecido');
                     const lastCheck = module.ultimo_healthcheck > 0 ?
-                                    new Date(module.ultimo_healthcheck).toLocaleString('pt-BR') :
+                                    new Date(module.ultimo_healthcheck * 1000).toLocaleString('pt-BR') :
                                     'Nunca';
                     const origem = module.auto_descoberto ? '🔍 Auto' : '✍️ Manual';
 

@@ -360,7 +360,7 @@ bool fB_checkModuleHealth(uint8_t moduleIndex) {
         // Módulo respondeu
         module->online = true;
         module->falhas_consecutivas = 0;
-        module->ultimo_healthcheck = millis();
+        module->ultimo_healthcheck = (unsigned long)time(nullptr);
 
         fV_printSerialDebug(LOG_INTERMOD, "Healthcheck OK: %s (%s)",
                            module->hostname.c_str(), module->ip.c_str());
