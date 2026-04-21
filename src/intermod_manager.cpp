@@ -364,6 +364,7 @@ bool fB_checkModuleHealth(uint8_t moduleIndex) {
         module->online = true;
         module->falhas_consecutivas = 0;
         module->ultimo_healthcheck = (unsigned long)time(nullptr);
+        if (wasOffline) fV_publishInterModStatus(moduleIndex);
 
         fV_printSerialDebug(LOG_INTERMOD, "Healthcheck OK: %s (%s)",
                            module->hostname.c_str(), module->ip.c_str());
@@ -399,7 +400,8 @@ bool fB_checkModuleHealth(uint8_t moduleIndex) {
         if (module->falhas_consecutivas >= vSt_mainConfig.vU8_interModMaxFailures) {
             if (module->online) {
                 module->online = false;
-                fV_printSerialDebug(LOG_INTERMOD, "Módulo OFFLINE após %d falhas: %s", 
+                fV_publishInterModStatus(moduleIndex);
+                fV_printSerialDebug(LOG_INTERMOD, "Módulo OFFLINE após %d falhas: %s",
                                    module->falhas_consecutivas, module->hostname.c_str());
             }
         }

@@ -1068,6 +1068,7 @@ void fV_setupWebServer() {
             xSemaphoreGive(vO_pinActionMutex);
         }
         fB_saveInterModConfigs();
+        fV_publishInterModStatus(index);
         request->send(200, "application/json", "{\"success\": true}");
     });
 
@@ -1102,6 +1103,7 @@ void fV_setupWebServer() {
             xSemaphoreGive(vO_pinActionMutex);
         }
         fB_saveInterModConfigs();
+        fV_publishInterModStatus(index);
 
         String resp = "{\"success\": true, \"ativo\": ";
         resp += novoEstado ? "true" : "false";

@@ -258,8 +258,9 @@ void fV_setupMqtt(void) {
             vB_discoveryPublished = true;
         }
         
-        // Publicar status inicial de todos os pinos
+        // Publicar status inicial de todos os pinos e inter-módulos
         fV_publishAllPinsStatus();
+        fV_publishAllInterModStatus();
         
     } else {
         int state = vO_mqttClient.state();
@@ -308,6 +309,7 @@ void fV_mqttLoop(void) {
     if (now - vUL_lastMqttPublish >= publishInterval) {
         vUL_lastMqttPublish = now;
         fV_publishAllPinsStatus();
+        fV_publishAllInterModStatus();
     }
 }
 
@@ -624,6 +626,22 @@ void fV_publishPinStatus(uint8_t pinIndex) {
 /**
  * Publica status de todos os pinos
  */
+void fV_publishInterModStatus(uint8_t index) {
+    if (!vO_mqttClient.connected() || index >= vU8_activeInterModCount) return;
+    InterModConfig_t* m = &vA_interModConfigs[index];
+    String base = vSt_mainConfig.vS_mqttTopicBase + "/" + fS_getMqttUniqueId() + "/intermod/" + m->id;
+    vO_mqttClient.publish((base + "/online").c_str(), m->online ? "1" : "0", true);
+    vO_mqttClient.publish((base + "/ativo").c_str(),  m->ativo  ? "1" : "0", true);
+}
+
+void fV_publishAllInterModStatus(void) {
+    if (!vO_mqttClient.connected() || vU8_activeInterModCount == 0) return;
+    for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+        fV_publishInterModStatus(i);
+        delay(5);
+    }
+}
+
 void fV_publishAllPinsStatus(void) {
     if (!vO_mqttClient.connected()) {
         return;

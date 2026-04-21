@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.1"
+#define FIRMWARE_VERSION "2.3.2"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -417,8 +417,10 @@ void fV_initMqtt(void);               // Inicializa sistema MQTT
 void fV_setupMqtt(void);              // Configura conexão MQTT (não bloqueante)
 void fV_mqttLoop(void);               // Loop MQTT (reconexão automática não bloqueante)
 void fV_publishMqttDiscovery(void);   // Publica configurações de auto-discovery do Home Assistant
-void fV_publishPinStatus(uint8_t pinIndex); // Publica status de um pino específico
-void fV_publishAllPinsStatus(void);   // Publica status de todos os pinos
+void fV_publishPinStatus(uint8_t pinIndex);   // Publica status de um pino específico
+void fV_publishAllPinsStatus(void);           // Publica status de todos os pinos
+void fV_publishInterModStatus(uint8_t index); // Publica status de um inter-módulo (online + ativo)
+void fV_publishAllInterModStatus(void);        // Publica status de todos os inter-módulos
 String fS_getMqttStatus(void);        // Retorna status da conexão MQTT
 String fS_getMqttUniqueId(void);      // Retorna ID único do módulo para MQTT
 
