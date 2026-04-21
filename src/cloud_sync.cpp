@@ -434,6 +434,7 @@ void fV_cloudSyncTask(void) {
             if (moduleId[0] == '\0') continue;
             for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
                 if (vA_interModConfigs[i].id != moduleId) continue;
+                if (m.containsKey("ativo"))                    vA_interModConfigs[i].ativo                    = m["ativo"].as<bool>();
                 vA_interModConfigs[i].pins_offline             = m["pins_offline"]              | vA_interModConfigs[i].pins_offline;
                 vA_interModConfigs[i].offline_alert_enabled    = m["offline_alert_enabled"]     | vA_interModConfigs[i].offline_alert_enabled;
                 vA_interModConfigs[i].offline_flash_ms         = m["offline_flash_ms"]          | vA_interModConfigs[i].offline_flash_ms;
