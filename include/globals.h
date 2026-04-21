@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.2.9"
+#define FIRMWARE_VERSION "2.3.0"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -189,6 +189,7 @@ struct InterModConfig_t {
     String ip;                   // Endereço IP do módulo
     uint16_t porta;              // Porta do servidor web do módulo
     bool online;                 // Status online/offline
+    bool ativo;                  // Módulo ativo (participa de comunicação) ou inativo (ignorado)
     uint8_t falhas_consecutivas; // Contador de falhas de healthcheck
     unsigned long ultimo_healthcheck; // Timestamp do último healthcheck bem-sucedido
     bool auto_descoberto;        // Se foi descoberto via mDNS ou cadastrado manualmente

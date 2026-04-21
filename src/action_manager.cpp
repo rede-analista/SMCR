@@ -844,26 +844,32 @@ bool fB_sendRemoteAction(const String& moduleId, uint16_t remotePin, bool state)
         return false;
     }
     
+    // Verifica se módulo está ativo
+    if (!vA_interModConfigs[moduleIndex].ativo) {
+        fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Módulo '%s' está inativo, ignorando envio", moduleId.c_str());
+        return false;
+    }
+
     // Verifica se módulo está online
     if (!vA_interModConfigs[moduleIndex].online) {
         fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Módulo '%s' está offline, ignorando envio", moduleId.c_str());
         return false;
     }
-    
+
     // Monta a URL para o endpoint do módulo remoto
     String url = "http://";
     url += vA_interModConfigs[moduleIndex].ip;
     url += ":";
     url += String(vA_interModConfigs[moduleIndex].porta);
     url += "/api/pin/set";
-    
+
     fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Enviando comando para %s", url.c_str());
-    
+
     HTTPClient http;
     http.begin(url);
     http.setTimeout(3000); // 3 segundos de timeout
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-    
+
     // Monta o body da requisição
     String postData = "pin=" + String(remotePin) + "&value=" + String(state ? 1 : 0);
     
@@ -908,12 +914,18 @@ bool fB_sendRemoteAction(const String& moduleId, uint16_t remotePin, uint16_t va
         return false;
     }
     
+    // Verifica se módulo está ativo
+    if (!vA_interModConfigs[moduleIndex].ativo) {
+        fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Módulo '%s' está inativo, ignorando envio", moduleId.c_str());
+        return false;
+    }
+
     // Verifica se módulo está online
     if (!vA_interModConfigs[moduleIndex].online) {
         fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] Módulo '%s' está offline, ignorando envio", moduleId.c_str());
         return false;
     }
-    
+
     // Monta a URL para o endpoint do módulo remoto
     String url = "http://";
     url += vA_interModConfigs[moduleIndex].ip;
@@ -973,10 +985,10 @@ void fV_syncRemotePinsOnBoot(void) {
         return;
     }
 
-    // Força healthcheck em todos os módulos offline antes de sincronizar
-    // (no boot todos iniciam como offline, mas podem estar acessíveis)
+    // Força healthcheck em todos os módulos ativos e offline antes de sincronizar
     fV_printSerialDebug(LOG_INTERMOD, "[SYNC] Verificando disponibilidade dos módulos...");
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+        if (!vA_interModConfigs[i].ativo) continue;
         if (!vA_interModConfigs[i].online) {
             fV_printSerialDebug(LOG_INTERMOD, "[SYNC] Checando módulo '%s'...", vA_interModConfigs[i].hostname.c_str());
             fB_checkModuleHealth(i);
@@ -1053,6 +1065,11 @@ bool fB_requestPinSyncFromModule(const String& moduleId) {
     }
 
     InterModConfig_t* module = &vA_interModConfigs[moduleIndex];
+
+    if (!module->ativo) {
+        fV_printSerialDebug(LOG_INTERMOD, "[SYNC-REQ] Módulo '%s' está inativo, sincronização cancelada", moduleId.c_str());
+        return false;
+    }
 
     // Monta URL de requisição
     String url = "http://" + module->ip + ":" + String(module->porta) + "/api/request_pin_sync";

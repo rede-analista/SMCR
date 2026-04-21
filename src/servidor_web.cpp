@@ -890,6 +890,7 @@ void fV_setupWebServer() {
             module["ip"] = vA_interModConfigs[i].ip;
             module["porta"] = vA_interModConfigs[i].porta;
             module["online"] = vA_interModConfigs[i].online;
+            module["ativo"] = vA_interModConfigs[i].ativo;
             module["falhas_consecutivas"] = vA_interModConfigs[i].falhas_consecutivas;
             module["ultimo_healthcheck"] = vA_interModConfigs[i].ultimo_healthcheck;
             module["auto_descoberto"]           = vA_interModConfigs[i].auto_descoberto;
@@ -926,6 +927,7 @@ void fV_setupWebServer() {
         newModule.ip = request->arg("moduleIp");
         newModule.porta = request->arg("modulePort").toInt();
         newModule.auto_descoberto           = false;
+        newModule.ativo                     = request->hasArg("ativo") && request->arg("ativo") == "1";
         newModule.pins_offline              = request->hasArg("pinsOffline")            ? request->arg("pinsOffline")            : "";
         newModule.offline_alert_enabled     = request->hasArg("offlineAlertEnabled")    && request->arg("offlineAlertEnabled") == "1";
         newModule.offline_flash_ms          = request->hasArg("offlineFlashMs")         ? request->arg("offlineFlashMs").toInt() : 200;
@@ -1056,6 +1058,7 @@ void fV_setupWebServer() {
             if (request->hasArg("moduleHostname"))        vA_interModConfigs[index].hostname               = request->arg("moduleHostname");
             if (request->hasArg("moduleIp"))              vA_interModConfigs[index].ip                     = request->arg("moduleIp");
             if (request->hasArg("modulePort"))            vA_interModConfigs[index].porta                  = request->arg("modulePort").toInt();
+            if (request->hasArg("ativo"))                 vA_interModConfigs[index].ativo                  = request->arg("ativo") == "1";
             if (request->hasArg("pinsOffline"))           vA_interModConfigs[index].pins_offline            = request->arg("pinsOffline");
             if (request->hasArg("offlineAlertEnabled"))   vA_interModConfigs[index].offline_alert_enabled   = request->arg("offlineAlertEnabled") == "1";
             if (request->hasArg("offlineFlashMs"))        vA_interModConfigs[index].offline_flash_ms        = request->arg("offlineFlashMs").toInt();
@@ -1066,6 +1069,44 @@ void fV_setupWebServer() {
         }
         fB_saveInterModConfigs();
         request->send(200, "application/json", "{\"success\": true}");
+    });
+
+    // API: Ativar/desativar módulo (toggle)
+    SERVIDOR_WEB_ASYNC->on("/api/intermod/modules/toggle", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+
+        if (!request->hasArg("id")) {
+            request->send(400, "text/plain", "ID do modulo nao fornecido");
+            return;
+        }
+
+        String moduleId = request->arg("id");
+        int index = fI_findInterModIndex(moduleId);
+        if (index < 0) {
+            request->send(404, "application/json", "{\"success\": false, \"message\": \"Modulo nao encontrado\"}");
+            return;
+        }
+
+        bool novoEstado = false;
+        if (xSemaphoreTake(vO_pinActionMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            if (request->hasArg("ativo")) {
+                vA_interModConfigs[index].ativo = request->arg("ativo") == "1";
+            } else {
+                vA_interModConfigs[index].ativo = !vA_interModConfigs[index].ativo;
+            }
+            novoEstado = vA_interModConfigs[index].ativo;
+            xSemaphoreGive(vO_pinActionMutex);
+        }
+        fB_saveInterModConfigs();
+
+        String resp = "{\"success\": true, \"ativo\": ";
+        resp += novoEstado ? "true" : "false";
+        resp += "}";
+        request->send(200, "application/json", resp);
     });
 
     // API: Executar descoberta mDNS

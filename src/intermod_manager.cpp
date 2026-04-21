@@ -115,6 +115,7 @@ void fV_loadInterModConfigs(void) {
         vA_interModConfigs[index].ip = module["ip"].as<String>();
         vA_interModConfigs[index].porta = module["porta"] | 8080;
         vA_interModConfigs[index].online = false; // Inicializa como offline
+        vA_interModConfigs[index].ativo = module["ativo"] | false;
         vA_interModConfigs[index].falhas_consecutivas = 0;
         vA_interModConfigs[index].ultimo_healthcheck = 0;
         vA_interModConfigs[index].auto_descoberto = module["auto_descoberto"] | false;
@@ -157,6 +158,7 @@ bool fB_saveInterModConfigs(void) {
         module["hostname"] = vA_interModConfigs[i].hostname;
         module["ip"] = vA_interModConfigs[i].ip;
         module["porta"] = vA_interModConfigs[i].porta;
+        module["ativo"]                     = vA_interModConfigs[i].ativo;
         module["auto_descoberto"]           = vA_interModConfigs[i].auto_descoberto;
         module["pins_offline"]              = vA_interModConfigs[i].pins_offline;
         module["offline_alert_enabled"]     = vA_interModConfigs[i].offline_alert_enabled;
@@ -243,6 +245,7 @@ int fI_addInterModConfig(const InterModConfig_t& config) {
     // Adiciona novo módulo
     newArray[vU8_activeInterModCount] = config;
     newArray[vU8_activeInterModCount].online = false;
+    newArray[vU8_activeInterModCount].ativo = false;
     newArray[vU8_activeInterModCount].falhas_consecutivas = 0;
     newArray[vU8_activeInterModCount].ultimo_healthcheck = 0;
     newArray[vU8_activeInterModCount].ultimo_offline_flash = 0;
@@ -434,11 +437,11 @@ void fV_interModHealthCheckTask(void) {
     
     vU32_lastHealthCheck = now;
 
-    // Calcula janela de flash: máximo healthcheck_flash_ms entre módulos habilitados × 3
-    // Garante pelo menos 1 ciclo completo visível (mínimo 1000ms)
+    // Calcula janela de flash: máximo healthcheck_flash_ms entre módulos ativos × 3
     unsigned long vU32_maxFlashMs = 1000;
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
-        if (vA_interModConfigs[i].healthcheck_alert_enabled &&
+        if (vA_interModConfigs[i].ativo &&
+            vA_interModConfigs[i].healthcheck_alert_enabled &&
             vA_interModConfigs[i].pins_healthcheck.length() > 0 &&
             vA_interModConfigs[i].healthcheck_flash_ms > vU32_maxFlashMs) {
             vU32_maxFlashMs = vA_interModConfigs[i].healthcheck_flash_ms;
@@ -446,8 +449,9 @@ void fV_interModHealthCheckTask(void) {
     }
     vU32_healthCheckFlashUntil = now + (vU32_maxFlashMs * 3);
 
-    // Executa healthcheck para cada módulo
+    // Executa healthcheck apenas para módulos ativos
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+        if (!vA_interModConfigs[i].ativo) continue;
         fB_checkModuleHealth(i);
         delay(300); // Delay entre requests para não sobrecarregar rede
     }
@@ -632,13 +636,14 @@ String fS_getInterModStatus(void) {
     }
     
     uint8_t online = 0;
+    uint8_t ativos = 0;
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
-        if (vA_interModConfigs[i].online) {
-            online++;
-        }
+        if (!vA_interModConfigs[i].ativo) continue;
+        ativos++;
+        if (vA_interModConfigs[i].online) online++;
     }
-    
-    return String(online) + "/" + String(vU8_activeInterModCount) + " online";
+
+    return String(online) + "/" + String(ativos) + " online (" + String(vU8_activeInterModCount) + " total)";
 }
 
 /**
@@ -692,7 +697,7 @@ static bool fB_isPinInString(const String& pinsStr, uint16_t gpio) {
 bool fB_isPinBlockedByOffline(uint16_t gpio) {
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
         InterModConfig_t* m = &vA_interModConfigs[i];
-        if (m->offline_alert_enabled && !m->online && fB_isPinInString(m->pins_offline, gpio)) {
+        if (m->ativo && m->offline_alert_enabled && !m->online && fB_isPinInString(m->pins_offline, gpio)) {
             return true;
         }
     }
@@ -735,6 +740,19 @@ void fV_interModAlertFlashTask(void) {
 
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
         InterModConfig_t* m = &vA_interModConfigs[i];
+
+        if (!m->ativo) {
+            // Garante que pinos de alerta fiquem desligados para módulos inativos
+            if (m->offline_flash_state) {
+                m->offline_flash_state = false;
+                fV_applyPinsFlash(m->pins_offline, false);
+            }
+            if (m->hc_flash_state) {
+                m->hc_flash_state = false;
+                fV_applyPinsFlash(m->pins_healthcheck, false);
+            }
+            continue;
+        }
 
         // ── Alerta de Offline ────────────────────────────────────────────
         if (m->offline_alert_enabled && !m->online && m->pins_offline.length() > 0) {
