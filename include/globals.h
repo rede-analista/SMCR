@@ -131,6 +131,7 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
     // 14. Configurações SMCR Cloud
     String vS_cloudUrl;                  // URL da cloud SMCR (padrão: smcr.pensenet.com.br)
     uint16_t vU16_cloudPort;             // Porta HTTP da cloud (padrão: 8765)
+    bool vB_cloudUseHttps;               // Usa HTTPS ao se comunicar com a cloud (padrão: false)
     bool vB_cloudSyncEnabled;            // Habilita busca periódica de configurações na cloud
     uint16_t vU16_cloudSyncIntervalMin;  // Intervalo de sync em minutos (padrão 5)
     String vS_cloudApiToken;             // Token API para autenticação na cloud

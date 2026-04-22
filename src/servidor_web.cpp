@@ -802,6 +802,7 @@ void fV_setupWebServer() {
         // Configurações SMCR Cloud
         doc["cloud_url"] = vSt_mainConfig.vS_cloudUrl;
         doc["cloud_port"] = vSt_mainConfig.vU16_cloudPort;
+        doc["cloud_use_https"] = vSt_mainConfig.vB_cloudUseHttps;
         doc["cloud_sync_enabled"] = vSt_mainConfig.vB_cloudSyncEnabled;
         doc["cloud_sync_interval_min"] = vSt_mainConfig.vU16_cloudSyncIntervalMin;
         doc["cloud_api_token"] = vSt_mainConfig.vS_cloudApiToken;
@@ -1626,6 +1627,7 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
             vSt_mainConfig.vU16_cloudPort = request->arg("cloud_port").toInt();
             fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_port = %d", vSt_mainConfig.vU16_cloudPort);
         }
+        vSt_mainConfig.vB_cloudUseHttps = request->hasArg("cloud_use_https") && request->arg("cloud_use_https") != "0";
         vSt_mainConfig.vB_cloudSyncEnabled = request->hasArg("cloud_sync_enabled") && request->arg("cloud_sync_enabled") != "0";
         fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_sync_enabled = %d", vSt_mainConfig.vB_cloudSyncEnabled);
         if (request->hasArg("cloud_sync_interval_min")) {

@@ -124,6 +124,7 @@ const char* KEY_TELEGRAM_INTERVAL = "tg_intval";
 // Chaves SMCR Cloud
 const char* KEY_CLOUD_URL = "cloud_url";
 const char* KEY_CLOUD_PORT = "cloud_port";
+const char* KEY_CLOUD_USE_HTTPS = "cloud_https";
 const char* KEY_CLOUD_SYNC_EN = "cloud_sync_en";
 const char* KEY_CLOUD_SYNC_INT = "cloud_sint";
 const char* KEY_CLOUD_API_TOKEN = "cloud_token";
@@ -211,6 +212,7 @@ void fV_carregarMainConfig(void) {
     // 14. Configurações SMCR Cloud
     vSt_mainConfig.vS_cloudUrl = preferences.getString(KEY_CLOUD_URL, "smcr.pensenet.com.br");
     vSt_mainConfig.vU16_cloudPort = preferences.getUInt(KEY_CLOUD_PORT, 8765);
+    vSt_mainConfig.vB_cloudUseHttps = preferences.getBool(KEY_CLOUD_USE_HTTPS, false);
     vSt_mainConfig.vB_cloudSyncEnabled = preferences.getBool(KEY_CLOUD_SYNC_EN, false);
     vSt_mainConfig.vU16_cloudSyncIntervalMin = preferences.getUInt(KEY_CLOUD_SYNC_INT, 5);
     vSt_mainConfig.vS_cloudApiToken = preferences.getString(KEY_CLOUD_API_TOKEN, "");
@@ -310,6 +312,7 @@ void fV_salvarMainConfig(void) {
     // 14. Configurações SMCR Cloud
     preferences.putString(KEY_CLOUD_URL, vSt_mainConfig.vS_cloudUrl);
     preferences.putUInt(KEY_CLOUD_PORT, vSt_mainConfig.vU16_cloudPort);
+    preferences.putBool(KEY_CLOUD_USE_HTTPS, vSt_mainConfig.vB_cloudUseHttps);
     preferences.putBool(KEY_CLOUD_SYNC_EN, vSt_mainConfig.vB_cloudSyncEnabled);
     preferences.putUInt(KEY_CLOUD_SYNC_INT, vSt_mainConfig.vU16_cloudSyncIntervalMin);
     preferences.putString(KEY_CLOUD_API_TOKEN, vSt_mainConfig.vS_cloudApiToken);

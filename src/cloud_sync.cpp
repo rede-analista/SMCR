@@ -34,10 +34,12 @@ String fS_getCloudHeartbeatStatus(void) { return vS_heartbeatStatus; }
 String fS_getCloudHeartbeatLastTime(void) { return vS_heartbeatLastTime; }
 String fS_getCloudSyncLastTime(void) { return vS_cloudSyncLastTime; }
 
-// Monta base URL com porta: http://host:porta
+// Monta base URL com porta: http(s)://host:porta
 static String fS_cloudBaseUrl(void) {
-    String base = "http://" + vSt_mainConfig.vS_cloudUrl;
-    if (vSt_mainConfig.vU16_cloudPort > 0 && vSt_mainConfig.vU16_cloudPort != 80) {
+    bool https = vSt_mainConfig.vB_cloudUseHttps;
+    String base = (https ? "https://" : "http://") + vSt_mainConfig.vS_cloudUrl;
+    uint16_t defaultPort = https ? 443 : 80;
+    if (vSt_mainConfig.vU16_cloudPort > 0 && vSt_mainConfig.vU16_cloudPort != defaultPort) {
         base += ":" + String(vSt_mainConfig.vU16_cloudPort);
     }
     return base;
@@ -198,9 +200,13 @@ void fV_cloudSyncTask(void) {
 
     fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Iniciando sync: %s", url.c_str());
 
+    WiFiClientSecure secClient;
+    if (vSt_mainConfig.vB_cloudUseHttps) secClient.setInsecure();
+
     HTTPClient http;
     http.setTimeout(5000);
-    if (!http.begin(url)) {
+    bool httpOk = vSt_mainConfig.vB_cloudUseHttps ? http.begin(secClient, url) : http.begin(url);
+    if (!httpOk) {
         vS_cloudSyncStatus = "Erro: Falha ao conectar";
         fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Falha ao iniciar HTTP");
         return;
@@ -483,12 +489,18 @@ void fV_fetchCloudFilesTask(void) {
         return;
     }
 
-    String listUrl = "http://" + vS_fetchCloudFilesUrl + ":" + String(vSt_mainConfig.vU16_cloudPort) + "/api/get_web_files.php";
+    bool fetchHttps = vSt_mainConfig.vB_cloudUseHttps;
+    String fetchSchema = fetchHttps ? "https://" : "http://";
+    String listUrl = fetchSchema + vS_fetchCloudFilesUrl + ":" + String(vSt_mainConfig.vU16_cloudPort) + "/api/get_web_files.php";
     fV_printSerialDebug(LOG_NETWORK, "[FETCH] Buscando lista: %s", listUrl.c_str());
+
+    WiFiClientSecure fetchSecClient;
+    if (fetchHttps) fetchSecClient.setInsecure();
 
     HTTPClient http;
     http.setTimeout(5000);
-    if (!http.begin(listUrl)) {
+    bool fetchOk = fetchHttps ? http.begin(fetchSecClient, listUrl) : http.begin(listUrl);
+    if (!fetchOk) {
         vS_fetchStatus = "Erro: falha ao conectar ao servidor";
         vB_fetchDone = vB_fetchError = true;
         fV_printSerialDebug(LOG_NETWORK, "[FETCH] Falha ao iniciar HTTP");
@@ -528,13 +540,16 @@ void fV_fetchCloudFilesTask(void) {
 
     for (JsonVariant fv : files) {
         String filename = fv.as<String>();
-        String fileUrl  = "http://" + vS_fetchCloudFilesUrl + ":" + String(vSt_mainConfig.vU16_cloudPort) + "/api/get_web_files.php?file=" + filename;
+        String fileUrl  = fetchSchema + vS_fetchCloudFilesUrl + ":" + String(vSt_mainConfig.vU16_cloudPort) + "/api/get_web_files.php?file=" + filename;
         vS_fetchStatus  = "Baixando " + filename + " (" + String(downloaded + errors + 1) + "/" + String(total) + ")";
         fV_printSerialDebug(LOG_NETWORK, "[FETCH] %s", vS_fetchStatus.c_str());
 
+        WiFiClientSecure fileSecClient;
+        if (fetchHttps) fileSecClient.setInsecure();
         HTTPClient fhttp;
         fhttp.setTimeout(15000);
-        if (!fhttp.begin(fileUrl)) { errors++; continue; }
+        bool fileOk = fetchHttps ? fhttp.begin(fileSecClient, fileUrl) : fhttp.begin(fileUrl);
+        if (!fileOk) { errors++; continue; }
 
         int fc = fhttp.GET();
         if (fc == HTTP_CODE_OK) {
@@ -602,9 +617,13 @@ void fV_cloudHeartbeatTask(void) {
     String body;
     serializeJson(doc, body);
 
+    WiFiClientSecure hbSecClient;
+    if (vSt_mainConfig.vB_cloudUseHttps) hbSecClient.setInsecure();
+
     HTTPClient http;
     http.setTimeout(5000);
-    if (!http.begin(url)) {
+    bool hbOk = vSt_mainConfig.vB_cloudUseHttps ? http.begin(hbSecClient, url) : http.begin(url);
+    if (!hbOk) {
         vS_heartbeatStatus = "Erro: falha ao conectar";
         fV_printSerialDebug(LOG_NETWORK, "[HB] Falha ao iniciar HTTP: %s", url.c_str());
         return;
