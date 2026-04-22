@@ -361,7 +361,9 @@ void fV_cloudSyncTask(void) {
     // cloud_api_token são configurações locais e NÃO são sobrescritas pelo sync.
     // Isso evita que a cloud desabilite o próprio sincronismo ou altere
     // a URL/token de onde o ESP32 busca as configurações.
-    // Heartbeat pode ser controlado pela cloud pois não afeta o sync.
+    // cloud_use_https, heartbeat e intervalos podem ser controlados pela cloud.
+    if (!doc["cloud_use_https"].isNull())
+        vSt_mainConfig.vB_cloudUseHttps = doc["cloud_use_https"].as<bool>();
     if (!doc["cloud_heartbeat_enabled"].isNull())
         vSt_mainConfig.vB_cloudHeartbeatEnabled = doc["cloud_heartbeat_enabled"].as<bool>();
     if (!doc["cloud_heartbeat_interval_min"].isNull())
