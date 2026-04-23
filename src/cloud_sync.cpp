@@ -357,11 +357,12 @@ void fV_cloudSyncTask(void) {
         vSt_mainConfig.vU16_telegramCheckInterval = doc["telegram_interval"].as<int>();
 
     // ── SMCR Cloud ────────────────────────────────────────────────────
-    // NOTA: cloud_url, cloud_port, cloud_sync_enabled, cloud_sync_interval_min e
-    // cloud_api_token são configurações locais e NÃO são sobrescritas pelo sync.
-    // Isso evita que a cloud desabilite o próprio sincronismo ou altere
-    // a URL/token de onde o ESP32 busca as configurações.
-    // cloud_use_https, heartbeat e intervalos podem ser controlados pela cloud.
+    // NOTA: cloud_sync_enabled, cloud_sync_interval_min e cloud_api_token
+    // são configurações locais e NÃO são sobrescritas pelo sync.
+    if (!doc["cloud_url"].isNull() && doc["cloud_url"].as<String>().length() > 0)
+        vSt_mainConfig.vS_cloudUrl = doc["cloud_url"].as<String>();
+    if (!doc["cloud_port"].isNull())
+        vSt_mainConfig.vU16_cloudPort = doc["cloud_port"].as<uint16_t>();
     if (!doc["cloud_use_https"].isNull())
         vSt_mainConfig.vB_cloudUseHttps = doc["cloud_use_https"].as<bool>();
     if (!doc["cloud_heartbeat_enabled"].isNull())
