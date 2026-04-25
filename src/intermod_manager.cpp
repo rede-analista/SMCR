@@ -20,6 +20,8 @@ static unsigned long vU32_healthCheckFlashUntil = 0; // Pisca durante healthchec
 static void fV_applyPinsFlash(const String& pinsStr, bool state);
 static bool fB_isPinInString(const String& pinsStr, uint16_t gpio);
 static bool fB_pinsStringHasConflict(const String& pinsStr);
+static bool fB_gpioRetidoPorOffline(uint16_t gpio, uint8_t exceptIdx);
+static void fV_applyOfflinePinsSelectiveOff(const String& pinsStr, uint8_t exceptIdx);
 
 // Variáveis globais para log de comunicações
 InterModCommLog_t vSt_InterModCommReceived[MAX_INTERMOD_COMM_LOG];
@@ -374,9 +376,9 @@ bool fB_checkModuleHealth(uint8_t moduleIndex) {
             fV_printSerialDebug(LOG_INTERMOD, "[AUTO-SYNC] Módulo %s voltou ONLINE, sincronizando...",
                                module->hostname.c_str());
 
-            // Desliga pinos de alerta offline do módulo que voltou online
+            // Desliga pinos de alerta offline do módulo que voltou online (respeita outros módulos ainda offline)
             if (module->pins_offline.length() > 0) {
-                fV_applyPinsFlash(module->pins_offline, false);
+                fV_applyOfflinePinsSelectiveOff(module->pins_offline, moduleIndex);
             }
             module->offline_flash_state = false;
 
@@ -692,6 +694,43 @@ static bool fB_isPinInString(const String& pinsStr, uint16_t gpio) {
     return false;
 }
 
+// Retorna true se outro módulo (exceto exceptIdx) está offline, com alerta ativo e offline_flash_state=true para este GPIO
+static bool fB_gpioRetidoPorOffline(uint16_t gpio, uint8_t exceptIdx) {
+    for (uint8_t j = 0; j < vU8_activeInterModCount; j++) {
+        if (j == exceptIdx) continue;
+        InterModConfig_t* m = &vA_interModConfigs[j];
+        if (m->ativo && m->offline_alert_enabled && !m->online &&
+            m->offline_flash_state && fB_isPinInString(m->pins_offline, gpio))
+            return true;
+    }
+    return false;
+}
+
+// Desliga GPIOs da lista apenas se não estiverem retidos por outro módulo offline
+static void fV_applyOfflinePinsSelectiveOff(const String& pinsStr, uint8_t exceptIdx) {
+    if (pinsStr.length() == 0) return;
+    String str = pinsStr;
+    int startPos = 0;
+    while (startPos <= (int)str.length()) {
+        int commaPos = str.indexOf(',', startPos);
+        String pinStr = (commaPos == -1) ? str.substring(startPos) : str.substring(startPos, commaPos);
+        pinStr.trim();
+        if (pinStr.length() > 0) {
+            uint16_t gpio = (uint16_t)pinStr.toInt();
+            if (!fB_gpioRetidoPorOffline(gpio, exceptIdx)) {
+                uint8_t idx = fU8_findPinIndex(gpio);
+                if (idx != 255) {
+                    bool nivelInvertido = (vA_pinConfigs[idx].nivel_acionamento_min == 0);
+                    vA_pinConfigs[idx].status_atual = 0;
+                    digitalWrite(gpio, nivelInvertido ? HIGH : LOW);
+                }
+            }
+        }
+        if (commaPos == -1) break;
+        startPos = commaPos + 1;
+    }
+}
+
 /**
  * @brief Retorna true se algum módulo offline tem alerta ativo para este GPIO
  * Prioridade 1 (máxima): bloqueia ações e healthcheck no mesmo pino
@@ -764,9 +803,8 @@ void fV_interModAlertFlashTask(void) {
                 fV_applyPinsFlash(m->pins_offline, m->offline_flash_state);
             }
         } else if (m->offline_flash_state) {
-            // Módulo voltou online ou alerta desabilitado: desliga pinos
             m->offline_flash_state = false;
-            fV_applyPinsFlash(m->pins_offline, false);
+            fV_applyOfflinePinsSelectiveOff(m->pins_offline, i);
         }
 
         // ── Alerta de HealthCheck ────────────────────────────────────────

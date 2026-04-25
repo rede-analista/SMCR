@@ -543,6 +543,22 @@ void fV_writeActionPin(uint8_t pinIndex, uint8_t pinGpio, bool ligar) {
     digitalWrite(pinGpio, valorFisico ? HIGH : LOW);
 }
 
+static bool fB_outraAcaoAtivaNoDestino(uint8_t idx, uint16_t destino) {
+    for (uint8_t j = 0; j < vU8_activeActionsCount; j++) {
+        if (j != idx && vA_actionConfigs[j].pino_destino == destino && vA_actionConfigs[j].estado_acao)
+            return true;
+    }
+    return false;
+}
+
+static bool fB_acaoMenorIndiceAtivaNoDestino(uint8_t idx, uint16_t destino) {
+    for (uint8_t j = 0; j < idx; j++) {
+        if (vA_actionConfigs[j].pino_destino == destino && vA_actionConfigs[j].estado_acao)
+            return true;
+    }
+    return false;
+}
+
 //========================================
 // Task para execução de ações
 // Chamada periodicamente (ex: a cada 100ms)
@@ -586,7 +602,8 @@ void fV_executeActionsTask(void) {
 
                 // Executa ação local ANTES do envio remoto para garantir independência:
                 // chamadas HTTP bloqueantes (timeout de até 3s) não devem atrasar a execução local.
-                fV_executeAction(i);
+                if (!fB_acaoMenorIndiceAtivaNoDestino(i, vA_actionConfigs[i].pino_destino))
+                    fV_executeAction(i);
                 executedLocally = true;
 
                 // Envia para módulo remoto se configurado
@@ -623,11 +640,13 @@ void fV_executeActionsTask(void) {
                 uint8_t pinDestinoIndex = fU8_findPinIndex(vA_actionConfigs[i].pino_destino);
                 if (pinDestinoIndex != 255) {
                     // Desliga o pino destino para todas as ações (exceto STATUS/SINCRONISMO)
-                    if (vA_actionConfigs[i].acao != ACTION_TYPE_STATUS && 
+                    if (vA_actionConfigs[i].acao != ACTION_TYPE_STATUS &&
                         vA_actionConfigs[i].acao != ACTION_TYPE_SINCRONISMO) {
-                        fV_writeActionPin(pinDestinoIndex, vA_actionConfigs[i].pino_destino, false);
-                        fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Desligando GPIO %d (origem desativada) - Ação tipo %d", 
-                            vA_actionConfigs[i].pino_destino, vA_actionConfigs[i].acao);
+                        if (!fB_outraAcaoAtivaNoDestino(i, vA_actionConfigs[i].pino_destino)) {
+                            fV_writeActionPin(pinDestinoIndex, vA_actionConfigs[i].pino_destino, false);
+                            fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Desligando GPIO %d (origem desativada) - Ação tipo %d",
+                                vA_actionConfigs[i].pino_destino, vA_actionConfigs[i].acao);
+                        }
                         
                         // Se ação deve ser enviada para módulo remoto, envia valor REAL do pino origem
                         if (vA_actionConfigs[i].envia_modulo != "" && vA_actionConfigs[i].pino_remoto > 0) {
@@ -672,9 +691,10 @@ void fV_executeActionsTask(void) {
         }
         
         // Se pino está acionado, executa a ação (iterações subsequentes: PISCA, PULSO contínuo, etc.)
-        // Pula se já foi executado nesta iteração (primeira ativação)
+        // Pula se já foi executado nesta iteração (primeira ativação) ou se ação de menor índice controla o mesmo destino
         if (!executedLocally && pinoAcionado && vA_actionConfigs[i].estado_acao) {
-            fV_executeAction(i);
+            if (!fB_acaoMenorIndiceAtivaNoDestino(i, vA_actionConfigs[i].pino_destino))
+                fV_executeAction(i);
         }
     }
 }
