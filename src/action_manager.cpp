@@ -545,8 +545,9 @@ void fV_writeActionPin(uint8_t pinIndex, uint8_t pinGpio, bool ligar) {
 
 // Retorna true se a ação j está "ativa": em execução (estado_acao) OU origem ainda acionada (cobre LIGA que zera estado_acao imediatamente)
 static bool fB_acaoEstaAtiva(uint8_t j) {
+    uint16_t tipo = vA_actionConfigs[j].acao;
+    if (tipo == ACTION_TYPE_NONE || tipo == ACTION_TYPE_STATUS || tipo == ACTION_TYPE_SINCRONISMO) return false;
     if (vA_actionConfigs[j].estado_acao) return true;
-    if (vA_actionConfigs[j].acao == ACTION_TYPE_NONE) return false;
     uint8_t srcIdx = fU8_findPinIndex(vA_actionConfigs[j].pino_origem);
     return (srcIdx != 255 && fB_isPinActivated(srcIdx));
 }
