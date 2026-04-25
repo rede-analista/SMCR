@@ -543,9 +543,17 @@ void fV_writeActionPin(uint8_t pinIndex, uint8_t pinGpio, bool ligar) {
     digitalWrite(pinGpio, valorFisico ? HIGH : LOW);
 }
 
+// Retorna true se a ação j está "ativa": em execução (estado_acao) OU origem ainda acionada (cobre LIGA que zera estado_acao imediatamente)
+static bool fB_acaoEstaAtiva(uint8_t j) {
+    if (vA_actionConfigs[j].estado_acao) return true;
+    if (vA_actionConfigs[j].acao == ACTION_TYPE_NONE) return false;
+    uint8_t srcIdx = fU8_findPinIndex(vA_actionConfigs[j].pino_origem);
+    return (srcIdx != 255 && fB_isPinActivated(srcIdx));
+}
+
 static bool fB_outraAcaoAtivaNoDestino(uint8_t idx, uint16_t destino) {
     for (uint8_t j = 0; j < vU8_activeActionsCount; j++) {
-        if (j != idx && vA_actionConfigs[j].pino_destino == destino && vA_actionConfigs[j].estado_acao)
+        if (j != idx && vA_actionConfigs[j].pino_destino == destino && fB_acaoEstaAtiva(j))
             return true;
     }
     return false;
@@ -553,7 +561,7 @@ static bool fB_outraAcaoAtivaNoDestino(uint8_t idx, uint16_t destino) {
 
 static bool fB_acaoMenorIndiceAtivaNoDestino(uint8_t idx, uint16_t destino) {
     for (uint8_t j = 0; j < idx; j++) {
-        if (vA_actionConfigs[j].pino_destino == destino && vA_actionConfigs[j].estado_acao)
+        if (vA_actionConfigs[j].pino_destino == destino && fB_acaoEstaAtiva(j))
             return true;
     }
     return false;
