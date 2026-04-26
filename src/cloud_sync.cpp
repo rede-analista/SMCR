@@ -619,6 +619,14 @@ void fV_cloudHeartbeatTask(void) {
     doc["sketch_free"]      = ESP.getFreeSketchSpace();
     doc["wifi_rssi"]        = WiFi.RSSI();
 
+    // Inclui histórico de acionamentos para persistência no servidor
+    {
+        JsonDocument histDoc;
+        if (deserializeJson(histDoc, fS_getActionHistoryJson()) == DeserializationError::Ok) {
+            doc["action_history"].set(histDoc.as<JsonArray>());
+        }
+    }
+
     String body;
     serializeJson(doc, body);
 
