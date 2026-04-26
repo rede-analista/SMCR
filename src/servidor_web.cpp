@@ -13,6 +13,7 @@
 #include "web_preferencias.h"
 #include "web_littlefs.h"
 #include "web_serial.h"
+#include "web_historico.h"
 #include <LittleFS.h>
 #include <Preferences.h>
 // Inclusões para navegação completa no NVS
@@ -30,6 +31,7 @@ void fV_handleFileDownload(AsyncWebServerRequest *request);
 void fV_handleFileDelete(AsyncWebServerRequest *request);
 void fV_handleFormatFlash(AsyncWebServerRequest *request);
 void fV_handleSerialPage(AsyncWebServerRequest *request);
+void fV_handleHistoricoPage(AsyncWebServerRequest *request);
 void fV_handleSerialLogs(AsyncWebServerRequest *request);
 
 // Helper: serve página de LittleFS com fallback para PROGMEM
@@ -456,6 +458,15 @@ void fV_setupWebServer() {
             }
         }
         fV_handleSerialPage(request);
+    });
+
+    SERVIDOR_WEB_ASYNC->on("/historico", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str())) {
+                return request->requestAuthentication();
+            }
+        }
+        fV_handleHistoricoPage(request);
     });
     
     // API: Obter logs do Web Serial (polling)
@@ -3410,4 +3421,8 @@ void fV_handleActionsPage(AsyncWebServerRequest *request) {
     servePageWithFallback(request, "/web_actions.html", WEBPAGE_ACTIONS);
 }
 
+void fV_handleHistoricoPage(AsyncWebServerRequest *request) {
+    fV_printSerialDebug(LOG_WEB, "[WEB] Servindo página de histórico");
+    servePageWithFallback(request, "/web_historico.html", web_historico_html);
+}
 
