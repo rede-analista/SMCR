@@ -1,0 +1,18 @@
+SMCR Firmware v2.3.11
+Build Date: dom 26 abr 2026 10:57:49 -03
+Git Commit: 944f320547a19b808840b66cb9b4f6bcc0d4239f
+Git Branch: main
+
+Files:
+- SMCR_v2.3.11_firmware.bin (1,2MB)
+- SMCR_v2.3.11_bootloader.bin (18KB)  
+- SMCR_v2.3.11_partitions.bin (3,0KB)
+
+Flash Command (esptool):
+esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 write_flash \
+  0x1000 SMCR_v2.3.11_bootloader.bin \
+  0x8000 SMCR_v2.3.11_partitions.bin \
+  0x10000 SMCR_v2.3.11_firmware.bin
+
+Simple Flash (firmware only):
+esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 write_flash 0x10000 SMCR_v2.3.11_firmware.bin

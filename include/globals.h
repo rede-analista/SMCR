@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.10"
+#define FIRMWARE_VERSION "2.3.11"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -181,6 +181,10 @@ struct ActionConfig_t {
     uint16_t contador_off;       // Contador atual de ciclos OFF
     bool estado_acao;            // Estado atual da ação (true=executando, false=parada)
     bool ultimo_estado_origem;   // Último estado do pino origem (para detectar mudanças)
+    // Agendamento por horário (NTP)
+    uint8_t hora_agendada;          // 0-23 (255 = desabilitado)
+    uint8_t minuto_agendado;        // 0-59
+    unsigned long ultimo_disparo_agendado; // millis() do último disparo por agendamento
 };
 
 // --- Estrutura para Módulos Inter-Comunicação ---
@@ -381,6 +385,8 @@ void fV_executeActionsTask(void); // Task periódica para execução de ações
 void fV_executeAction(uint8_t actionIndex); // Executa uma ação específica
 void fV_syncRemotePinsOnBoot(void); // Sincroniza todos os pinos remotos após inicialização
 void fV_processPendingRemoteSends(void); // Processa envios HTTP pendentes (chamado fora do mutex)
+void fV_logActionEvent(uint16_t gpio, uint16_t tipo); // Registra evento de acionamento no ring buffer
+String fS_getActionHistoryJson(void); // Retorna JSON do histórico de acionamentos
 
 /* Funções do SMCR Cloud (cloud_sync.cpp) */
 void fV_cloudSyncTask(void);               // Executa sincronização com a cloud SMCR

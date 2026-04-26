@@ -481,6 +481,15 @@ void fV_setupWebServer() {
         fV_handleActionsListApi(request);
     });
     
+    // API: Histórico de acionamentos
+    SERVIDOR_WEB_ASYNC->on("/api/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str()))
+                return request->requestAuthentication();
+        }
+        request->send(200, "application/json", fS_getActionHistoryJson());
+    });
+
     // API: Criar nova ação
     SERVIDOR_WEB_ASYNC->on("/api/actions", HTTP_POST, [](AsyncWebServerRequest *request) {
         // Verifica autenticação se habilitada
@@ -3273,9 +3282,11 @@ void fV_handleActionsListApi(AsyncWebServerRequest *request) {
             actionObj["envia_modulo"] = vA_actionConfigs[i].envia_modulo;
             actionObj["telegram"] = vA_actionConfigs[i].telegram;
             actionObj["assistente"] = vA_actionConfigs[i].assistente;
+            actionObj["hora_agendada"]   = vA_actionConfigs[i].hora_agendada;
+            actionObj["minuto_agendado"] = vA_actionConfigs[i].minuto_agendado;
         }
     }
-    
+
     doc["total"] = vU8_activeActionsCount;
     
     String response;
@@ -3306,7 +3317,14 @@ void fV_handleActionCreateApi(AsyncWebServerRequest *request) {
     newAction.envia_modulo = request->hasArg("envia_modulo") ? request->arg("envia_modulo") : "";
     newAction.telegram = request->hasArg("telegram") && request->arg("telegram") == "true";
     newAction.assistente = request->hasArg("assistente") && request->arg("assistente") == "true";
-    
+    newAction.hora_agendada = request->hasArg("hora_agendada") ? (uint8_t)request->arg("hora_agendada").toInt() : 255;
+    newAction.minuto_agendado = request->hasArg("minuto_agendado") ? (uint8_t)request->arg("minuto_agendado").toInt() : 0;
+    newAction.ultimo_disparo_agendado = 0;
+    newAction.contador_on = 0;
+    newAction.contador_off = 0;
+    newAction.estado_acao = false;
+    newAction.ultimo_estado_origem = false;
+
     // Detecta modo de edição (campos hidden)
     bool isEdit = request->hasArg("edit_pino_origem") && request->hasArg("edit_numero_acao") &&
                   request->arg("edit_pino_origem") != "" && request->arg("edit_numero_acao") != "";

@@ -4,6 +4,7 @@
 #include "LittleFS.h"
 #include <HTTPClient.h>
 #include <WiFi.h>
+#include <time.h>
 
 // Variáveis globais para gerenciamento de ações
 ActionConfig_t* vA_actionConfigs = nullptr;
@@ -87,6 +88,40 @@ void fV_processRemoteQueue(void) {
     }
 }
 
+// Ring buffer de histórico de acionamentos (20 eventos)
+#define ACTION_HISTORY_SIZE 20
+struct ActionEvent_t {
+    uint16_t gpio;
+    uint16_t tipo;
+    char     ts[21];
+};
+static ActionEvent_t vA_actionHistory[ACTION_HISTORY_SIZE];
+static uint8_t vU8_historyIndex = 0;
+static bool vB_historyWrapped = false;
+
+void fV_logActionEvent(uint16_t gpio, uint16_t tipo) {
+    String t = fS_getFormattedTime();
+    t.toCharArray(vA_actionHistory[vU8_historyIndex].ts, sizeof(ActionEvent_t::ts));
+    vA_actionHistory[vU8_historyIndex].gpio = gpio;
+    vA_actionHistory[vU8_historyIndex].tipo = tipo;
+    vU8_historyIndex = (vU8_historyIndex + 1) % ACTION_HISTORY_SIZE;
+    if (vU8_historyIndex == 0) vB_historyWrapped = true;
+}
+
+String fS_getActionHistoryJson() {
+    uint8_t total = vB_historyWrapped ? ACTION_HISTORY_SIZE : vU8_historyIndex;
+    String out = "[";
+    for (uint8_t i = 0; i < total; i++) {
+        uint8_t idx = (vU8_historyIndex - total + i + ACTION_HISTORY_SIZE) % ACTION_HISTORY_SIZE;
+        if (i > 0) out += ',';
+        out += "{\"gpio\":" + String(vA_actionHistory[idx].gpio)
+             + ",\"tipo\":" + String(vA_actionHistory[idx].tipo)
+             + ",\"ts\":\"" + String(vA_actionHistory[idx].ts) + "\"}";
+    }
+    out += "]";
+    return out;
+}
+
 // Constantes para tipos de ação
 const uint16_t ACTION_TYPE_NONE = 0;
 const uint16_t ACTION_TYPE_LIGA = 1;
@@ -142,6 +177,9 @@ void fV_initActionSystem(void) {
         vA_actionConfigs[i].contador_off = 0;
         vA_actionConfigs[i].estado_acao = false;
         vA_actionConfigs[i].ultimo_estado_origem = false;
+        vA_actionConfigs[i].hora_agendada = 255;
+        vA_actionConfigs[i].minuto_agendado = 0;
+        vA_actionConfigs[i].ultimo_disparo_agendado = 0;
     }
     
     vU8_activeActionsCount = 0;
@@ -263,10 +301,13 @@ void fV_loadActionConfigs(void) {
         vA_actionConfigs[index].envia_modulo = action["envia_modulo"].as<String>();
         vA_actionConfigs[index].telegram = action["telegram"] | false;
         vA_actionConfigs[index].assistente = action["assistente"] | false;
+        vA_actionConfigs[index].hora_agendada = action["hora_agendada"] | (uint8_t)255;
+        vA_actionConfigs[index].minuto_agendado = action["minuto_agendado"] | (uint8_t)0;
         vA_actionConfigs[index].contador_on = 0;
         vA_actionConfigs[index].contador_off = 0;
         vA_actionConfigs[index].estado_acao = false;
         vA_actionConfigs[index].ultimo_estado_origem = false;
+        vA_actionConfigs[index].ultimo_disparo_agendado = 0;
         
         fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Carregada: Origem=%d, Ação#%d, Destino=%d, Tipo=%d", 
             pinOrigem, numeroAcao, vA_actionConfigs[index].pino_destino, vA_actionConfigs[index].acao);
@@ -302,6 +343,10 @@ bool fB_saveActionConfigs(void) {
             action["envia_modulo"] = vA_actionConfigs[i].envia_modulo;
             action["telegram"] = vA_actionConfigs[i].telegram;
             action["assistente"] = vA_actionConfigs[i].assistente;
+            if (vA_actionConfigs[i].hora_agendada != 255) {
+                action["hora_agendada"]   = vA_actionConfigs[i].hora_agendada;
+                action["minuto_agendado"] = vA_actionConfigs[i].minuto_agendado;
+            }
         }
     }
     
@@ -579,6 +624,24 @@ void fV_executeActionsTask(void) {
     }
     // Reseta buffer de envios pendentes a cada ciclo
     vU8_pendingSendsCount = 0;
+
+    // Verifica ações agendadas por horário (NTP)
+    struct tm vSt_now;
+    bool vB_ntpOk = getLocalTime(&vSt_now, 0);
+    if (vB_ntpOk) {
+        for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
+            ActionConfig_t* a = &vA_actionConfigs[i];
+            if (a->hora_agendada == 255 || a->acao == ACTION_TYPE_NONE) continue;
+            if (vSt_now.tm_hour == a->hora_agendada && vSt_now.tm_min == a->minuto_agendado) {
+                if (millis() - a->ultimo_disparo_agendado > 65000UL) {
+                    a->ultimo_disparo_agendado = millis();
+                    a->estado_acao = true;
+                    fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Agendamento: acao %d disparo %02d:%02d GPIO %d",
+                        i, a->hora_agendada, a->minuto_agendado, a->pino_destino);
+                }
+            }
+        }
+    }
     
     for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
         // Pula ações desabilitadas
@@ -724,6 +787,7 @@ void fV_executeAction(uint8_t actionIndex) {
             // Liga o pino destino imediatamente
             fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
             action->estado_acao = false; // Executa uma vez
+            fV_logActionEvent(action->pino_destino, ACTION_TYPE_LIGA);
             fV_printSerialDebug(LOG_ACTIONS, "[ACTION] LIGA: GPIO %d", action->pino_destino);
             break;
             
@@ -734,7 +798,8 @@ void fV_executeAction(uint8_t actionIndex) {
             if (action->contador_on >= ciclos_delay) {
                 fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
                 action->estado_acao = false;
-                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] LIGA_DELAY: GPIO %d após %d ms", 
+                fV_logActionEvent(action->pino_destino, ACTION_TYPE_LIGA_DELAY);
+                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] LIGA_DELAY: GPIO %d após %d ms",
                     action->pino_destino, action->tempo_on);
             }
             break;
@@ -752,6 +817,7 @@ void fV_executeAction(uint8_t actionIndex) {
                 // impedindo que esta condição seja reutilizada erroneamente.
                 if (action->contador_off == 0 && action->contador_on == 0) {
                     fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
+                    fV_logActionEvent(action->pino_destino, ACTION_TYPE_PISCA);
                 } else {
                     action->contador_off++;
                     if (action->contador_off >= ciclos_off_pisca) {
@@ -777,7 +843,8 @@ void fV_executeAction(uint8_t actionIndex) {
             // Liga por tempo_on e depois desliga (tempo em ms, task roda a cada 100ms)
             if (action->contador_on == 0) {
                 fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
-                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] PULSO iniciado: GPIO %d por %d ms", 
+                fV_logActionEvent(action->pino_destino, ACTION_TYPE_PULSO);
+                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] PULSO iniciado: GPIO %d por %d ms",
                     action->pino_destino, action->tempo_on);
             }
             action->contador_on++;
@@ -801,8 +868,9 @@ void fV_executeAction(uint8_t actionIndex) {
                 action->contador_on++;
             } else if (action->contador_off == 0) {
                 fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
+                fV_logActionEvent(action->pino_destino, ACTION_TYPE_PULSO_DELAY_ON);
                 action->contador_off = 1;
-                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] PULSO_DELAY_ON ligado: GPIO %d após %d ms delay", 
+                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] PULSO_DELAY_ON ligado: GPIO %d após %d ms delay",
                     action->pino_destino, action->tempo_on);
             } else if (action->contador_off < ciclos_duracao) {
                 action->contador_off++;
