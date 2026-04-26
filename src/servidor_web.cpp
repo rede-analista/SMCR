@@ -1655,9 +1655,9 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
             vSt_mainConfig.vU16_cloudSyncIntervalMin = request->arg("cloud_sync_interval_min").toInt();
             fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_sync_interval_min = %d", vSt_mainConfig.vU16_cloudSyncIntervalMin);
         }
-        if (request->hasArg("cloud_api_token") && request->arg("cloud_api_token").length() > 0) {
+        if (request->hasArg("cloud_api_token")) {
             vSt_mainConfig.vS_cloudApiToken = request->arg("cloud_api_token");
-            fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_api_token atualizado");
+            fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_api_token = '%s'", vSt_mainConfig.vS_cloudApiToken.c_str());
         }
         if (request->hasArg("cloud_register_token")) {
             vSt_mainConfig.vS_cloudRegisterToken = request->arg("cloud_register_token");
