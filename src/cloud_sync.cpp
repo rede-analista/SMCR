@@ -615,6 +615,8 @@ void fV_cloudHeartbeatTask(void) {
     doc["firmware_version"] = FIRMWARE_VERSION;
     doc["free_heap"]        = ESP.getFreeHeap();
     doc["uptime_ms"]        = millis();
+    doc["sketch_size"]      = ESP.getSketchSize();
+    doc["sketch_free"]      = ESP.getFreeSketchSpace();
     doc["wifi_rssi"]        = WiFi.RSSI();
 
     String body;

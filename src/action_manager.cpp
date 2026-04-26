@@ -92,6 +92,7 @@ void fV_processRemoteQueue(void) {
 #define ACTION_HISTORY_SIZE 20
 struct ActionEvent_t {
     uint16_t gpio;
+    uint16_t origem;
     uint16_t tipo;
     char     ts[21];
 };
@@ -99,11 +100,12 @@ static ActionEvent_t vA_actionHistory[ACTION_HISTORY_SIZE];
 static uint8_t vU8_historyIndex = 0;
 static bool vB_historyWrapped = false;
 
-void fV_logActionEvent(uint16_t gpio, uint16_t tipo) {
+void fV_logActionEvent(uint16_t gpio, uint16_t tipo, uint16_t origem) {
     String t = fS_getFormattedTime();
     t.toCharArray(vA_actionHistory[vU8_historyIndex].ts, sizeof(ActionEvent_t::ts));
-    vA_actionHistory[vU8_historyIndex].gpio = gpio;
-    vA_actionHistory[vU8_historyIndex].tipo = tipo;
+    vA_actionHistory[vU8_historyIndex].gpio   = gpio;
+    vA_actionHistory[vU8_historyIndex].tipo   = tipo;
+    vA_actionHistory[vU8_historyIndex].origem = origem;
     vU8_historyIndex = (vU8_historyIndex + 1) % ACTION_HISTORY_SIZE;
     if (vU8_historyIndex == 0) vB_historyWrapped = true;
 }
@@ -115,6 +117,7 @@ String fS_getActionHistoryJson() {
         uint8_t idx = (vU8_historyIndex - total + i + ACTION_HISTORY_SIZE) % ACTION_HISTORY_SIZE;
         if (i > 0) out += ',';
         out += "{\"gpio\":" + String(vA_actionHistory[idx].gpio)
+             + ",\"origem\":" + String(vA_actionHistory[idx].origem)
              + ",\"tipo\":" + String(vA_actionHistory[idx].tipo)
              + ",\"ts\":\"" + String(vA_actionHistory[idx].ts) + "\"}";
     }
@@ -787,7 +790,7 @@ void fV_executeAction(uint8_t actionIndex) {
             // Liga o pino destino imediatamente
             fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
             action->estado_acao = false; // Executa uma vez
-            fV_logActionEvent(action->pino_destino, ACTION_TYPE_LIGA);
+            fV_logActionEvent(action->pino_destino, ACTION_TYPE_LIGA, action->pino_origem);
             fV_printSerialDebug(LOG_ACTIONS, "[ACTION] LIGA: GPIO %d", action->pino_destino);
             break;
             
@@ -798,7 +801,7 @@ void fV_executeAction(uint8_t actionIndex) {
             if (action->contador_on >= ciclos_delay) {
                 fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
                 action->estado_acao = false;
-                fV_logActionEvent(action->pino_destino, ACTION_TYPE_LIGA_DELAY);
+                fV_logActionEvent(action->pino_destino, ACTION_TYPE_LIGA_DELAY, action->pino_origem);
                 fV_printSerialDebug(LOG_ACTIONS, "[ACTION] LIGA_DELAY: GPIO %d após %d ms",
                     action->pino_destino, action->tempo_on);
             }
@@ -817,7 +820,7 @@ void fV_executeAction(uint8_t actionIndex) {
                 // impedindo que esta condição seja reutilizada erroneamente.
                 if (action->contador_off == 0 && action->contador_on == 0) {
                     fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
-                    fV_logActionEvent(action->pino_destino, ACTION_TYPE_PISCA);
+                    fV_logActionEvent(action->pino_destino, ACTION_TYPE_PISCA, action->pino_origem);
                 } else {
                     action->contador_off++;
                     if (action->contador_off >= ciclos_off_pisca) {
@@ -843,7 +846,7 @@ void fV_executeAction(uint8_t actionIndex) {
             // Liga por tempo_on e depois desliga (tempo em ms, task roda a cada 100ms)
             if (action->contador_on == 0) {
                 fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
-                fV_logActionEvent(action->pino_destino, ACTION_TYPE_PULSO);
+                fV_logActionEvent(action->pino_destino, ACTION_TYPE_PULSO, action->pino_origem);
                 fV_printSerialDebug(LOG_ACTIONS, "[ACTION] PULSO iniciado: GPIO %d por %d ms",
                     action->pino_destino, action->tempo_on);
             }
@@ -868,7 +871,7 @@ void fV_executeAction(uint8_t actionIndex) {
                 action->contador_on++;
             } else if (action->contador_off == 0) {
                 fV_writeActionPin(pinDestinoIndex, action->pino_destino, true);
-                fV_logActionEvent(action->pino_destino, ACTION_TYPE_PULSO_DELAY_ON);
+                fV_logActionEvent(action->pino_destino, ACTION_TYPE_PULSO_DELAY_ON, action->pino_origem);
                 action->contador_off = 1;
                 fV_printSerialDebug(LOG_ACTIONS, "[ACTION] PULSO_DELAY_ON ligado: GPIO %d após %d ms delay",
                     action->pino_destino, action->tempo_on);

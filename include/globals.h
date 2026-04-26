@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.12"
+#define FIRMWARE_VERSION "2.3.13"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -385,7 +385,7 @@ void fV_executeActionsTask(void); // Task periódica para execução de ações
 void fV_executeAction(uint8_t actionIndex); // Executa uma ação específica
 void fV_syncRemotePinsOnBoot(void); // Sincroniza todos os pinos remotos após inicialização
 void fV_processPendingRemoteSends(void); // Processa envios HTTP pendentes (chamado fora do mutex)
-void fV_logActionEvent(uint16_t gpio, uint16_t tipo); // Registra evento de acionamento no ring buffer
+void fV_logActionEvent(uint16_t gpio, uint16_t tipo, uint16_t origem); // Registra evento de acionamento no ring buffer
 String fS_getActionHistoryJson(void); // Retorna JSON do histórico de acionamentos
 
 /* Funções do SMCR Cloud (cloud_sync.cpp) */
