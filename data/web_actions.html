@@ -405,7 +405,7 @@
                     </div>
 
                     <div id="agendamentoGroup" style="display:none">
-                        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
                             <div class="form-group">
                                 <label for="hora_agendada">Hora (0-23)</label>
                                 <input type="number" id="hora_agendada" name="hora_agendada" min="0" max="23" value="0">
@@ -414,8 +414,12 @@
                                 <label for="minuto_agendado">Minuto (0-59)</label>
                                 <input type="number" id="minuto_agendado" name="minuto_agendado" min="0" max="59" value="0">
                             </div>
+                            <div class="form-group">
+                                <label for="duracao_agendada_s">Duração (seg, 0=indefinida)</label>
+                                <input type="number" id="duracao_agendada_s" name="duracao_agendada_s" min="0" max="65535" value="0">
+                            </div>
                         </div>
-                        <p style="font-size:0.8rem;color:#888;margin:0 0 8px">Requer NTP sincronizado. A ação dispara uma vez por minuto no horário configurado, independente do pino de origem.</p>
+                        <p style="font-size:0.8rem;color:#888;margin:0 0 8px">Requer NTP. Dispara independente do pino de origem. Duração 0 = fica ativo até reiniciar.</p>
                     </div>
 
                     <div class="button-group">
@@ -669,6 +673,7 @@
                 const agendHab = document.getElementById('agendamento_hab').checked;
                 params.set('hora_agendada', agendHab ? document.getElementById('hora_agendada').value : '255');
                 params.set('minuto_agendado', agendHab ? document.getElementById('minuto_agendado').value : '0');
+                params.set('duracao_agendada_s', agendHab ? document.getElementById('duracao_agendada_s').value : '0');
                 
                 // Força inclusão de campos disabled quando em modo de edição
                 const pinoOrigemDisabled = document.getElementById('pino_origem').disabled;
@@ -736,6 +741,7 @@
             if (agendHab) {
                 document.getElementById('hora_agendada').value = action.hora_agendada;
                 document.getElementById('minuto_agendado').value = action.minuto_agendado;
+                document.getElementById('duracao_agendada_s').value = action.duracao_agendada_s || 0;
             }
 
             // Desabilitar campos de identificação durante edição
@@ -782,6 +788,9 @@
             document.getElementById('pino_origem').disabled = false;
             document.getElementById('numero_acao').disabled = false;
             document.getElementById('agendamento_hab').checked = false;
+            document.getElementById('hora_agendada').value = '0';
+            document.getElementById('minuto_agendado').value = '0';
+            document.getElementById('duracao_agendada_s').value = '0';
             toggleAgendamento(false);
             editMode = false;
             editingOrigin = null;

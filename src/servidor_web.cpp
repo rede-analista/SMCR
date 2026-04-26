@@ -3298,8 +3298,9 @@ void fV_handleActionsListApi(AsyncWebServerRequest *request) {
             actionObj["envia_modulo"] = vA_actionConfigs[i].envia_modulo;
             actionObj["telegram"] = vA_actionConfigs[i].telegram;
             actionObj["assistente"] = vA_actionConfigs[i].assistente;
-            actionObj["hora_agendada"]   = vA_actionConfigs[i].hora_agendada;
-            actionObj["minuto_agendado"] = vA_actionConfigs[i].minuto_agendado;
+            actionObj["hora_agendada"]      = vA_actionConfigs[i].hora_agendada;
+            actionObj["minuto_agendado"]    = vA_actionConfigs[i].minuto_agendado;
+            actionObj["duracao_agendada_s"] = vA_actionConfigs[i].duracao_agendada_s;
         }
     }
 
@@ -3335,7 +3336,10 @@ void fV_handleActionCreateApi(AsyncWebServerRequest *request) {
     newAction.assistente = request->hasArg("assistente") && request->arg("assistente") == "true";
     newAction.hora_agendada = request->hasArg("hora_agendada") ? (uint8_t)request->arg("hora_agendada").toInt() : 255;
     newAction.minuto_agendado = request->hasArg("minuto_agendado") ? (uint8_t)request->arg("minuto_agendado").toInt() : 0;
+    newAction.duracao_agendada_s = request->hasArg("duracao_agendada_s") ? (uint16_t)request->arg("duracao_agendada_s").toInt() : 0;
     newAction.ultimo_disparo_agendado = 0;
+    newAction.vB_agendamentoAtivo = false;
+    newAction.vUL_agendamentoFimMs = 0;
     newAction.contador_on = 0;
     newAction.contador_off = 0;
     newAction.estado_acao = false;

@@ -182,7 +182,10 @@ void fV_initActionSystem(void) {
         vA_actionConfigs[i].ultimo_estado_origem = false;
         vA_actionConfigs[i].hora_agendada = 255;
         vA_actionConfigs[i].minuto_agendado = 0;
+        vA_actionConfigs[i].duracao_agendada_s = 0;
         vA_actionConfigs[i].ultimo_disparo_agendado = 0;
+        vA_actionConfigs[i].vB_agendamentoAtivo = false;
+        vA_actionConfigs[i].vUL_agendamentoFimMs = 0;
     }
     
     vU8_activeActionsCount = 0;
@@ -306,11 +309,14 @@ void fV_loadActionConfigs(void) {
         vA_actionConfigs[index].assistente = action["assistente"] | false;
         vA_actionConfigs[index].hora_agendada = action["hora_agendada"] | (uint8_t)255;
         vA_actionConfigs[index].minuto_agendado = action["minuto_agendado"] | (uint8_t)0;
+        vA_actionConfigs[index].duracao_agendada_s = action["duracao_agendada_s"] | (uint16_t)0;
         vA_actionConfigs[index].contador_on = 0;
         vA_actionConfigs[index].contador_off = 0;
         vA_actionConfigs[index].estado_acao = false;
         vA_actionConfigs[index].ultimo_estado_origem = false;
         vA_actionConfigs[index].ultimo_disparo_agendado = 0;
+        vA_actionConfigs[index].vB_agendamentoAtivo = false;
+        vA_actionConfigs[index].vUL_agendamentoFimMs = 0;
         
         fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Carregada: Origem=%d, Ação#%d, Destino=%d, Tipo=%d", 
             pinOrigem, numeroAcao, vA_actionConfigs[index].pino_destino, vA_actionConfigs[index].acao);
@@ -347,8 +353,9 @@ bool fB_saveActionConfigs(void) {
             action["telegram"] = vA_actionConfigs[i].telegram;
             action["assistente"] = vA_actionConfigs[i].assistente;
             if (vA_actionConfigs[i].hora_agendada != 255) {
-                action["hora_agendada"]   = vA_actionConfigs[i].hora_agendada;
-                action["minuto_agendado"] = vA_actionConfigs[i].minuto_agendado;
+                action["hora_agendada"]    = vA_actionConfigs[i].hora_agendada;
+                action["minuto_agendado"]  = vA_actionConfigs[i].minuto_agendado;
+                action["duracao_agendada_s"] = vA_actionConfigs[i].duracao_agendada_s;
             }
         }
     }
@@ -628,38 +635,59 @@ void fV_executeActionsTask(void) {
     // Reseta buffer de envios pendentes a cada ciclo
     vU8_pendingSendsCount = 0;
 
-    // Verifica ações agendadas por horário (NTP)
+    // Obtém hora atual para agendamento (uma vez por ciclo)
     struct tm vSt_now;
     bool vB_ntpOk = getLocalTime(&vSt_now, 0);
-    if (vB_ntpOk) {
-        for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
-            ActionConfig_t* a = &vA_actionConfigs[i];
-            if (a->hora_agendada == 255 || a->acao == ACTION_TYPE_NONE) continue;
-            if (vSt_now.tm_hour == a->hora_agendada && vSt_now.tm_min == a->minuto_agendado) {
-                if (millis() - a->ultimo_disparo_agendado > 65000UL) {
-                    a->ultimo_disparo_agendado = millis();
-                    a->estado_acao = true;
-                    fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Agendamento: acao %d disparo %02d:%02d GPIO %d",
-                        i, a->hora_agendada, a->minuto_agendado, a->pino_destino);
-                }
-            }
-        }
-    }
-    
+
     for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
         // Pula ações desabilitadas
         if (vA_actionConfigs[i].acao == ACTION_TYPE_NONE) {
             continue;
         }
-        
+
         // Busca índice do pino de origem
         uint8_t pinOrigemIndex = fU8_findPinIndex(vA_actionConfigs[i].pino_origem);
         if (pinOrigemIndex == 255) {
-            continue; // Pino de origem não encontrado
+            continue;
         }
-        
+
         // Verifica se pino de origem está acionado
         bool pinoAcionado = fB_isPinActivated(pinOrigemIndex);
+
+        // Agendamento integrado: dispara e controla duração independente do pino físico
+        if (vA_actionConfigs[i].hora_agendada != 255) {
+            // Verifica se é hora de disparar
+            if (vB_ntpOk &&
+                vSt_now.tm_hour == vA_actionConfigs[i].hora_agendada &&
+                vSt_now.tm_min  == vA_actionConfigs[i].minuto_agendado &&
+                millis() - vA_actionConfigs[i].ultimo_disparo_agendado > 65000UL) {
+                vA_actionConfigs[i].ultimo_disparo_agendado = millis();
+                vA_actionConfigs[i].vB_agendamentoAtivo    = true;
+                vA_actionConfigs[i].vUL_agendamentoFimMs   =
+                    (vA_actionConfigs[i].duracao_agendada_s > 0)
+                    ? millis() + (unsigned long)vA_actionConfigs[i].duracao_agendada_s * 1000UL
+                    : 0; // 0 = indefinida
+                // Força rising edge independente do pino físico
+                pinoAcionado = true;
+                vA_actionConfigs[i].ultimo_estado_origem = false;
+                fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Agendamento disparado %02d:%02d GPIO %d dur=%ds",
+                    vA_actionConfigs[i].hora_agendada, vA_actionConfigs[i].minuto_agendado,
+                    vA_actionConfigs[i].pino_destino, vA_actionConfigs[i].duracao_agendada_s);
+            }
+            // Controla duração enquanto agendamento está ativo
+            if (vA_actionConfigs[i].vB_agendamentoAtivo) {
+                if (vA_actionConfigs[i].vUL_agendamentoFimMs > 0 &&
+                    millis() >= vA_actionConfigs[i].vUL_agendamentoFimMs) {
+                    // Duração expirou — desativa e deixa pinoAcionado voltar ao estado físico
+                    vA_actionConfigs[i].vB_agendamentoAtivo  = false;
+                    vA_actionConfigs[i].vUL_agendamentoFimMs = 0;
+                    fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Agendamento expirado GPIO %d",
+                        vA_actionConfigs[i].pino_destino);
+                } else {
+                    pinoAcionado = true; // mantém ativo enquanto duração não expirar
+                }
+            }
+        }
         
         // Detecta mudança de estado do pino origem
         bool executedLocally = false;

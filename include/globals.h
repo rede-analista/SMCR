@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.16"
+#define FIRMWARE_VERSION "2.3.17"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -183,9 +183,13 @@ struct ActionConfig_t {
     bool estado_acao;            // Estado atual da ação (true=executando, false=parada)
     bool ultimo_estado_origem;   // Último estado do pino origem (para detectar mudanças)
     // Agendamento por horário (NTP)
-    uint8_t hora_agendada;          // 0-23 (255 = desabilitado)
-    uint8_t minuto_agendado;        // 0-59
-    unsigned long ultimo_disparo_agendado; // millis() do último disparo por agendamento
+    uint8_t  hora_agendada;              // 0-23 (255 = desabilitado)
+    uint8_t  minuto_agendado;            // 0-59
+    uint16_t duracao_agendada_s;         // Duração em segundos (0 = indefinida)
+    unsigned long ultimo_disparo_agendado;  // millis() do último disparo
+    // Controle de runtime do agendamento (não persistidos)
+    bool          vB_agendamentoAtivo;      // ação está rodando via agendamento
+    unsigned long vUL_agendamentoFimMs;     // millis() de expiração (0 = indefinida)
 };
 
 // --- Estrutura para Módulos Inter-Comunicação ---
