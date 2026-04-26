@@ -501,6 +501,14 @@ void fV_setupWebServer() {
         request->send(200, "application/json", fS_getActionHistoryJson());
     });
 
+    SERVIDOR_WEB_ASYNC->on("/api/trigger", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (vSt_mainConfig.vB_authEnabled) {
+            if (!request->authenticate(vSt_mainConfig.vS_webUsername.c_str(), vSt_mainConfig.vS_webPassword.c_str()))
+                return request->requestAuthentication();
+        }
+        fV_handleTriggerApi(request);
+    });
+
     // API: Criar nova ação
     SERVIDOR_WEB_ASYNC->on("/api/actions", HTTP_POST, [](AsyncWebServerRequest *request) {
         // Verifica autenticação se habilitada
@@ -3433,5 +3441,16 @@ void fV_handleActionsPage(AsyncWebServerRequest *request) {
 void fV_handleHistoricoPage(AsyncWebServerRequest *request) {
     fV_printSerialDebug(LOG_WEB, "[WEB] Servindo página de histórico");
     servePageWithFallback(request, "/web_historico.html", web_historico_html);
+}
+
+void fV_handleTriggerApi(AsyncWebServerRequest *request) {
+    if (!request->hasArg("pino")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"pino obrigatorio\"}");
+        return;
+    }
+    uint16_t pino = (uint16_t)request->arg("pino").toInt();
+    vU16_pinoSimulado = pino;
+    fV_printSerialDebug(LOG_ACTIONS, "[TRIGGER] Simulacao GPIO %d agendada", pino);
+    request->send(200, "application/json", "{\"ok\":true}");
 }
 

@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.17"
+#define FIRMWARE_VERSION "2.3.18"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -253,6 +253,7 @@ extern uint8_t vU8_activePinsCount;  // Contador de pinos ativos configurados
 // --- Variáveis globais para gerenciamento de ações ---
 extern ActionConfig_t* vA_actionConfigs;  // Array dinâmico de configurações de ações
 extern uint8_t vU8_activeActionsCount;    // Contador de ações ativas configuradas
+extern volatile uint16_t vU16_pinoSimulado; // 65535 = nenhum; setado via /api/trigger
 
 // --- Variáveis globais para gerenciamento de inter-módulos ---
 extern InterModConfig_t* vA_interModConfigs;  // Array dinâmico de módulos cadastrados
@@ -353,7 +354,8 @@ void fV_handleActionCreateApi(AsyncWebServerRequest *request); // Handler para A
 void fV_handleActionUpdateApi(AsyncWebServerRequest *request); // Handler para API de atualização de ações
 void fV_handleActionDeleteApi(AsyncWebServerRequest *request); // Handler para API de deleção de ações
 void fV_handleActionsSaveApi(AsyncWebServerRequest *request); // Handler para API de salvamento de ações
-void fV_handleActionsPage(AsyncWebServerRequest *request); // Handler para página de ações
+void fV_handleActionsPage(AsyncWebServerRequest *request);
+void fV_handleTriggerApi(AsyncWebServerRequest *request);
 
 /* Funções de NTP (ntp_func.cpp) */
 void fV_setupNtp();

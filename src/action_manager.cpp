@@ -9,6 +9,7 @@
 // Variáveis globais para gerenciamento de ações
 ActionConfig_t* vA_actionConfigs = nullptr;
 uint8_t vU8_activeActionsCount = 0;
+volatile uint16_t vU16_pinoSimulado = 65535;
 
 // Fila de reenvio para alertas inter-módulos que falharam
 RemoteQueueItem_t vA_remoteQueue[REMOTE_QUEUE_SIZE];
@@ -654,6 +655,13 @@ void fV_executeActionsTask(void) {
         // Verifica se pino de origem está acionado
         bool pinoAcionado = fB_isPinActivated(pinOrigemIndex);
 
+        // Simulação de acionamento via /api/trigger
+        if (vU16_pinoSimulado == vA_actionConfigs[i].pino_origem) {
+            pinoAcionado = true;
+            vA_actionConfigs[i].ultimo_estado_origem = false;
+            fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Simulacao GPIO %d", vA_actionConfigs[i].pino_origem);
+        }
+
         // Agendamento integrado: dispara e controla duração independente do pino físico
         if (vA_actionConfigs[i].hora_agendada != 255) {
             // Verifica se é hora de disparar
@@ -800,6 +808,7 @@ void fV_executeActionsTask(void) {
                 fV_executeAction(i);
         }
     }
+    vU16_pinoSimulado = 65535; // limpa após processar todos os actions
 }
 
 //========================================
