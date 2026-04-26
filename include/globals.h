@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.15"
+#define FIRMWARE_VERSION "2.3.16"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -135,6 +135,7 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
     bool vB_cloudSyncEnabled;            // Habilita busca periódica de configurações na cloud
     uint16_t vU16_cloudSyncIntervalMin;  // Intervalo de sync em minutos (padrão 5)
     String vS_cloudApiToken;             // Token API para autenticação na cloud
+    String vS_cloudRegisterToken;        // Token de auto-registro (usado uma vez para obter api_token)
     bool vB_cloudHeartbeatEnabled;       // Habilita envio periódico de heartbeat para a cloud
     uint16_t vU16_cloudHeartbeatIntervalMin; // Intervalo do heartbeat em minutos (padrão 2)
 
@@ -398,6 +399,7 @@ void fV_fetchCloudFilesTask(void);         // Baixa arquivos HTML da cloud para 
 String fS_getFetchCloudFilesStatus(void);  // Retorna status do download
 extern bool vB_pendingFetchCloudFiles;     // Flag para iniciar download
 extern String vS_fetchCloudFilesUrl;       // URL do servidor para download
+void fV_cloudAutoRegisterTask(void);       // Auto-registra dispositivo na cloud e obtém api_token
 void fV_cloudHeartbeatTask(void);          // Envia heartbeat de status para a cloud SMCR
 String fS_getCloudHeartbeatStatus(void);   // Retorna último status do heartbeat
 String fS_getCloudHeartbeatLastTime(void); // Retorna horário do último heartbeat

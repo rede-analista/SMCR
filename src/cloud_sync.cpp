@@ -591,6 +591,72 @@ void fV_fetchCloudFilesTask(void) {
 }
 
 /**
+ * @brief Registra o dispositivo na cloud usando register_token e salva o api_token retornado.
+ * Executa apenas quando cloudApiToken está vazio e cloudRegisterToken está configurado.
+ */
+void fV_cloudAutoRegisterTask(void) {
+    if (!vB_wifiIsConnected) return;
+    if (vSt_mainConfig.vS_cloudUrl.length() == 0) return;
+    if (vSt_mainConfig.vS_cloudRegisterToken.length() == 0) return;
+    if (vSt_mainConfig.vS_cloudApiToken.length() > 0) return; // já registrado
+
+    String url = fS_cloudBaseUrl() + "/api/register.php";
+    String uniqueId = fS_getMqttUniqueId();
+
+    JsonDocument doc;
+    doc["unique_id"]       = uniqueId;
+    doc["register_token"]  = vSt_mainConfig.vS_cloudRegisterToken;
+    doc["hostname"]        = vSt_mainConfig.vS_hostname;
+    doc["ip"]              = WiFi.localIP().toString();
+    doc["port"]            = vSt_mainConfig.vU16_webServerPort;
+    doc["firmware_version"] = FIRMWARE_VERSION;
+
+    String body;
+    serializeJson(doc, body);
+
+    WiFiClientSecure regSecClient;
+    if (vSt_mainConfig.vB_cloudUseHttps) regSecClient.setInsecure();
+
+    HTTPClient http;
+    http.setTimeout(8000);
+    bool ok = vSt_mainConfig.vB_cloudUseHttps ? http.begin(regSecClient, url) : http.begin(url);
+    if (!ok) {
+        fV_printSerialDebug(LOG_NETWORK, "[REG] Falha ao iniciar HTTP: %s", url.c_str());
+        return;
+    }
+    http.addHeader("Content-Type", "application/json");
+
+    int code = http.POST(body);
+    String resp = http.getString();
+    http.end();
+
+    if (code != 200) {
+        fV_printSerialDebug(LOG_NETWORK, "[REG] Erro HTTP %d: %s", code, resp.c_str());
+        return;
+    }
+
+    JsonDocument respDoc;
+    if (deserializeJson(respDoc, resp) != DeserializationError::Ok) {
+        fV_printSerialDebug(LOG_NETWORK, "[REG] Resposta inválida");
+        return;
+    }
+    if (!respDoc["ok"].as<bool>()) {
+        fV_printSerialDebug(LOG_NETWORK, "[REG] Registro rejeitado: %s", respDoc["error"].as<const char*>());
+        return;
+    }
+
+    String token = respDoc["api_token"].as<String>();
+    if (token.length() == 0) {
+        fV_printSerialDebug(LOG_NETWORK, "[REG] api_token vazio na resposta");
+        return;
+    }
+
+    vSt_mainConfig.vS_cloudApiToken = token;
+    fV_salvarMainConfig();
+    fV_printSerialDebug(LOG_NETWORK, "[REG] Dispositivo registrado com sucesso. api_token salvo.");
+}
+
+/**
  * @brief Envia heartbeat de status para o SMCR Cloud HA (POST /api/status.php).
  * Mantém o dispositivo marcado como online no painel da cloud.
  * Requer que vS_cloudApiToken esteja configurado (recebido no auto-registro).

@@ -826,6 +826,7 @@ void fV_setupWebServer() {
         doc["cloud_sync_enabled"] = vSt_mainConfig.vB_cloudSyncEnabled;
         doc["cloud_sync_interval_min"] = vSt_mainConfig.vU16_cloudSyncIntervalMin;
         doc["cloud_api_token"] = vSt_mainConfig.vS_cloudApiToken;
+        doc["cloud_register_token"] = vSt_mainConfig.vS_cloudRegisterToken;
         doc["cloud_heartbeat_enabled"] = vSt_mainConfig.vB_cloudHeartbeatEnabled;
         doc["cloud_heartbeat_interval_min"] = vSt_mainConfig.vU16_cloudHeartbeatIntervalMin;
         doc["cloud_sync_status"] = fS_getCloudSyncStatus();
@@ -1657,6 +1658,10 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
         if (request->hasArg("cloud_api_token") && request->arg("cloud_api_token").length() > 0) {
             vSt_mainConfig.vS_cloudApiToken = request->arg("cloud_api_token");
             fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_api_token atualizado");
+        }
+        if (request->hasArg("cloud_register_token")) {
+            vSt_mainConfig.vS_cloudRegisterToken = request->arg("cloud_register_token");
+            fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_register_token atualizado");
         }
         vSt_mainConfig.vB_cloudHeartbeatEnabled = request->hasArg("cloud_heartbeat_enabled") && request->arg("cloud_heartbeat_enabled") != "0";
         fV_printSerialDebug(LOG_WEB, "[CONFIG] cloud_heartbeat_enabled = %d", vSt_mainConfig.vB_cloudHeartbeatEnabled);

@@ -130,6 +130,7 @@ const char* KEY_CLOUD_SYNC_INT = "cloud_sint";
 const char* KEY_CLOUD_API_TOKEN = "cloud_token";
 const char* KEY_CLOUD_HB_EN = "cloud_hb_en";
 const char* KEY_CLOUD_HB_INT = "cloud_hb_int";
+const char* KEY_CLOUD_REG_TOKEN = "cloud_reg_tok";
 
 void fV_carregarMainConfig(void) {
 
@@ -216,6 +217,7 @@ void fV_carregarMainConfig(void) {
     vSt_mainConfig.vB_cloudSyncEnabled = preferences.getBool(KEY_CLOUD_SYNC_EN, false);
     vSt_mainConfig.vU16_cloudSyncIntervalMin = preferences.getUInt(KEY_CLOUD_SYNC_INT, 5);
     vSt_mainConfig.vS_cloudApiToken = preferences.getString(KEY_CLOUD_API_TOKEN, "");
+    vSt_mainConfig.vS_cloudRegisterToken = preferences.getString(KEY_CLOUD_REG_TOKEN, "");
     vSt_mainConfig.vB_cloudHeartbeatEnabled = preferences.getBool(KEY_CLOUD_HB_EN, false);
     vSt_mainConfig.vU16_cloudHeartbeatIntervalMin = preferences.getUInt(KEY_CLOUD_HB_INT, 2);
 
@@ -316,6 +318,7 @@ void fV_salvarMainConfig(void) {
     preferences.putBool(KEY_CLOUD_SYNC_EN, vSt_mainConfig.vB_cloudSyncEnabled);
     preferences.putUInt(KEY_CLOUD_SYNC_INT, vSt_mainConfig.vU16_cloudSyncIntervalMin);
     preferences.putString(KEY_CLOUD_API_TOKEN, vSt_mainConfig.vS_cloudApiToken);
+    preferences.putString(KEY_CLOUD_REG_TOKEN, vSt_mainConfig.vS_cloudRegisterToken);
     preferences.putBool(KEY_CLOUD_HB_EN, vSt_mainConfig.vB_cloudHeartbeatEnabled);
     preferences.putUInt(KEY_CLOUD_HB_INT, vSt_mainConfig.vU16_cloudHeartbeatIntervalMin);
 

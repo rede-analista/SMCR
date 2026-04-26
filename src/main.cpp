@@ -202,6 +202,14 @@ void loop() {
     fV_interModAlertFlashTask();
   }
 
+  // 9a. AUTO-REGISTRO: Tenta registrar na cloud quando api_token está vazio
+  if (vB_wifiIsConnected &&
+      vSt_mainConfig.vS_cloudApiToken.length() == 0 &&
+      vSt_mainConfig.vS_cloudRegisterToken.length() > 0 &&
+      vU32_currentTime - vU32_lastCloudSyncTime >= 30000UL) {
+    fV_cloudAutoRegisterTask();
+  }
+
   // 9. CLOUD SYNC: Busca configurações na cloud SMCR (periódico ou forçado)
   unsigned long vU32_cloudSyncIntervalMs = (unsigned long)vSt_mainConfig.vU16_cloudSyncIntervalMin * 60000UL;
   if ((vB_pendingCloudSync && vB_wifiIsConnected) ||
