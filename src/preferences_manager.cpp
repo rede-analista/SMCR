@@ -144,7 +144,7 @@ void fV_carregarMainConfig(void) {
     vSt_mainConfig.vS_hostname = preferences.getString(KEY_HOSTNAME, "");
     vSt_mainConfig.vS_wifiSsid = preferences.getString(KEY_WIFI_SSID, ""); 
     vSt_mainConfig.vS_wifiPass = preferences.getString(KEY_WIFI_PASS, ""); 
-    vSt_mainConfig.vU16_wifiConnectAttempts = preferences.getUInt(KEY_WIFI_ATTEMPTS, 15);
+    vSt_mainConfig.vU16_wifiConnectAttempts = preferences.getUInt(KEY_WIFI_ATTEMPTS, 4);
 
     // 3. Configurações de Acesso (AP Fallback)
     vSt_mainConfig.vS_apSsid = preferences.getString(KEY_AP_SSID, "SMCR_AP_SETUP"); 

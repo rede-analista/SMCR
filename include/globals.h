@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.20"
+#define FIRMWARE_VERSION "2.3.21"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -61,7 +61,7 @@ struct MainConfig_t { // Usando _t como sufixo para indicar um tipo (Type)
     String vS_hostname;             // Hostname para a rede (mDNS)
     String vS_wifiSsid;             // SSID da rede Wi-Fi principal
     String vS_wifiPass;             // Senha da rede Wi-Fi principal
-    uint16_t vU16_wifiConnectAttempts; // Número de tentativas antes do fallback (padrão 15)
+    uint16_t vU16_wifiConnectAttempts; // Número de tentativas antes do fallback (padrão 4)
 
     // 3. Configurações de Acesso (AP Fallback)
     String vS_apSsid;               // SSID para o modo Access Point
