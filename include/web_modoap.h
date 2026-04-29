@@ -100,11 +100,15 @@ const char web_config_html[] PROGMEM = R"rawliteral(
             color: #155724; 
             border: 1px solid #c3e6cb; 
         }
-        .status-error { 
-            background: #f8d7da; 
-            color: #721c24; 
-            border: 1px solid #f5c6cb; 
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
+        .pass-wrap { display:inline-flex; align-items:center; gap:4px; width:100%; }
+        .pass-wrap input { flex:1; }
+        .pass-eye { background:none; border:1px solid #ccc; border-radius:3px; cursor:pointer; padding:1px 6px; font-size:13px; line-height:1.4; }
+        .pass-eye:hover { background:#f0f0f0; }
     </style>
 </head>
 <body>
@@ -124,7 +128,7 @@ const char web_config_html[] PROGMEM = R"rawliteral(
                 </tr>
                 <tr>
                     <td>Senha da Rede:</td>
-                    <td><input type="password" name="password" id="password" placeholder="Senha do Wi-Fi" maxlength="64" required></td>
+                    <td><span class="pass-wrap"><input type="password" name="password" id="password" placeholder="Senha do Wi-Fi" maxlength="64" required><button type="button" class="pass-eye" onclick="togglePass('password',this)">👁</button></span></td>
                 </tr>
             </table>
             
@@ -135,6 +139,12 @@ const char web_config_html[] PROGMEM = R"rawliteral(
     </div>
 
     <script>
+        function togglePass(id, btn) {
+            var inp = document.getElementById(id);
+            if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+            else { inp.type = 'password'; btn.textContent = '👁'; }
+        }
+
         document.getElementById('configForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
