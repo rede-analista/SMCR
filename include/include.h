@@ -17,5 +17,6 @@
 #include <FS.h>
 #include <LittleFS.h>
 #include "esp_task_wdt.h"
+#include "freertos/task.h"
 
 #endif // INCLUDE_H

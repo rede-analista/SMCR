@@ -428,7 +428,10 @@ void fV_setupWebServer() {
             // Upload em partes usando Update
             if (index == 0) {
                 fV_printSerialDebug(LOG_WEB | LOG_FLASH, "[OTA] Inicio upload firmware: %s (%u bytes esperados)", filename.c_str(), (unsigned)request->contentLength());
-                // Tenta iniciar o update para tamanho desconhecido
+                if (vSt_mainConfig.vB_watchdogEnabled) {
+                    TaskHandle_t loopTask = xTaskGetHandle("loopTask");
+                    if (loopTask) esp_task_wdt_delete(loopTask);
+                }
                 if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
                     Update.printError(Serial);
                 }

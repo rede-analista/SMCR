@@ -91,6 +91,9 @@ String fS_getCloudSyncStatus(void) {
 // OTA via GitHub — busca o firmware mais recente e instala via streaming
 // =============================================================================
 void fV_cloudOtaFromGitHub(void) {
+    if (vSt_mainConfig.vB_watchdogEnabled) {
+        esp_task_wdt_delete(NULL); // loop() bloqueado durante download — desativa WDT para não reiniciar
+    }
     fV_printSerialDebug(LOG_NETWORK, "[OTA] Iniciando update via GitHub...");
 
     String tag = "";
