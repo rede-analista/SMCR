@@ -78,6 +78,17 @@ void setup() {
   // 1. Carregar a MainConfig_t (sua startup-config) da Flash para a RAM (running-config)
   fV_carregarMainConfig();
 
+  // 1b. Ajusta frequência do clock do ESP32 (antes do Serial.begin para não afetar baud rate)
+  setCpuFrequencyMhz(vSt_mainConfig.vU16_clockEsp32Mhz);
+
+  // 1c. Inicializa o Task Watchdog Timer se habilitado
+  if (vSt_mainConfig.vB_watchdogEnabled) {
+    uint32_t vU32_wdtTimeoutSec = vSt_mainConfig.vU32_tempoWatchdogUs / 1000000UL;
+    if (vU32_wdtTimeoutSec < 1) vU32_wdtTimeoutSec = 8;
+    esp_task_wdt_init(vU32_wdtTimeoutSec, true);
+    esp_task_wdt_add(NULL);
+  }
+
   // 2. Condicionalmente inicializa a Serial e define as flags de log
   // Agora, usa os valores da struct vSt_mainConfig
   if (vSt_mainConfig.vB_serialDebugEnabled) {
@@ -97,6 +108,13 @@ void setup() {
   }
 
   fV_printSerialDebug(LOG_INIT, "Configuração inicial concluida.");
+  if (vSt_mainConfig.vB_watchdogEnabled) {
+    uint32_t vU32_wdtSec = vSt_mainConfig.vU32_tempoWatchdogUs / 1000000UL;
+    if (vU32_wdtSec < 1) vU32_wdtSec = 8;
+    fV_printSerialDebug(LOG_WATCHDOG, "Watchdog habilitado: timeout=%us, clock=%uMHz", vU32_wdtSec, vSt_mainConfig.vU16_clockEsp32Mhz);
+  } else {
+    fV_printSerialDebug(LOG_WATCHDOG, "Watchdog desabilitado. Clock=%uMHz", vSt_mainConfig.vU16_clockEsp32Mhz);
+  }
   
   // 3. INICIA A REDE: Tenta conectar ao Wi-Fi ou ativa o AP de Fallback
   fV_setupWifi();
@@ -245,6 +263,11 @@ void loop() {
     } else if (vU32_lastHeartbeatTime == 0) {
       vU32_lastHeartbeatTime = vU32_currentTime; // marca início do intervalo sem bloquear no boot
     }
+  }
+
+  // 13. WATCHDOG FEED: Alimenta o Task WDT ao final de cada ciclo completo do loop
+  if (vSt_mainConfig.vB_watchdogEnabled) {
+    esp_task_wdt_reset();
   }
 
 }

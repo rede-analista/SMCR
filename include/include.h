@@ -16,6 +16,6 @@
 #include <time.h>
 #include <FS.h>
 #include <LittleFS.h>
-
+#include "esp_task_wdt.h"
 
 #endif // INCLUDE_H
