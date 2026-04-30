@@ -625,7 +625,13 @@ void fV_readPinsTask(void) {
         if (tipo == PIN_TYPE_REMOTE) {
             continue;
         }
-        
+
+        // *** BLOQUEIA LEITURA APÓS DISPARO VIRTUAL (ignore_contador > 0) ***
+        if (vA_pinConfigs[i].ignore_contador > 0) {
+            vA_pinConfigs[i].ignore_contador--;
+            continue;
+        }
+
         // *** VERIFICA TEMPO DE RETENÇÃO ***
         // Se está em período de retenção, mantém o valor atual e ignora leitura
         if (tempoRetencao > 0 && vA_pinConfigs[i].ultimo_acionamento_ms > 0) {

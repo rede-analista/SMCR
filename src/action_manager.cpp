@@ -663,7 +663,11 @@ void fV_executeActionsTask(void) {
         if (vU16_pinoSimulado == vA_actionConfigs[i].pino_origem) {
             pinoAcionado = true;
             vA_actionConfigs[i].ultimo_estado_origem = false;
-            fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Simulacao GPIO %d", vA_actionConfigs[i].pino_origem);
+            // Força status_atual para o valor de acionamento e bloqueia leitura por ~5s
+            vA_pinConfigs[pinOrigemIndex].status_atual      = vA_pinConfigs[pinOrigemIndex].nivel_acionamento_min;
+            vA_pinConfigs[pinOrigemIndex].ignore_contador   = 10; // 10 ciclos × 500ms ≈ 5s
+            fV_printSerialDebug(LOG_ACTIONS, "[ACTION] Simulacao GPIO %d: valor=%d",
+                vA_actionConfigs[i].pino_origem, vA_pinConfigs[pinOrigemIndex].nivel_acionamento_min);
         }
 
         // Agendamento integrado: dispara e controla duração independente do pino físico
