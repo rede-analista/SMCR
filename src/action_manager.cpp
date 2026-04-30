@@ -95,6 +95,7 @@ struct ActionEvent_t {
     uint16_t gpio;
     uint16_t origem;
     uint16_t tipo;
+    uint16_t valor;
     char     ts[21];
 };
 static ActionEvent_t vA_actionHistory[ACTION_HISTORY_SIZE];
@@ -107,6 +108,8 @@ void fV_logActionEvent(uint16_t gpio, uint16_t tipo, uint16_t origem) {
     vA_actionHistory[vU8_historyIndex].gpio   = gpio;
     vA_actionHistory[vU8_historyIndex].tipo   = tipo;
     vA_actionHistory[vU8_historyIndex].origem = origem;
+    uint8_t origemIdx = fU8_findPinIndex(origem);
+    vA_actionHistory[vU8_historyIndex].valor = (origemIdx != 255) ? vA_pinConfigs[origemIdx].status_atual : 0;
     vU8_historyIndex = (vU8_historyIndex + 1) % ACTION_HISTORY_SIZE;
     if (vU8_historyIndex == 0) vB_historyWrapped = true;
 }
@@ -120,6 +123,7 @@ String fS_getActionHistoryJson() {
         out += "{\"gpio\":" + String(vA_actionHistory[idx].gpio)
              + ",\"origem\":" + String(vA_actionHistory[idx].origem)
              + ",\"tipo\":" + String(vA_actionHistory[idx].tipo)
+             + ",\"valor\":" + String(vA_actionHistory[idx].valor)
              + ",\"ts\":\"" + String(vA_actionHistory[idx].ts) + "\"}";
     }
     out += "]";
