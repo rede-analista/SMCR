@@ -90,7 +90,8 @@ void fV_connectWifiSta() {
     
     WiFi.setHostname(vSt_mainConfig.vS_hostname.c_str());
     WiFi.begin(vSt_mainConfig.vS_wifiSsid.c_str(), vSt_mainConfig.vS_wifiPass.c_str());
-    fV_printSerialDebug(LOG_NETWORK, "Tentando conectar em modo STA a %s...", vSt_mainConfig.vS_wifiSsid.c_str());
+    fV_printSerialDebug(LOG_NETWORK, "Tentando conectar em modo STA: SSID=[%s] pass_len=%d",
+                        vSt_mainConfig.vS_wifiSsid.c_str(), vSt_mainConfig.vS_wifiPass.length());
     vL_wifiDisconnectedSince = millis();
  
 }
@@ -170,8 +171,10 @@ void fV_checkWifiConnection(void) {
         vL_lastCheckTime = millis();
         vU16_reconnectAttempts++;
 
-        fV_printSerialDebug(LOG_NETWORK, "Re-init WiFi (tentativa %d/%d)...",
-                            vU16_reconnectAttempts, vSt_mainConfig.vU16_wifiConnectAttempts);
+        uint8_t vU8_wifiStatus = WiFi.status();
+        fV_printSerialDebug(LOG_NETWORK, "Re-init WiFi (tentativa %d/%d) status=%d SSID=%s...",
+                            vU16_reconnectAttempts, vSt_mainConfig.vU16_wifiConnectAttempts,
+                            vU8_wifiStatus, vSt_mainConfig.vS_wifiSsid.c_str());
 
         // Re-init completo do driver WiFi — mais eficaz que WiFi.reconnect() após longos períodos offline
         WiFi.disconnect(true);
