@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <Update.h>
+#include <LittleFS.h>
 
 bool vB_pendingCloudSync = false;
 static String vS_cloudSyncStatus = "Nunca sincronizado";
@@ -657,6 +658,13 @@ void fV_cloudAutoRegisterTask(void) {
     vSt_mainConfig.vS_cloudApiToken = token;
     fV_salvarMainConfig();
     fV_printSerialDebug(LOG_NETWORK, "[REG] Dispositivo registrado com sucesso. api_token salvo.");
+
+    // Se LittleFS não tem o dashboard, dispara download automático dos HTMLs
+    if (!LittleFS.exists("/web_dashboard.html")) {
+        vS_fetchCloudFilesUrl = vSt_mainConfig.vS_cloudUrl;
+        vB_pendingFetchCloudFiles = true;
+        fV_printSerialDebug(LOG_NETWORK, "[REG] LittleFS sem HTMLs — agendando fetch automatico de %s", vS_fetchCloudFilesUrl.c_str());
+    }
 }
 
 /**

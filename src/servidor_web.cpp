@@ -1503,13 +1503,10 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
         out.reserve(in.length());
         for (size_t i = 0; i < in.length(); ++i) {
             char c = in.charAt(i);
-            // Converte letras minúsculas para maiúsculas
-            if (c >= 'a' && c <= 'z') c = c - ('a' - 'A');
-            // Mantém apenas A-Z e 0-9 (remove espaços, acentos UTF-8 e especiais)
-            if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                (c >= '0' && c <= '9') || c == '-' || c == '_') {
                 out += c;
             }
-            // Demais bytes (ex.: parte de UTF-8) são descartados
         }
         return out;
     };

@@ -5,110 +5,113 @@
 #include <Arduino.h>
 
 // Dashboard principal - Servido de LittleFS (data/web_dashboard.html)
-// Fallback básico com link para upload de arquivos
+// Fallback básico com botão para buscar arquivos do cloud
 const char web_dashboard_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMCR - Configuração Inicial</title>
+    <title>SMCR - Configuracao Inicial</title>
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            margin: 0; 
-            padding: 20px; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .container { 
-            max-width: 600px; 
-            background: white; 
-            padding: 40px; 
-            border-radius: 12px; 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            text-align: center;
-        }
-        h1 { 
-            color: #333; 
-            margin-bottom: 20px;
-            font-size: 28px;
-        }
-        .warning {
-            background: #fff3cd;
-            border: 2px solid #ffc107;
-            color: #856404;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-        .warning h2 {
-            margin-top: 0;
-            color: #856404;
-        }
-        .btn {
-            display: inline-block;
-            padding: 15px 30px;
-            margin: 10px;
-            background: #007bff;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-weight: bold;
-            font-size: 16px;
-            transition: background 0.3s;
-        }
-        .btn:hover {
-            background: #0056b3;
-        }
-        .btn-success {
-            background: #28a745;
-        }
-        .btn-success:hover {
-            background: #1e7e34;
-        }
-        .info {
-            background: #e7f3ff;
-            border-left: 4px solid #2196f3;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: left;
-        }
-        .info p {
-            margin: 8px 0;
-        }
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+        .card{background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.3);padding:36px;max-width:560px;width:100%;text-align:center}
+        h1{color:#333;font-size:24px;margin-bottom:6px}
+        .sub{color:#666;font-size:14px;margin-bottom:24px}
+        .warn{background:#fff3cd;border:2px solid #ffc107;color:#856404;padding:16px;border-radius:8px;margin-bottom:20px;text-align:left}
+        .warn b{display:block;margin-bottom:6px}
+        label{display:block;text-align:left;font-size:13px;font-weight:bold;color:#444;margin-bottom:4px}
+        input[type=text]{width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-bottom:14px}
+        .row{display:flex;gap:10px}
+        .row input{margin-bottom:14px}
+        .col2{flex:0 0 110px}
+        .col1{flex:1}
+        .btn{display:block;width:100%;padding:13px;border:none;border-radius:6px;font-size:15px;font-weight:bold;cursor:pointer;margin-bottom:10px}
+        .btn-primary{background:#007bff;color:#fff}
+        .btn-primary:hover{background:#0056b3}
+        .btn-secondary{background:#6c757d;color:#fff;text-decoration:none;display:inline-block;width:auto;padding:10px 20px}
+        .btn-secondary:hover{background:#545b62}
+        #status{margin-top:12px;padding:12px;border-radius:6px;font-size:14px;display:none}
+        .ok{background:#d4edda;color:#155724}
+        .err{background:#f8d7da;color:#721c24}
+        .loading{background:#d1ecf1;color:#0c5460}
+        .divider{border-top:1px solid #eee;margin:20px 0;padding-top:16px}
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🚀 SMCR - Sistema Modular</h1>
-        
-        <div class="warning">
-            <h2>⚠️ Configuração Inicial Necessária</h2>
-            <p>As páginas HTML ainda não foram carregadas no sistema de arquivos.</p>
-        </div>
+<div class="card">
+    <h1>SMCR - Sistema Modular</h1>
+    <p class="sub">Configuracao inicial do dispositivo</p>
 
-        <div class="info">
-            <p><strong>Para configurar o sistema:</strong></p>
-            <p>1. Acesse a página de gerenciamento de arquivos</p>
-            <p>2. Faça o upload dos arquivos HTML da pasta <code>data/</code></p>
-            <p>3. Após o upload, todas as páginas funcionarão normalmente</p>
-        </div>
+    <div class="warn">
+        <b>Paginas HTML nao encontradas no sistema de arquivos.</b>
+        Se o Cloud/HA ja esta configurado, clique em "Buscar Arquivos" para baixa-las automaticamente.
+    </div>
 
-        <a href="/arquivos/littlefs" class="btn btn-success">📂 Acessar Gerenciador de Arquivos</a>
-        
-        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
-            <p style="color: #666; font-size: 14px;">
-                <strong>Arquivos necessários:</strong><br>
-                web_dashboard.html, web_pins.html, web_actions.html, web_config_gerais.html,<br>
-                web_mqtt.html, web_reset.html, web_preferencias.html,<br>
-                web_firmware.html, web_serial.html, web_intermod.html
-            </p>
+    <label>URL do Cloud / HA</label>
+    <input type="text" id="cloud_url" placeholder="smcr.pensenet.com.br">
+
+    <div class="row">
+        <div class="col1">
+            <label>Porta</label>
+            <input type="text" id="cloud_port" placeholder="80">
+        </div>
+        <div class="col2">
+            <label>HTTPS</label>
+            <select id="cloud_https" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-bottom:14px">
+                <option value="0">Nao</option>
+                <option value="1">Sim</option>
+            </select>
         </div>
     </div>
+
+    <button class="btn btn-primary" onclick="buscarArquivos()">Buscar Arquivos do Cloud</button>
+    <div id="status"></div>
+
+    <div class="divider">
+        <a href="/arquivos/littlefs" class="btn btn-secondary">Gerenciador de Arquivos (upload manual)</a>
+    </div>
+</div>
+<script>
+function showStatus(msg, type) {
+    var s = document.getElementById('status');
+    s.textContent = msg;
+    s.className = type;
+    s.style.display = 'block';
+}
+function buscarArquivos() {
+    var url = document.getElementById('cloud_url').value.trim();
+    var port = document.getElementById('cloud_port').value.trim();
+    var https = document.getElementById('cloud_https').value;
+    if (!url) { showStatus('Informe a URL do Cloud.', 'err'); return; }
+    showStatus('Buscando arquivos... aguarde.', 'loading');
+    fetch('/start-fetch-cloud-files?cloud_url=' + encodeURIComponent(url) + '&cloud_port=' + encodeURIComponent(port) + '&cloud_https=' + https)
+        .then(function(r){ return r.text(); })
+        .then(function(){ pollStatus(); })
+        .catch(function(){ showStatus('Erro ao iniciar download.', 'err'); });
+}
+function pollStatus() {
+    fetch('/fetch-cloud-files-status')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (d.done) {
+                if (d.error) { showStatus('Erro: ' + d.status, 'err'); }
+                else { showStatus('Concluido! Recarregando...', 'ok'); setTimeout(function(){ location.reload(); }, 2000); }
+            } else {
+                showStatus(d.status || 'Aguardando...', 'loading');
+                setTimeout(pollStatus, 2000);
+            }
+        })
+        .catch(function(){ setTimeout(pollStatus, 3000); });
+}
+// Preenche URL do cloud salvo no dispositivo
+fetch('/config/json').then(function(r){ return r.json(); }).then(function(d){
+    if (d.cloud_url) document.getElementById('cloud_url').value = d.cloud_url;
+    if (d.cloud_port) document.getElementById('cloud_port').value = d.cloud_port;
+    if (d.cloud_use_https !== undefined) document.getElementById('cloud_https').value = d.cloud_use_https ? '1' : '0';
+}).catch(function(){});
+</script>
 </body>
 </html>
 )rawliteral";

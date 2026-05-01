@@ -216,8 +216,8 @@ void fV_clearInterModConfigs(void) {
  */
 int fI_findInterModIndex(const String& id) {
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
-        if (vA_interModConfigs[i].id == id ||
-            vA_interModConfigs[i].hostname == id ||
+        if (vA_interModConfigs[i].id.equalsIgnoreCase(id) ||
+            vA_interModConfigs[i].hostname.equalsIgnoreCase(id) ||
             vA_interModConfigs[i].ip == id) {
             return i;
         }
@@ -597,7 +597,7 @@ void fV_interModDiscoveryTask(void) {
         String moduleId = hostname;
         
         // Verifica se é o próprio módulo
-        if (hostname == vSt_mainConfig.vS_hostname) {
+        if (hostname.equalsIgnoreCase(vSt_mainConfig.vS_hostname)) {
             fV_printSerialDebug(LOG_INTERMOD, "Ignorando o próprio módulo: %s", hostname.c_str());
             continue;
         }
