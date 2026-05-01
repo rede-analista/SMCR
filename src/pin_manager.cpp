@@ -364,7 +364,6 @@ void fV_setupConfiguredPins(void) {
                     uint8_t edge = (nivelAtivacao == 1) ? ((xorLogic == 1) ? FALLING : RISING)
                                                         : ((xorLogic == 1) ? RISING  : FALLING);
                     vA_isrGpioArg[i] = (uint8_t)pinNumber;
-                    detachInterrupt(digitalPinToInterrupt(pinNumber));
                     attachInterruptArg(digitalPinToInterrupt(pinNumber), fV_pinActivationISR, &vA_isrGpioArg[i], edge);
                     fV_printSerialDebug(LOG_PINS, "[PIN] GPIO %d interrupção configurada (%s)",
                         pinNumber, (edge == RISING) ? "RISING" : "FALLING");
