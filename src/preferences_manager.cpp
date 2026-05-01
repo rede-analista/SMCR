@@ -154,7 +154,7 @@ void fV_carregarMainConfig(void) {
     vSt_mainConfig.vB_apFallbackEnabled = preferences.getBool(KEY_AP_FALLBACK, true); // Padrão é TRUE
     
     // 4. Configurações de Checagem de Rede
-    vSt_mainConfig.vU32_wifiCheckInterval = preferences.getULong(KEY_WIFI_CHECK_INTERVAL, 32000); // 32 segundos
+    vSt_mainConfig.vU32_wifiCheckInterval = preferences.getULong(KEY_WIFI_CHECK_INTERVAL, 15000);
     
     // 5. Configurações NTP
     vSt_mainConfig.vS_ntpServer1 = preferences.getString(KEY_NTP_SERVER1, "pool.ntp.br"); // Servidor NTP padrão do Brasil

@@ -89,9 +89,9 @@ void fV_connectWifiSta() {
     }
     
     WiFi.setHostname(vSt_mainConfig.vS_hostname.c_str());
-    // Inicia a conexao de forma NAO-BLOQUEANTE
     WiFi.begin(vSt_mainConfig.vS_wifiSsid.c_str(), vSt_mainConfig.vS_wifiPass.c_str());
     fV_printSerialDebug(LOG_NETWORK, "Tentando conectar em modo STA a %s...", vSt_mainConfig.vS_wifiSsid.c_str());
+    vL_wifiDisconnectedSince = millis();
  
 }
 
