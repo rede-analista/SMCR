@@ -796,8 +796,9 @@ void fV_setupWebServer() {
         doc["hostname"] = vSt_mainConfig.vS_hostname;
         doc["wifi_ssid"] = vSt_mainConfig.vS_wifiSsid;
         doc["wifi_pass"] = vSt_mainConfig.vS_wifiPass;
-        doc["wifi_attempts"] = vSt_mainConfig.vU16_wifiConnectAttempts;
-        
+        doc["wifi_attempts"]            = vSt_mainConfig.vU16_wifiConnectAttempts;
+        doc["wifi_offline_restart_min"] = vSt_mainConfig.vU16_wifiOfflineRestartMin;
+
         // Configurações de NTP
         doc["ntp_server1"] = vSt_mainConfig.vS_ntpServer1;
         doc["gmt_offset"] = vSt_mainConfig.vI_gmtOffsetSec;
@@ -1551,6 +1552,10 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
             vSt_mainConfig.vU32_wifiCheckInterval = request->arg("wifi_check_interval").toInt();
             fV_printSerialDebug(LOG_WEB, "[CONFIG] wifi_check_interval = %lu", vSt_mainConfig.vU32_wifiCheckInterval);
         }
+        if (request->hasArg("wifi_offline_restart_min")) {
+            vSt_mainConfig.vU16_wifiOfflineRestartMin = (uint16_t)request->arg("wifi_offline_restart_min").toInt();
+            fV_printSerialDebug(LOG_WEB, "[CONFIG] wifi_offline_restart_min = %d", vSt_mainConfig.vU16_wifiOfflineRestartMin);
+        }
         
         // NTP
         if (request->hasArg("ntp_server1")) {
@@ -2041,6 +2046,9 @@ void fV_handleApplyConfig(AsyncWebServerRequest *request) {
     }
     if (request->hasArg("wifi_attempts")) {
         vSt_mainConfig.vU16_wifiConnectAttempts = request->arg("wifi_attempts").toInt();
+    }
+    if (request->hasArg("wifi_offline_restart_min")) {
+        vSt_mainConfig.vU16_wifiOfflineRestartMin = (uint16_t)request->arg("wifi_offline_restart_min").toInt();
     }
     if (request->hasArg("ntp_server1")) {
         vSt_mainConfig.vS_ntpServer1 = request->arg("ntp_server1");

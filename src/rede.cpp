@@ -3,8 +3,9 @@
 
 // Variável para controle de tempo da checagem (interna a este módulo)
 static unsigned long vL_lastCheckTime = 0;
-static uint16_t vU16_reconnectAttempts = 0;  // Contador de tentativas de reconexão
-static unsigned long vL_stableConnectedSince = 0; // Tempo desde que ficou conectado (0 = instável)
+static uint16_t vU16_reconnectAttempts = 0;        // Contador de tentativas de reconexão
+static unsigned long vL_stableConnectedSince = 0;  // Tempo desde que ficou conectado (0 = instável)
+static unsigned long vL_wifiDisconnectedSince = 0; // millis quando WiFi ficou offline (0 = conectado)
 
 //=======================================
 // FV_SETUP_MDNS: Inicializa o mDNS
@@ -129,11 +130,13 @@ void fV_checkWifiConnection(void) {
     if (vL_currentStatus != vB_wifiIsConnected) {
         vB_wifiIsConnected = vL_currentStatus;
         if (vB_wifiIsConnected) {
-            vL_stableConnectedSince = millis(); // Inicia contagem de estabilidade (não reseta contador ainda)
+            vL_stableConnectedSince = millis();
+            vL_wifiDisconnectedSince = 0; // Voltou — zera o timer de offline
             fV_printSerialDebug(LOG_NETWORK, "Evento: Conectado ao Wi-Fi. IP: %s", WiFi.localIP().toString().c_str());
             fV_setupMdns();
         } else {
-            vL_stableConnectedSince = 0; // Perdeu conexão antes de estabilizar
+            vL_stableConnectedSince = 0;
+            vL_wifiDisconnectedSince = millis(); // Marca início do offline
             fV_printSerialDebug(LOG_NETWORK, "Evento: Desconectado do Wi-Fi.");
             vL_lastCheckTime = millis() - vSt_mainConfig.vU32_wifiCheckInterval;
         }
@@ -150,15 +153,36 @@ void fV_checkWifiConnection(void) {
         vL_stableConnectedSince = 0; // Marca como estabilizado, não verifica mais
     }
 
-    // 2b. Lógica de Reconexão Periódica
+    // 2b. Restart por tempo offline (independente do modo STA/AP)
+    if (vSt_mainConfig.vU16_wifiOfflineRestartMin > 0 &&
+        vL_wifiDisconnectedSince > 0 &&
+        !vB_wifiIsConnected) {
+        unsigned long vL_thresholdMs = (unsigned long)vSt_mainConfig.vU16_wifiOfflineRestartMin * 60000UL;
+        if (millis() - vL_wifiDisconnectedSince >= vL_thresholdMs) {
+            fV_printSerialDebug(LOG_NETWORK, "[NET] WiFi offline por %u min — reiniciando.", vSt_mainConfig.vU16_wifiOfflineRestartMin);
+            delay(500);
+            ESP.restart();
+        }
+    }
+
+    // 2c. Reconexão periódica com re-init completo do stack WiFi
     if (!vB_wifiIsConnected && (WiFi.getMode() == WIFI_STA) && (millis() - vL_lastCheckTime >= vSt_mainConfig.vU32_wifiCheckInterval)) {
         vL_lastCheckTime = millis();
         vU16_reconnectAttempts++;
 
-        fV_printSerialDebug(LOG_NETWORK, "Tentando reconexao automatica... (tentativa %d/%d)",
+        fV_printSerialDebug(LOG_NETWORK, "Re-init WiFi (tentativa %d/%d)...",
                             vU16_reconnectAttempts, vSt_mainConfig.vU16_wifiConnectAttempts);
 
-        // Verifica se esgotou as tentativas configuradas
+        // Re-init completo do driver WiFi — mais eficaz que WiFi.reconnect() após longos períodos offline
+        WiFi.disconnect(true);
+        delay(200);
+        WiFi.mode(WIFI_OFF);
+        delay(500);
+        WiFi.mode(WIFI_STA);
+        WiFi.setHostname(vSt_mainConfig.vS_hostname.c_str());
+        WiFi.begin(vSt_mainConfig.vS_wifiSsid.c_str(), vSt_mainConfig.vS_wifiPass.c_str());
+
+        // Verifica se esgotou as tentativas → fallback AP
         if (vU16_reconnectAttempts >= vSt_mainConfig.vU16_wifiConnectAttempts) {
             if (vSt_mainConfig.vB_apFallbackEnabled) {
                 fV_printSerialDebug(LOG_NETWORK, "Limite de tentativas atingido. Ativando modo AP de fallback.");
@@ -171,8 +195,6 @@ void fV_checkWifiConnection(void) {
             }
             return;
         }
-
-        WiFi.reconnect();
     }
     
     // CORREÇÃO CRÍTICA: Adiciona um pequeno atraso para ceder tempo

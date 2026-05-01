@@ -62,6 +62,7 @@ const char* KEY_HOSTNAME = "hostname";
 const char* KEY_WIFI_SSID = "w_ssid";
 const char* KEY_WIFI_PASS = "w_pass";
 const char* KEY_WIFI_ATTEMPTS = "w_attmp";
+const char* KEY_WIFI_OFFLINE_RESTART = "w_offrst";
 const char* KEY_AP_SSID = "a_ssid";
 const char* KEY_AP_PASS = "a_pass";
 const char* KEY_AP_FALLBACK = "a_fallb";
@@ -144,7 +145,8 @@ void fV_carregarMainConfig(void) {
     vSt_mainConfig.vS_hostname = preferences.getString(KEY_HOSTNAME, "");
     vSt_mainConfig.vS_wifiSsid = preferences.getString(KEY_WIFI_SSID, ""); 
     vSt_mainConfig.vS_wifiPass = preferences.getString(KEY_WIFI_PASS, ""); 
-    vSt_mainConfig.vU16_wifiConnectAttempts = preferences.getUInt(KEY_WIFI_ATTEMPTS, 4);
+    vSt_mainConfig.vU16_wifiConnectAttempts   = preferences.getUInt(KEY_WIFI_ATTEMPTS, 4);
+    vSt_mainConfig.vU16_wifiOfflineRestartMin = preferences.getUInt(KEY_WIFI_OFFLINE_RESTART, 30);
 
     // 3. Configurações de Acesso (AP Fallback)
     vSt_mainConfig.vS_apSsid = preferences.getString(KEY_AP_SSID, "SMCR_AP_SETUP"); 
@@ -246,6 +248,7 @@ void fV_salvarMainConfig(void) {
     preferences.putString(KEY_WIFI_SSID, vSt_mainConfig.vS_wifiSsid);
     preferences.putString(KEY_WIFI_PASS, vSt_mainConfig.vS_wifiPass);
     preferences.putUInt(KEY_WIFI_ATTEMPTS, vSt_mainConfig.vU16_wifiConnectAttempts);
+    preferences.putUInt(KEY_WIFI_OFFLINE_RESTART, vSt_mainConfig.vU16_wifiOfflineRestartMin);
 
     // 3. Configurações de Acesso (AP Fallback)
     preferences.putString(KEY_AP_SSID, vSt_mainConfig.vS_apSsid);
