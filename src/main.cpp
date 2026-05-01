@@ -225,6 +225,7 @@ void loop() {
       vSt_mainConfig.vS_cloudApiToken.length() == 0 &&
       vSt_mainConfig.vS_cloudRegisterToken.length() > 0 &&
       vU32_currentTime - vU32_lastCloudSyncTime >= 30000UL) {
+    vU32_lastCloudSyncTime = vU32_currentTime;
     fV_cloudAutoRegisterTask();
   }
 

@@ -123,9 +123,22 @@ void fV_setupWebServer() {
             request->send(400, "application/json", "{\"ok\":false,\"error\":\"cloud_url obrigatorio\"}");
             return;
         }
-        vS_fetchCloudFilesUrl = request->arg("cloud_url");
-        // Persiste cloud_url, port e https no config para que o auto-registro use os valores corretos
-        vSt_mainConfig.vS_cloudUrl = vS_fetchCloudFilesUrl;
+        String vS_rawUrl = request->arg("cloud_url");
+        // Extrai protocolo (https://) se presente
+        if (vS_rawUrl.startsWith("https://")) {
+            vSt_mainConfig.vB_cloudUseHttps = true;
+            vS_rawUrl = vS_rawUrl.substring(8);
+        } else if (vS_rawUrl.startsWith("http://")) {
+            vS_rawUrl = vS_rawUrl.substring(7);
+        }
+        // Extrai porta se embutida no host (ex.: "host:2082")
+        int vI_colonIdx = vS_rawUrl.indexOf(':');
+        if (vI_colonIdx > 0) {
+            vSt_mainConfig.vU16_cloudPort = (uint16_t)vS_rawUrl.substring(vI_colonIdx + 1).toInt();
+            vS_rawUrl = vS_rawUrl.substring(0, vI_colonIdx);
+        }
+        vS_fetchCloudFilesUrl = vS_rawUrl;
+        vSt_mainConfig.vS_cloudUrl = vS_rawUrl;
         if (request->hasArg("cloud_port") && !request->arg("cloud_port").isEmpty())
             vSt_mainConfig.vU16_cloudPort = (uint16_t)request->arg("cloud_port").toInt();
         if (request->hasArg("cloud_https"))
