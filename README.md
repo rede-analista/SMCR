@@ -47,15 +47,10 @@ A interface web pode disponibilizar até 254(uint8_t) posições de configuraç�
 
   - Bibliotecas:
 
-    1. ESP Async WebServer.
-    2. ESP32MQTTClient.
-    3. HttpClient.
-    4. Universal Telegram Bot Library.
-    5. esp8266-google-home-notifier.
-    6. MQTTPubSubClient.
-    7. Arduino_FreeRTOS_Library.
-    8. ESPAsyncHTTPUpdateServer.
-    9. asyncHTTPrequest.
+	bblanchon/ArduinoJson@^7.4.2
+	esp32async/ESPAsyncWebServer
+	esp32async/AsyncTCP
+	knolleary/PubSubClient
      
   NOTA: Na pasta ["build"](https://github.com/rede-analista/SMCR/tree/main/firmware) deixarei o arquivo de fimware .bin já compilado caso queiram simplesmente realizar a gravação no ESP32 sem precisar compilar. Para gravação sem compílar pode usar qualquer ferramenta como exemplo "esptools".
 
