@@ -299,9 +299,6 @@ void fV_cloudSyncTask(void) {
         vSt_mainConfig.vB_watchdogEnabled = doc["watchdog_enabled"].as<bool>();
     if (!doc["tempo_watchdog_us"].isNull())
         vSt_mainConfig.vU32_tempoWatchdogUs = doc["tempo_watchdog_us"].as<unsigned long>();
-    if (!doc["clock_esp32_mhz"].isNull())
-        vSt_mainConfig.vU16_clockEsp32Mhz = doc["clock_esp32_mhz"].as<int>();
-
     // ── Servidor Web ──────────────────────────────────────────────────
     if (!doc["web_server_port"].isNull())
         vSt_mainConfig.vU16_webServerPort = doc["web_server_port"].as<int>();
@@ -608,12 +605,15 @@ void fV_cloudAutoRegisterTask(void) {
     String uniqueId = fS_getMqttUniqueId();
 
     JsonDocument doc;
-    doc["unique_id"]       = uniqueId;
-    doc["register_token"]  = vSt_mainConfig.vS_cloudRegisterToken;
-    doc["hostname"]        = vSt_mainConfig.vS_hostname;
-    doc["ip"]              = WiFi.localIP().toString();
-    doc["port"]            = vSt_mainConfig.vU16_webServerPort;
+    doc["unique_id"]        = uniqueId;
+    doc["register_token"]   = vSt_mainConfig.vS_cloudRegisterToken;
+    doc["hostname"]         = vSt_mainConfig.vS_hostname;
+    doc["ip"]               = WiFi.localIP().toString();
+    doc["port"]             = vSt_mainConfig.vU16_webServerPort;
     doc["firmware_version"] = FIRMWARE_VERSION;
+    doc["wifi_ssid"]        = vSt_mainConfig.vS_wifiSsid;
+    doc["wifi_attempts"]    = vSt_mainConfig.vU16_wifiConnectAttempts;
+    doc["qtd_pinos"]        = vSt_mainConfig.vU8_quantidadePinos;
 
     String body;
     serializeJson(doc, body);

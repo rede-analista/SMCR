@@ -172,7 +172,7 @@ void fV_carregarMainConfig(void) {
     vSt_mainConfig.vU32_tempoWatchdogUs = preferences.getULong(KEY_TEMPO_WATCHDOG, 8000000);
 
     // 8. Configurações dos Pinos
-    vSt_mainConfig.vU8_quantidadePinos = preferences.getUChar(KEY_QTD_PINOS, 16);
+    vSt_mainConfig.vU8_quantidadePinos = preferences.getUChar(KEY_QTD_PINOS, 25);
 
     // 9. Configurações do Servidor Web e Autenticação
     vSt_mainConfig.vU16_webServerPort = preferences.getUInt(KEY_WEB_PORT, 8080);
@@ -212,7 +212,7 @@ void fV_carregarMainConfig(void) {
 
     // 14. Configurações SMCR Cloud
     vSt_mainConfig.vS_cloudUrl = preferences.getString(KEY_CLOUD_URL, "smcr.pensenet.com.br");
-    vSt_mainConfig.vU16_cloudPort = preferences.getUInt(KEY_CLOUD_PORT, 8765);
+    vSt_mainConfig.vU16_cloudPort = preferences.getUInt(KEY_CLOUD_PORT, 2082);
     vSt_mainConfig.vB_cloudUseHttps = preferences.getBool(KEY_CLOUD_USE_HTTPS, false);
     vSt_mainConfig.vB_cloudSyncEnabled = preferences.getBool(KEY_CLOUD_SYNC_EN, false);
     vSt_mainConfig.vU16_cloudSyncIntervalMin = preferences.getUInt(KEY_CLOUD_SYNC_INT, 5);

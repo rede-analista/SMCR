@@ -45,18 +45,25 @@ void fV_printSerialDebug(uint32_t vU32_messageFlag, const char *vC_format, ...) 
     vC_locBuffer[sizeof(vC_locBuffer) - 1] = '\0';
   }
 
-  String vS_prefix = "[SMCR_DEBUG]";
-  if (vU32_messageFlag & LOG_INIT) vS_prefix += "[INIT]";
-  if (vU32_messageFlag & LOG_NETWORK) vS_prefix += "[NET]";
-  if (vU32_messageFlag & LOG_PINS) vS_prefix += "[PINS]";
-  if (vU32_messageFlag & LOG_FLASH) vS_prefix += "[FLASH]";
-  if (vU32_messageFlag & LOG_WEB) vS_prefix += "[WEB]";
-  if (vU32_messageFlag & LOG_SENSOR) vS_prefix += "[SENSOR]";
-  if (vU32_messageFlag & LOG_ACTIONS) vS_prefix += "[ACTIONS]";
+  // Prefixo com timestamp (NTP) ou millis como fallback
+  String vS_prefix;
+  struct tm vSt_tm;
+  if (getLocalTime(&vSt_tm, 0) && vSt_tm.tm_year > 100) {
+    char vC_ts[22];
+    strftime(vC_ts, sizeof(vC_ts), "[%d/%m/%Y %H:%M:%S]", &vSt_tm);
+    vS_prefix = vC_ts;
+  } else {
+    vS_prefix = "[t=" + String(millis()) + "ms]";
+  }
+  if (vU32_messageFlag & LOG_INIT)     vS_prefix += "[INIT]";
+  if (vU32_messageFlag & LOG_NETWORK)  vS_prefix += "[NET]";
+  if (vU32_messageFlag & LOG_PINS)     vS_prefix += "[PINS]";
+  if (vU32_messageFlag & LOG_FLASH)    vS_prefix += "[FLASH]";
+  if (vU32_messageFlag & LOG_WEB)      vS_prefix += "[WEB]";
+  if (vU32_messageFlag & LOG_SENSOR)   vS_prefix += "[SENSOR]";
+  if (vU32_messageFlag & LOG_ACTIONS)  vS_prefix += "[ACTIONS]";
   if (vU32_messageFlag & LOG_INTERMOD) vS_prefix += "[INTERMOD]";
   if (vU32_messageFlag & LOG_WATCHDOG) vS_prefix += "[WDOG]";
-  if (vU32_messageFlag == LOG_FULL) vS_prefix += "[FULL]"; 
-
   vS_prefix += " ";
 
   Serial.print(vS_prefix);

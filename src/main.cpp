@@ -78,8 +78,8 @@ void setup() {
   // 1. Carregar a MainConfig_t (sua startup-config) da Flash para a RAM (running-config)
   fV_carregarMainConfig();
 
-  // 1b. Ajusta frequência do clock do ESP32 (antes do Serial.begin para não afetar baud rate)
-  setCpuFrequencyMhz(vSt_mainConfig.vU16_clockEsp32Mhz);
+  // 1b. setCpuFrequencyMhz removido — ESP32 opera em 240 MHz por padrão (correto para WiFi+MQTT+WebServer)
+  // setCpuFrequencyMhz(vSt_mainConfig.vU16_clockEsp32Mhz);
 
   // 1c. Inicializa o Task Watchdog Timer se habilitado
   if (vSt_mainConfig.vB_watchdogEnabled) {

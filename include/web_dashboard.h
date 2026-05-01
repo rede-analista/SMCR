@@ -86,13 +86,13 @@ function buscarArquivos() {
     var https = document.getElementById('cloud_https').value;
     if (!url) { showStatus('Informe a URL do Cloud.', 'err'); return; }
     showStatus('Buscando arquivos... aguarde.', 'loading');
-    fetch('/start-fetch-cloud-files?cloud_url=' + encodeURIComponent(url) + '&cloud_port=' + encodeURIComponent(port) + '&cloud_https=' + https)
+    fetch('/api/fetch_cloud_files?cloud_url=' + encodeURIComponent(url) + '&cloud_port=' + encodeURIComponent(port) + '&cloud_https=' + https)
         .then(function(r){ return r.text(); })
         .then(function(){ pollStatus(); })
         .catch(function(){ showStatus('Erro ao iniciar download.', 'err'); });
 }
 function pollStatus() {
-    fetch('/fetch-cloud-files-status')
+    fetch('/api/fetch_cloud_files_status')
         .then(function(r){ return r.json(); })
         .then(function(d){
             if (d.done) {

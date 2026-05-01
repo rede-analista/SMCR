@@ -117,16 +117,25 @@ void fV_setupWebServer() {
     // CORREÇÃO: Rota para salvar a configuracao inicial usa HTTP_POST e chama o handler
     SERVIDOR_WEB_ASYNC->on("/save_config", HTTP_POST, fV_handleSaveConfig);
 
-    // Rota: iniciar download de arquivos HTML da SMCR Cloud
-    SERVIDOR_WEB_ASYNC->on("/api/fetch_cloud_files", HTTP_POST, [](AsyncWebServerRequest *request) {
+    // Rota: iniciar download de arquivos HTML da SMCR Cloud (GET ou POST, para compatibilidade com fallback PROGMEM)
+    auto fV_handleFetchCloudFiles = [](AsyncWebServerRequest *request) {
         if (!request->hasArg("cloud_url") || request->arg("cloud_url").isEmpty()) {
             request->send(400, "application/json", "{\"ok\":false,\"error\":\"cloud_url obrigatorio\"}");
             return;
         }
-        vS_fetchCloudFilesUrl    = request->arg("cloud_url");
+        vS_fetchCloudFilesUrl = request->arg("cloud_url");
+        // Persiste cloud_url, port e https no config para que o auto-registro use os valores corretos
+        vSt_mainConfig.vS_cloudUrl = vS_fetchCloudFilesUrl;
+        if (request->hasArg("cloud_port") && !request->arg("cloud_port").isEmpty())
+            vSt_mainConfig.vU16_cloudPort = (uint16_t)request->arg("cloud_port").toInt();
+        if (request->hasArg("cloud_https"))
+            vSt_mainConfig.vB_cloudUseHttps = request->arg("cloud_https") == "1";
+        fV_salvarMainConfig();
         vB_pendingFetchCloudFiles = true;
         request->send(200, "application/json", "{\"ok\":true}");
-    });
+    };
+    SERVIDOR_WEB_ASYNC->on("/api/fetch_cloud_files",  HTTP_POST, fV_handleFetchCloudFiles);
+    SERVIDOR_WEB_ASYNC->on("/api/fetch_cloud_files",  HTTP_GET,  fV_handleFetchCloudFiles);
 
     // Rota: status do download de arquivos da cloud
     SERVIDOR_WEB_ASYNC->on("/api/fetch_cloud_files_status", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -805,7 +814,6 @@ void fV_setupWebServer() {
         
         // Configurações do watchdog
         doc["watchdog_enabled"] = vSt_mainConfig.vB_watchdogEnabled;
-        doc["clock_esp32_mhz"] = vSt_mainConfig.vU16_clockEsp32Mhz;
         doc["tempo_watchdog_us"] = vSt_mainConfig.vU32_tempoWatchdogUs;
         
         // Configurações dos pinos
@@ -1595,10 +1603,6 @@ void fV_handleSaveConfig(AsyncWebServerRequest *request) {
         vSt_mainConfig.vB_watchdogEnabled = request->hasArg("watchdog_enabled") && request->arg("watchdog_enabled") != "0";
         fV_printSerialDebug(LOG_WEB, "[CONFIG] watchdog_enabled = %d", vSt_mainConfig.vB_watchdogEnabled);
         
-        if (request->hasArg("clock_esp32_mhz")) {
-            vSt_mainConfig.vU16_clockEsp32Mhz = request->arg("clock_esp32_mhz").toInt();
-            fV_printSerialDebug(LOG_WEB, "[CONFIG] clock_esp32_mhz = %d", vSt_mainConfig.vU16_clockEsp32Mhz);
-        }
         if (request->hasArg("tempo_watchdog_us")) {
             vSt_mainConfig.vU32_tempoWatchdogUs = request->arg("tempo_watchdog_us").toInt();
             fV_printSerialDebug(LOG_WEB, "[CONFIG] tempo_watchdog_us = %lu", vSt_mainConfig.vU32_tempoWatchdogUs);
@@ -2065,9 +2069,6 @@ void fV_handleApplyConfig(AsyncWebServerRequest *request) {
     // Configurações do watchdog
     vSt_mainConfig.vB_watchdogEnabled = request->hasArg("watchdog_enabled") && request->arg("watchdog_enabled") != "0";
     
-    if (request->hasArg("clock_esp32_mhz")) {
-        vSt_mainConfig.vU16_clockEsp32Mhz = request->arg("clock_esp32_mhz").toInt();
-    }
     if (request->hasArg("tempo_watchdog_us")) {
         vSt_mainConfig.vU32_tempoWatchdogUs = request->arg("tempo_watchdog_us").toInt();
     }
