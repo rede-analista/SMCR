@@ -234,6 +234,12 @@ const char web_setup_files_html[] PROGMEM = R"rawliteral(
         .skip  { display: block; text-align: center; margin-top: 14px; font-size: 13px;
                  color: #888; text-decoration: none; }
         .skip:hover { color: #555; }
+        .row2  { display: flex; gap: 10px; margin-bottom: 16px; }
+        .row2 .col-port { flex: 0 0 110px; }
+        .row2 .col-https { flex: 1; display: flex; align-items: center; gap: 8px; padding-top: 6px; }
+        .row2 input[type=number] { width: 100%; padding: 9px 12px; border: 2px solid #ddd;
+                                   border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+        .row2 input[type=number]:focus { outline: none; border-color: #007bff; }
     </style>
 </head>
 <body>
@@ -241,9 +247,20 @@ const char web_setup_files_html[] PROGMEM = R"rawliteral(
     <h1>Setup Inicial - SMCR</h1>
     <p class="sub">✔ Wi-Fi conectado com sucesso!</p>
 
-    <label for="cloudUrl">URL do servidor SMCR Cloud:</label>
+    <label for="cloudUrl">URL do servidor SMCR Cloud (apenas hostname):</label>
     <input type="text" id="cloudUrl" value="smcr.pensenet.com.br"
            placeholder="smcr.pensenet.com.br">
+
+    <div class="row2">
+        <div class="col-port">
+            <label for="cloudPort">Porta:</label>
+            <input type="number" id="cloudPort" value="2082" min="1" max="65535">
+        </div>
+        <div class="col-https">
+            <input type="checkbox" id="cloudHttps">
+            <label for="cloudHttps" style="margin-bottom:0;">Usar HTTPS</label>
+        </div>
+    </div>
 
     <button class="btn" id="btnFetch" onclick="fetchFiles()">
         ☁ Baixar arquivos HTML do servidor cloud
@@ -266,6 +283,9 @@ const char web_setup_files_html[] PROGMEM = R"rawliteral(
         const url = document.getElementById('cloudUrl').value.trim();
         if (!url) { showStatus('Informe a URL do servidor cloud.', 'err'); return; }
 
+        const port = document.getElementById('cloudPort').value.trim() || '2082';
+        const https = document.getElementById('cloudHttps').checked ? '1' : '0';
+
         const btn = document.getElementById('btnFetch');
         btn.disabled = true;
         btn.textContent = 'Iniciando...';
@@ -275,7 +295,9 @@ const char web_setup_files_html[] PROGMEM = R"rawliteral(
             const r = await fetch('/api/fetch_cloud_files', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'cloud_url=' + encodeURIComponent(url)
+                body: 'cloud_url=' + encodeURIComponent(url) +
+                      '&cloud_port=' + encodeURIComponent(port) +
+                      '&cloud_https=' + https
             });
             const d = await r.json();
             if (!d.ok) { showStatus('Erro: ' + d.error, 'err'); btn.disabled = false; btn.textContent = '☁ Baixar arquivos HTML do servidor cloud'; return; }
