@@ -176,8 +176,13 @@ void fV_cloudOtaFromGitHub(void) {
     size_t written = Update.writeStream(*binStream);
     http2.end();
 
+    if (written != (size_t)contentLen) {
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Stream incompleto: %u/%u bytes recebidos — CDN/rede falhou", written, (size_t)contentLen);
+        Update.abort();
+        return;
+    }
     if (!Update.end(true)) {
-        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao finalizar Update (%d bytes gravados)", written);
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao finalizar Update. Erro %d: %s", Update.getError(), Update.errorString());
         return;
     }
 
