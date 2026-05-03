@@ -629,6 +629,68 @@ void fV_cloudAutoRegisterTask(void) {
     doc["wifi_attempts"]    = vSt_mainConfig.vU16_wifiConnectAttempts;
     doc["qtd_pinos"]        = vSt_mainConfig.vU8_quantidadePinos;
 
+    // Config de conexão com o cloud (fonte de verdade para esses campos)
+    doc["cloud_port"]                   = vSt_mainConfig.vU16_cloudPort;
+    doc["cloud_use_https"]              = vSt_mainConfig.vB_cloudUseHttps;
+    doc["cloud_sync_enabled"]           = vSt_mainConfig.vB_cloudSyncEnabled;
+    doc["cloud_sync_interval_min"]      = vSt_mainConfig.vU16_cloudSyncIntervalMin;
+    doc["cloud_heartbeat_enabled"]      = vSt_mainConfig.vB_cloudHeartbeatEnabled;
+    doc["cloud_heartbeat_interval_min"] = vSt_mainConfig.vU16_cloudHeartbeatIntervalMin;
+
+    // Pinos configurados
+    JsonArray pinsArr = doc["pins"].to<JsonArray>();
+    for (uint8_t i = 0; i < vU8_activePinsCount; i++) {
+        if (vA_pinConfigs[i].tipo == 0) continue;
+        JsonObject p = pinsArr.add<JsonObject>();
+        p["nome"]                  = vA_pinConfigs[i].nome;
+        p["pino"]                  = vA_pinConfigs[i].pino;
+        p["tipo"]                  = vA_pinConfigs[i].tipo;
+        p["modo"]                  = vA_pinConfigs[i].modo;
+        p["xor_logic"]             = vA_pinConfigs[i].xor_logic;
+        p["tempo_retencao"]        = vA_pinConfigs[i].tempo_retencao;
+        p["nivel_acionamento_min"] = vA_pinConfigs[i].nivel_acionamento_min;
+        p["nivel_acionamento_max"] = vA_pinConfigs[i].nivel_acionamento_max;
+        p["classe_mqtt"]           = vA_pinConfigs[i].classe_mqtt;
+        p["icone_mqtt"]            = vA_pinConfigs[i].icone_mqtt;
+    }
+
+    // Ações configuradas
+    JsonArray actArr = doc["actions"].to<JsonArray>();
+    for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
+        if (vA_actionConfigs[i].acao == 0) continue;
+        JsonObject a = actArr.add<JsonObject>();
+        a["pino_origem"]        = vA_actionConfigs[i].pino_origem;
+        a["numero_acao"]        = vA_actionConfigs[i].numero_acao;
+        a["pino_destino"]       = vA_actionConfigs[i].pino_destino;
+        a["acao"]               = vA_actionConfigs[i].acao;
+        a["tempo_on"]           = vA_actionConfigs[i].tempo_on;
+        a["tempo_off"]          = vA_actionConfigs[i].tempo_off;
+        a["pino_remoto"]        = vA_actionConfigs[i].pino_remoto;
+        a["envia_modulo"]       = vA_actionConfigs[i].envia_modulo;
+        a["telegram"]           = vA_actionConfigs[i].telegram;
+        a["assistente"]         = vA_actionConfigs[i].assistente;
+        a["hora_agendada"]      = vA_actionConfigs[i].hora_agendada;
+        a["minuto_agendado"]    = vA_actionConfigs[i].minuto_agendado;
+        a["duracao_agendada_s"] = vA_actionConfigs[i].duracao_agendada_s;
+    }
+
+    // Inter-módulos cadastrados
+    JsonArray modArr = doc["intermod_modules"].to<JsonArray>();
+    for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+        JsonObject m = modArr.add<JsonObject>();
+        m["module_id"]                = vA_interModConfigs[i].id;
+        m["hostname"]                 = vA_interModConfigs[i].hostname;
+        m["ip"]                       = vA_interModConfigs[i].ip;
+        m["porta"]                    = vA_interModConfigs[i].porta;
+        m["ativo"]                    = vA_interModConfigs[i].ativo;
+        m["pins_offline"]             = vA_interModConfigs[i].pins_offline;
+        m["offline_alert_enabled"]    = vA_interModConfigs[i].offline_alert_enabled;
+        m["offline_flash_ms"]         = vA_interModConfigs[i].offline_flash_ms;
+        m["pins_healthcheck"]         = vA_interModConfigs[i].pins_healthcheck;
+        m["healthcheck_alert_enabled"]= vA_interModConfigs[i].healthcheck_alert_enabled;
+        m["healthcheck_flash_ms"]     = vA_interModConfigs[i].healthcheck_flash_ms;
+    }
+
     String body;
     serializeJson(doc, body);
 
