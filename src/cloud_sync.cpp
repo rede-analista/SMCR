@@ -226,6 +226,12 @@ void fV_cloudSyncTask(void) {
         http.end();
         vS_cloudSyncStatus = "Erro HTTP: " + String(httpCode);
         fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Erro HTTP: %d", httpCode);
+        if (httpCode == 401 && vSt_mainConfig.vS_cloudApiToken.length() > 0) {
+            vSt_mainConfig.vS_cloudApiToken = "";
+            fV_salvarMainConfig();
+            vB_pendingCloudSync = false;
+            fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Token rejeitado (401) — apagado para novo auto-registro");
+        }
         return;
     }
 
