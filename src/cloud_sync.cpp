@@ -428,6 +428,9 @@ void fV_cloudSyncTask(void) {
         act.envia_modulo         = a["envia_modulo"] | String("");
         act.telegram             = a["telegram"] | false;
         act.assistente           = a["assistente"] | false;
+        act.hora_agendada        = a["hora_agendada"] | (uint8_t)255;
+        act.minuto_agendado      = a["minuto_agendado"] | (uint8_t)0;
+        act.duracao_agendada_s   = a["duracao_agendada_s"] | (uint16_t)0;
         act.contador_on          = 0;
         act.contador_off         = 0;
         act.estado_acao          = false;
