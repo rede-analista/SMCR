@@ -732,6 +732,21 @@ static void fV_applyOfflinePinsSelectiveOff(const String& pinsStr, uint8_t excep
 }
 
 /**
+ * @brief Marca todos os módulos ativos como offline quando o WiFi cai.
+ * Garante que alertas de offline disparem mesmo sem conseguir fazer healthcheck.
+ */
+void fV_markAllModulesOfflineOnWifiLoss(void) {
+    if (!vSt_mainConfig.vB_interModEnabled) return;
+    for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+        InterModConfig_t* m = &vA_interModConfigs[i];
+        if (m->ativo && m->online) {
+            m->online = false;
+            fV_printSerialDebug(LOG_INTERMOD, "[INTERMOD] WiFi offline — modulo %s marcado como offline", m->id.c_str());
+        }
+    }
+}
+
+/**
  * @brief Retorna true se algum módulo offline tem alerta ativo para este GPIO
  * Prioridade 1 (máxima): bloqueia ações e healthcheck no mesmo pino
  */

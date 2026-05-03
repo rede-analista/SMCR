@@ -140,6 +140,7 @@ void fV_checkWifiConnection(void) {
             vL_wifiDisconnectedSince = millis(); // Marca início do offline
             fV_printSerialDebug(LOG_NETWORK, "Evento: Desconectado do Wi-Fi.");
             vL_lastCheckTime = millis() - vSt_mainConfig.vU32_wifiCheckInterval;
+            fV_markAllModulesOfflineOnWifiLoss();
         }
     }
 

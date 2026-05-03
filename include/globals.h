@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.37"
+#define FIRMWARE_VERSION "2.3.38"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -449,6 +449,7 @@ int fI_addInterModConfig(const InterModConfig_t& config); // Adiciona novo módu
 bool fB_removeInterModConfig(const String& id); // Remove módulo por ID
 bool fB_updateInterModConfig(const String& id, const InterModConfig_t& config); // Atualiza módulo
 int fI_findInterModIndex(const String& id);    // Encontra índice do módulo por ID
+void fV_markAllModulesOfflineOnWifiLoss(void); // Marca todos os módulos ativos como offline quando WiFi cai
 void fV_interModHealthCheckTask(void);         // Task de healthcheck periódico
 void fV_interModDiscoveryTask(void);           // Task de descoberta automática via mDNS
 void fV_interModAlertFlashTask(void);          // Task de piscar LEDs de alerta quando módulo offline
