@@ -637,6 +637,12 @@ void fV_cloudAutoRegisterTask(void) {
     doc["cloud_heartbeat_enabled"]      = vSt_mainConfig.vB_cloudHeartbeatEnabled;
     doc["cloud_heartbeat_interval_min"] = vSt_mainConfig.vU16_cloudHeartbeatIntervalMin;
 
+    // Inter-módulos (fonte de verdade no ESP)
+    doc["intermod_enabled"]        = vSt_mainConfig.vB_interModEnabled;
+    doc["intermod_auto_discovery"] = vSt_mainConfig.vB_interModAutoDiscovery;
+    doc["intermod_healthcheck"]    = vSt_mainConfig.vU16_interModHealthCheckInterval;
+    doc["intermod_max_failures"]   = vSt_mainConfig.vU8_interModMaxFailures;
+
     // Pinos configurados
     JsonArray pinsArr = doc["pins"].to<JsonArray>();
     for (uint8_t i = 0; i < vU8_activePinsCount; i++) {
