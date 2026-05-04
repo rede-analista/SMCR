@@ -95,6 +95,12 @@ void fV_cloudOtaFromGitHub(void) {
     if (vSt_mainConfig.vB_watchdogEnabled) {
         esp_task_wdt_delete(NULL); // loop() bloqueado durante download — desativa WDT para não reiniciar
     }
+
+    // Suspende task de pinos/ações (Core 1) para evitar chamadas HTTP concorrentes
+    // durante o download HTTPS do firmware — conflito de rede causa abort() no ESP32
+    if (vO_pinActionTaskHandle) vTaskSuspend(vO_pinActionTaskHandle);
+    delay(200); // aguarda task encerrar operação em andamento
+
     fV_printSerialDebug(LOG_NETWORK, "[OTA] Iniciando update via GitHub...");
 
     String tag = "";
@@ -113,6 +119,7 @@ void fV_cloudOtaFromGitHub(void) {
 
         if (!http.begin(secClient, "https://api.github.com/repos/rede-analista/SMCR/releases/latest")) {
             fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao conectar na API GitHub");
+            if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
             return;
         }
 
@@ -120,6 +127,7 @@ void fV_cloudOtaFromGitHub(void) {
         if (apiCode != HTTP_CODE_OK) {
             http.end();
             fV_printSerialDebug(LOG_NETWORK, "[OTA] Erro HTTP na API GitHub: %d", apiCode);
+            if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
             return;
         }
 
@@ -132,6 +140,7 @@ void fV_cloudOtaFromGitHub(void) {
 
         if (err || (tag = apiDoc["tag_name"] | "").length() == 0) {
             fV_printSerialDebug(LOG_NETWORK, "[OTA] Erro ao parsear API GitHub");
+            if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
             return;
         }
 
@@ -153,6 +162,7 @@ void fV_cloudOtaFromGitHub(void) {
 
     if (!http2.begin(secClient2, binUrl)) {
         fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao conectar para download do firmware");
+        if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
         return;
     }
 
@@ -160,6 +170,7 @@ void fV_cloudOtaFromGitHub(void) {
     if (binCode != HTTP_CODE_OK) {
         http2.end();
         fV_printSerialDebug(LOG_NETWORK, "[OTA] Erro HTTP no download do firmware: %d", binCode);
+        if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
         return;
     }
 
@@ -169,6 +180,7 @@ void fV_cloudOtaFromGitHub(void) {
     if (!Update.begin(contentLen > 0 ? (size_t)contentLen : UPDATE_SIZE_UNKNOWN)) {
         http2.end();
         fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao iniciar Update (sem espaço?)");
+        if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
         return;
     }
 
@@ -179,10 +191,12 @@ void fV_cloudOtaFromGitHub(void) {
     if (written != (size_t)contentLen) {
         fV_printSerialDebug(LOG_NETWORK, "[OTA] Stream incompleto: %u/%u bytes recebidos — CDN/rede falhou", written, (size_t)contentLen);
         Update.abort();
+        if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
         return;
     }
     if (!Update.end(true)) {
         fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao finalizar Update. Erro %d: %s", Update.getError(), Update.errorString());
+        if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
         return;
     }
 

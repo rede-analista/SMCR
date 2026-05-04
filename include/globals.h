@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.42"
+#define FIRMWARE_VERSION "2.3.43"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -456,5 +456,7 @@ void fV_interModAlertFlashTask(void);          // Task de piscar LEDs de alerta 
 bool fB_checkModuleHealth(uint8_t moduleIndex); // Verifica saúde de um módulo específico
 String fS_getInterModStatus(void);             // Retorna resumo de status dos módulos
 bool fB_isPinBlockedByOffline(uint16_t gpio);  // Retorna true se algum módulo offline usa este GPIO para alerta offline
+
+extern TaskHandle_t vO_pinActionTaskHandle;
 
 #endif // GLOBALS_H
