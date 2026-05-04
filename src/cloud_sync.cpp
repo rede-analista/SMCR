@@ -93,114 +93,100 @@ String fS_getCloudSyncStatus(void) {
 // =============================================================================
 void fV_cloudOtaFromGitHub(void) {
     if (vSt_mainConfig.vB_watchdogEnabled) {
-        esp_task_wdt_delete(NULL); // loop() bloqueado durante download — desativa WDT para não reiniciar
+        esp_task_wdt_delete(NULL);
     }
-
-    // Suspende task de pinos/ações (Core 1) para evitar chamadas HTTP concorrentes
-    // durante o download HTTPS do firmware — conflito de rede causa abort() no ESP32
     if (vO_pinActionTaskHandle) vTaskSuspend(vO_pinActionTaskHandle);
-    delay(200); // aguarda task encerrar operação em andamento
+    delay(200);
 
-    fV_printSerialDebug(LOG_NETWORK, "[OTA] Iniciando update via GitHub...");
+    fV_printSerialDebug(LOG_NETWORK, "[OTA] Iniciando update via proxy cloud...");
 
-    String tag = "";
-    String binUrl = "";
+    if (vSt_mainConfig.vS_cloudApiToken.length() == 0) {
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Token ausente, abortando");
+        if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
+        return;
+    }
 
-    // ── 1. Busca a versão mais recente na API do GitHub ───────────────
-    // Escopo fechado para garantir que secClient seja destruído antes do download
-    {
-        WiFiClientSecure secClient;
-        secClient.setInsecure();
+    String url = fS_cloudBaseUrl() + "/api/get_firmware.php?token=" + vSt_mainConfig.vS_cloudApiToken;
 
-        HTTPClient http;
-        http.setTimeout(10000);
-        http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-        http.addHeader("User-Agent", "ESP32-SMCR");
+    WiFiClientSecure secClient;
+    if (vSt_mainConfig.vB_cloudUseHttps) secClient.setInsecure();
 
-        if (!http.begin(secClient, "https://api.github.com/repos/rede-analista/SMCR/releases/latest")) {
-            fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao conectar na API GitHub");
-            if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
-            return;
-        }
+    HTTPClient http;
+    http.setTimeout(60000);
+    http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
-        int apiCode = http.GET();
-        if (apiCode != HTTP_CODE_OK) {
-            http.end();
-            fV_printSerialDebug(LOG_NETWORK, "[OTA] Erro HTTP na API GitHub: %d", apiCode);
-            if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
-            return;
-        }
+    const char* hdrs[] = {"X-Firmware-Version"};
+    http.collectHeaders(hdrs, 1);
 
-        JsonDocument apiDoc;
-        JsonDocument filter;
-        filter["tag_name"] = true;
-        WiFiClient* apiStream = http.getStreamPtr();
-        DeserializationError err = deserializeJson(apiDoc, *apiStream, DeserializationOption::Filter(filter));
+    bool httpOk = vSt_mainConfig.vB_cloudUseHttps
+        ? http.begin(secClient, url)
+        : http.begin(url);
+
+    if (!httpOk) {
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao conectar no proxy cloud");
+        if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
+        return;
+    }
+
+    int code = http.GET();
+    if (code != HTTP_CODE_OK) {
         http.end();
-
-        if (err || (tag = apiDoc["tag_name"] | "").length() == 0) {
-            fV_printSerialDebug(LOG_NETWORK, "[OTA] Erro ao parsear API GitHub");
-            if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
-            return;
-        }
-
-        String version = tag.startsWith("v") ? tag.substring(1) : tag;
-        binUrl = "https://raw.githubusercontent.com/rede-analista/SMCR/" + tag
-               + "/firmware/v" + version + "/SMCR_v" + version + "_firmware.bin";
-        fV_printSerialDebug(LOG_NETWORK, "[OTA] Release: %s | URL: %s", tag.c_str(), binUrl.c_str());
-    } // secClient + http destruídos aqui — memória SSL liberada antes do download
-
-    delay(300); // Aguarda heap se estabilizar
-
-    // ── 2. Download e gravação em streaming ───────────────────────────
-    WiFiClientSecure secClient2;
-    secClient2.setInsecure();
-
-    HTTPClient http2;
-    http2.setTimeout(60000);
-    http2.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-
-    if (!http2.begin(secClient2, binUrl)) {
-        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao conectar para download do firmware");
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Proxy retornou HTTP %d", code);
         if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
         return;
     }
 
-    int binCode = http2.GET();
-    if (binCode != HTTP_CODE_OK) {
-        http2.end();
-        fV_printSerialDebug(LOG_NETWORK, "[OTA] Erro HTTP no download do firmware: %d", binCode);
-        if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
-        return;
-    }
-
-    int contentLen = http2.getSize();
-    fV_printSerialDebug(LOG_NETWORK, "[OTA] Tamanho: %d bytes. Gravando...", contentLen);
+    String fwVersion = http.header("X-Firmware-Version");
+    int contentLen   = http.getSize();
+    fV_printSerialDebug(LOG_NETWORK, "[OTA] Firmware %s | %d bytes. Gravando...", fwVersion.c_str(), contentLen);
 
     if (!Update.begin(contentLen > 0 ? (size_t)contentLen : UPDATE_SIZE_UNKNOWN)) {
-        http2.end();
-        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao iniciar Update (sem espaço?)");
+        http.end();
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao iniciar Update (sem espaco?)");
         if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
         return;
     }
 
-    WiFiClient* binStream = http2.getStreamPtr();
-    size_t written = Update.writeStream(*binStream);
-    http2.end();
+    WiFiClient* stream     = http.getStreamPtr();
+    size_t written         = 0;
+    size_t expected        = (contentLen > 0) ? (size_t)contentLen : 0;
+    uint8_t buf[512];
+    unsigned long lastAct  = millis();
 
-    if (written != (size_t)contentLen) {
-        fV_printSerialDebug(LOG_NETWORK, "[OTA] Stream incompleto: %u/%u bytes recebidos — CDN/rede falhou", written, (size_t)contentLen);
+    while (true) {
+        if (stream->available()) {
+            int n = stream->readBytes(buf, sizeof(buf));
+            if (n > 0) {
+                Update.write(buf, n);
+                written  += n;
+                lastAct   = millis();
+            }
+            if (expected > 0 && written >= expected) break;
+        } else if (!http.connected()) {
+            break;
+        } else if (millis() - lastAct > 30000) {
+            fV_printSerialDebug(LOG_NETWORK, "[OTA] Timeout de inatividade (30s)");
+            break;
+        }
+        yield();
+    }
+
+    http.end();
+
+    if (expected > 0 && written != expected) {
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Stream incompleto: %u/%u bytes", written, expected);
         Update.abort();
         if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
         return;
     }
     if (!Update.end(true)) {
-        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao finalizar Update. Erro %d: %s", Update.getError(), Update.errorString());
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao finalizar Update. Erro %d: %s",
+            Update.getError(), Update.errorString());
         if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
         return;
     }
 
-    fV_printSerialDebug(LOG_NETWORK, "[OTA] Firmware %s instalado (%d bytes). Reiniciando...", tag.c_str(), written);
+    fV_printSerialDebug(LOG_NETWORK, "[OTA] Firmware %s instalado (%u bytes). Reiniciando...", fwVersion.c_str(), written);
     delay(500);
     ESP.restart();
 }
