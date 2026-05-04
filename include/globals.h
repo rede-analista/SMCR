@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.40"
+#define FIRMWARE_VERSION "2.3.41"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar

@@ -643,6 +643,47 @@ void fV_cloudAutoRegisterTask(void) {
     doc["intermod_healthcheck"]    = vSt_mainConfig.vU16_interModHealthCheckInterval;
     doc["intermod_max_failures"]   = vSt_mainConfig.vU8_interModMaxFailures;
 
+    // Config completa do ESP (fonte de verdade para migração)
+    doc["wifi_pass"]               = vSt_mainConfig.vS_wifiPass;
+    doc["wifi_check_interval"]     = vSt_mainConfig.vU32_wifiCheckInterval;
+    doc["wifi_offline_restart_min"]= vSt_mainConfig.vU16_wifiOfflineRestartMin;
+    doc["ap_ssid"]                 = vSt_mainConfig.vS_apSsid;
+    doc["ap_pass"]                 = vSt_mainConfig.vS_apPass;
+    doc["ap_fallback_enabled"]     = vSt_mainConfig.vB_apFallbackEnabled;
+    doc["ntp_server1"]             = vSt_mainConfig.vS_ntpServer1;
+    doc["gmt_offset"]              = vSt_mainConfig.vI_gmtOffsetSec;
+    doc["daylight_offset"]         = vSt_mainConfig.vI_daylightOffsetSec;
+    doc["status_pinos_enabled"]    = vSt_mainConfig.vB_statusPinosEnabled;
+    doc["inter_modulos_enabled"]   = vSt_mainConfig.vB_interModulosEnabled;
+    doc["cor_com_alerta"]          = vSt_mainConfig.vS_corStatusComAlerta;
+    doc["cor_sem_alerta"]          = vSt_mainConfig.vS_corStatusSemAlerta;
+    doc["tempo_refresh"]           = vSt_mainConfig.vU16_tempoRefresh;
+    doc["show_analog_history"]     = vSt_mainConfig.vB_showAnalogHistory;
+    doc["show_digital_history"]    = vSt_mainConfig.vB_showDigitalHistory;
+    doc["serial_debug_enabled"]    = vSt_mainConfig.vB_serialDebugEnabled;
+    doc["active_log_flags"]        = vSt_mainConfig.vU32_activeLogFlags;
+    doc["watchdog_enabled"]        = vSt_mainConfig.vB_watchdogEnabled;
+    doc["tempo_watchdog_us"]       = vSt_mainConfig.vU32_tempoWatchdogUs;
+    doc["auth_enabled"]            = vSt_mainConfig.vB_authEnabled;
+    doc["web_username"]            = vSt_mainConfig.vS_webUsername;
+    doc["web_password"]            = vSt_mainConfig.vS_webPassword;
+    doc["dashboard_auth_required"] = vSt_mainConfig.vB_dashboardAuthRequired;
+    doc["mqtt_enabled"]            = vSt_mainConfig.vB_mqttEnabled;
+    doc["mqtt_server"]             = vSt_mainConfig.vS_mqttServer;
+    doc["mqtt_port"]               = vSt_mainConfig.vU16_mqttPort;
+    doc["mqtt_user"]               = vSt_mainConfig.vS_mqttUser;
+    doc["mqtt_password"]           = vSt_mainConfig.vS_mqttPassword;
+    doc["mqtt_topic_base"]         = vSt_mainConfig.vS_mqttTopicBase;
+    doc["mqtt_publish_interval"]   = vSt_mainConfig.vU16_mqttPublishInterval;
+    doc["mqtt_ha_discovery"]       = vSt_mainConfig.vB_mqttHomeAssistantDiscovery;
+    doc["mqtt_ha_batch"]           = vSt_mainConfig.vU8_mqttHaDiscoveryBatchSize;
+    doc["mqtt_ha_interval_ms"]     = vSt_mainConfig.vU16_mqttHaDiscoveryIntervalMs;
+    doc["mqtt_ha_repeat_sec"]      = vSt_mainConfig.vU32_mqttHaDiscoveryRepeatSec;
+    doc["telegram_enabled"]        = vSt_mainConfig.vB_telegramEnabled;
+    doc["telegram_token"]          = vSt_mainConfig.vS_telegramToken;
+    doc["telegram_chatid"]         = vSt_mainConfig.vS_telegramChatId;
+    doc["telegram_interval"]       = vSt_mainConfig.vU16_telegramCheckInterval;
+
     // Pinos configurados
     JsonArray pinsArr = doc["pins"].to<JsonArray>();
     for (uint8_t i = 0; i < vU8_activePinsCount; i++) {
