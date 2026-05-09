@@ -10,13 +10,36 @@ uint8_t vU8_activePinsCount = 0;
 // Latch de interrupção para detecção de pulsos rápidos (indexado por número do GPIO)
 volatile bool vB_gpioActivationLatch[MAX_GPIO_NUM] = {false};
 
-// Array estático com GPIO numbers persistentes para uso como arg das ISRs
-static uint8_t vA_isrGpioArg[254];
+// Contexto passado às ISRs de detecção de pulso com filtro de duração mínima
+struct IsrPinContext_t {
+    uint8_t gpio;
+    uint8_t nivel_fisico;              // Nível físico do GPIO que representa "ativado" (0=LOW, 1=HIGH), já com XOR aplicado
+    uint32_t min_pulse_ms;             // 0=latch imediato; >0=mede duração e só latch se >= min_pulse_ms
+    volatile unsigned long fall_time_ms; // Timestamp da borda de ativação (para medir duração)
+};
+static IsrPinContext_t vA_isrContexts[254];
 
-// ISR: marca latch quando GPIO é ativado brevemente
-void IRAM_ATTR fV_pinActivationISR(void* arg) {
-    uint8_t gpio = *((uint8_t*)arg);
-    vB_gpioActivationLatch[gpio] = true;
+// ISR de borda dupla: filtra glitches curtos preservando detecção de pulsos legítimos
+void IRAM_ATTR fV_pinChangeISR(void* arg) {
+    IsrPinContext_t* ctx = (IsrPinContext_t*)arg;
+    bool isActivated = ((uint8_t)digitalRead(ctx->gpio) == ctx->nivel_fisico);
+    if (isActivated) {
+        if (ctx->min_pulse_ms == 0) {
+            // Comportamento original: latch imediato na borda de ativação
+            vB_gpioActivationLatch[ctx->gpio] = true;
+        } else {
+            // Registra início do pulso para medir duração
+            ctx->fall_time_ms = millis();
+        }
+    } else {
+        // Borda de desativação: confirma latch apenas se duração >= min_pulse_ms
+        if (ctx->min_pulse_ms > 0 && ctx->fall_time_ms > 0) {
+            if ((millis() - ctx->fall_time_ms) >= ctx->min_pulse_ms) {
+                vB_gpioActivationLatch[ctx->gpio] = true;
+            }
+            ctx->fall_time_ms = 0;
+        }
+    }
 }
 
 // Constantes para tipos de pino
@@ -73,6 +96,7 @@ void fV_initPinSystem(void) {
         vA_pinConfigs[i].modo = PIN_MODE_UNUSED;
         vA_pinConfigs[i].xor_logic = 0;
         vA_pinConfigs[i].tempo_retencao = 0;
+        vA_pinConfigs[i].tempo_min_pulso_ms = 0;
         vA_pinConfigs[i].nivel_acionamento_min = 0;
         vA_pinConfigs[i].nivel_acionamento_max = 0;
         vA_pinConfigs[i].status_atual = 0;
@@ -187,6 +211,7 @@ void fV_loadPinConfigs(void) {
         vA_pinConfigs[index].modo = pin["modo"] | PIN_MODE_UNUSED;
         vA_pinConfigs[index].xor_logic = pin["xor_logic"] | 0;
         vA_pinConfigs[index].tempo_retencao = pin["tempo_retencao"] | 0;
+        vA_pinConfigs[index].tempo_min_pulso_ms = pin["tempo_min_pulso_ms"] | 0;
         vA_pinConfigs[index].nivel_acionamento_min = pin["nivel_acionamento_min"] | 0;
         vA_pinConfigs[index].nivel_acionamento_max = pin["nivel_acionamento_max"] | 0;
             vA_pinConfigs[index].classe_mqtt = pin["classe_mqtt"] | "";
@@ -235,6 +260,7 @@ bool fB_savePinConfigs(void) {
             pin["modo"] = vA_pinConfigs[i].modo;
             pin["xor_logic"] = vA_pinConfigs[i].xor_logic;
             pin["tempo_retencao"] = vA_pinConfigs[i].tempo_retencao;
+            pin["tempo_min_pulso_ms"] = vA_pinConfigs[i].tempo_min_pulso_ms;
             pin["nivel_acionamento_min"] = vA_pinConfigs[i].nivel_acionamento_min;
             pin["nivel_acionamento_max"] = vA_pinConfigs[i].nivel_acionamento_max;
                     pin["classe_mqtt"] = vA_pinConfigs[i].classe_mqtt;
@@ -300,6 +326,7 @@ void fV_clearPinConfigs(void) {
             vA_pinConfigs[i].modo = PIN_MODE_UNUSED;
             vA_pinConfigs[i].xor_logic = 0;
             vA_pinConfigs[i].tempo_retencao = 0;
+            vA_pinConfigs[i].tempo_min_pulso_ms = 0;
             vA_pinConfigs[i].nivel_acionamento_min = 0;
             vA_pinConfigs[i].nivel_acionamento_max = 0;
             vA_pinConfigs[i].status_atual = 0;
@@ -358,15 +385,15 @@ void fV_setupConfiguredPins(void) {
                 // Configura interrupção para pinos digitais de entrada (detecção de pulsos rápidos)
                 if (tipo == PIN_TYPE_DIGITAL && pinNumber < MAX_GPIO_NUM &&
                     (modo == PIN_MODE_INPUT || modo == PIN_MODE_INPUT_PULLUP || modo == PIN_MODE_INPUT_PULLDOWN)) {
-                    uint8_t nivelAtivacao = (uint8_t)vA_pinConfigs[i].nivel_acionamento_min;
-                    uint8_t xorLogic = vA_pinConfigs[i].xor_logic;
-                    // Borda física de ativação (XOR inverte a relação lógica/física)
-                    uint8_t edge = (nivelAtivacao == 1) ? ((xorLogic == 1) ? FALLING : RISING)
-                                                        : ((xorLogic == 1) ? RISING  : FALLING);
-                    vA_isrGpioArg[i] = (uint8_t)pinNumber;
-                    attachInterruptArg(digitalPinToInterrupt(pinNumber), fV_pinActivationISR, &vA_isrGpioArg[i], edge);
-                    fV_printSerialDebug(LOG_PINS, "[PIN] GPIO %d interrupção configurada (%s)",
-                        pinNumber, (edge == RISING) ? "RISING" : "FALLING");
+                    // Nível físico que representa "ativado": XOR inverte a relação lógica/física
+                    uint8_t nivelFisico = ((uint8_t)vA_pinConfigs[i].nivel_acionamento_min ^ vA_pinConfigs[i].xor_logic) & 1;
+                    vA_isrContexts[i].gpio          = (uint8_t)pinNumber;
+                    vA_isrContexts[i].nivel_fisico  = nivelFisico;
+                    vA_isrContexts[i].min_pulse_ms  = vA_pinConfigs[i].tempo_min_pulso_ms;
+                    vA_isrContexts[i].fall_time_ms  = 0;
+                    attachInterruptArg(digitalPinToInterrupt(pinNumber), fV_pinChangeISR, &vA_isrContexts[i], CHANGE);
+                    fV_printSerialDebug(LOG_PINS, "[PIN] GPIO %d interrupção CHANGE configurada (nivel_fisico=%d, min_pulse=%lu ms)",
+                        pinNumber, nivelFisico, vA_pinConfigs[i].tempo_min_pulso_ms);
                 }
             } else if (tipo == PIN_TYPE_REMOTE || tipo == 65533) {
                 // Inicializa pino remoto no estado "não alarmado" (inverso do nível de acionamento)
@@ -449,6 +476,7 @@ bool fB_removePinConfig(uint16_t pinNumber) {
     vA_pinConfigs[vU8_activePinsCount].modo = PIN_MODE_UNUSED;
     vA_pinConfigs[vU8_activePinsCount].xor_logic = 0;
     vA_pinConfigs[vU8_activePinsCount].tempo_retencao = 0;
+    vA_pinConfigs[vU8_activePinsCount].tempo_min_pulso_ms = 0;
     vA_pinConfigs[vU8_activePinsCount].nivel_acionamento_min = 0;
     vA_pinConfigs[vU8_activePinsCount].nivel_acionamento_max = 0;
     vA_pinConfigs[vU8_activePinsCount].status_atual = 0;

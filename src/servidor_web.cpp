@@ -2963,6 +2963,7 @@ void fV_handlePinAdd(AsyncWebServerRequest *request) {
     newPin.modo = request->arg("modo").toInt();
     newPin.xor_logic = request->hasArg("xor_logic") ? request->arg("xor_logic").toInt() : 0;
     newPin.tempo_retencao = request->hasArg("tempo_retencao") ? request->arg("tempo_retencao").toInt() : 0;
+    newPin.tempo_min_pulso_ms = request->hasArg("tempo_min_pulso_ms") ? request->arg("tempo_min_pulso_ms").toInt() : 0;
     newPin.status_atual = 0;
     newPin.ignore_contador = 0;
     newPin.nivel_acionamento_min = request->hasArg("nivel_acionamento_min") ? request->arg("nivel_acionamento_min").toInt() : 0;
@@ -3014,6 +3015,7 @@ void fV_handlePinsListApi(AsyncWebServerRequest *request) {
             pinObj["modo"] = vA_pinConfigs[i].modo;
             pinObj["xor_logic"] = vA_pinConfigs[i].xor_logic;
             pinObj["tempo_retencao"] = vA_pinConfigs[i].tempo_retencao;
+            pinObj["tempo_min_pulso_ms"] = vA_pinConfigs[i].tempo_min_pulso_ms;
             pinObj["nivel_acionamento_min"] = vA_pinConfigs[i].nivel_acionamento_min;
             pinObj["nivel_acionamento_max"] = vA_pinConfigs[i].nivel_acionamento_max;
                         pinObj["classe_mqtt"] = vA_pinConfigs[i].classe_mqtt;
@@ -3061,6 +3063,7 @@ void fV_handlePinCreateApi(AsyncWebServerRequest *request) {
     newPin.modo = doc["modo"] | 0;
     newPin.xor_logic = doc["xor_logic"] | 0;
     newPin.tempo_retencao = doc["tempo_retencao"] | 0;
+    newPin.tempo_min_pulso_ms = doc["tempo_min_pulso_ms"] | 0;
     newPin.nivel_acionamento_min = doc["nivel_acionamento_min"] | 0;
     newPin.nivel_acionamento_max = doc["nivel_acionamento_max"] | 0;
     newPin.status_atual = 0;
@@ -3127,6 +3130,7 @@ void fV_handlePinUpdateApi(AsyncWebServerRequest *request) {
     updatedPin.modo = doc["modo"] | 0;
     updatedPin.xor_logic = doc["xor_logic"] | 0;
     updatedPin.tempo_retencao = doc["tempo_retencao"] | 0;
+    updatedPin.tempo_min_pulso_ms = doc["tempo_min_pulso_ms"] | 0;
     updatedPin.nivel_acionamento_min = doc["nivel_acionamento_min"] | 0;
     updatedPin.nivel_acionamento_max = doc["nivel_acionamento_max"] | 0;
     updatedPin.classe_mqtt = doc["classe_mqtt"] | "";
@@ -3263,6 +3267,7 @@ void fV_handlePinsReloadApi(AsyncWebServerRequest *request) {
                 vA_pinConfigs[i].modo = 0;
                 vA_pinConfigs[i].xor_logic = 0;
                 vA_pinConfigs[i].tempo_retencao = 0;
+                vA_pinConfigs[i].tempo_min_pulso_ms = 0;
                 vA_pinConfigs[i].nivel_acionamento_min = 0;
                 vA_pinConfigs[i].nivel_acionamento_max = 0;
                 vA_pinConfigs[i].status_atual = 0;
@@ -3291,6 +3296,7 @@ void fV_handlePinsClearApi(AsyncWebServerRequest *request) {
                 vA_pinConfigs[i].modo = 0;
                 vA_pinConfigs[i].xor_logic = 0;
                 vA_pinConfigs[i].tempo_retencao = 0;
+                vA_pinConfigs[i].tempo_min_pulso_ms = 0;
                 vA_pinConfigs[i].nivel_acionamento_min = 0;
                 vA_pinConfigs[i].nivel_acionamento_max = 0;
                 vA_pinConfigs[i].status_atual = 0;

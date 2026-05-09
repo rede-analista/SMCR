@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.45"
+#define FIRMWARE_VERSION "2.3.46"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -150,6 +150,7 @@ struct PinConfig_t {
     uint8_t modo;               // pinMode(): 0=SEM_USO, 1=INPUT, 3=OUTPUT, etc.
     uint8_t xor_logic;          // Lógica invertida (0=normal, 1=invertido)
     uint32_t tempo_retencao;    // Tempo em millisegundos para ações temporizadas
+    uint32_t tempo_min_pulso_ms; // Duração mínima do pulso ISR em ms (0=imediato, >0=filtra glitches)
     uint16_t status_atual;      // Status: 0-1 (digital) ou 0-4095 (analógico)
     uint16_t ignore_contador;   // Contador para ignore temporário
     unsigned long ultimo_acionamento_ms; // Timestamp da última mudança (para tempo de retenção)
