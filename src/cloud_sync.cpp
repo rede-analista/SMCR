@@ -23,6 +23,7 @@ static uint32_t fU32_hashPayload(const String& s) {
 
 // ── Download de arquivos HTML da cloud ────────────────────────────────────────
 bool vB_pendingFetchCloudFiles = false;
+bool vB_fetchHtmlGithub        = false;
 String vS_fetchCloudFilesUrl   = "smcr.pensenet.com.br";
 static String vS_fetchStatus = "Aguardando";
 
@@ -385,8 +386,10 @@ void fV_cloudSyncTask(void) {
     // ── Flags de ação ─────────────────────────────────────────────────
     // Lidas antes de salvar/reiniciar para que o reboot_on_sync e ota_update_on_sync
     // atuem após aplicar toda a configuração.
-    bool vB_rebootOnSync = !doc["reboot_on_sync"].isNull() && doc["reboot_on_sync"].as<bool>();
-    bool vB_otaOnSync    = !doc["ota_update_on_sync"].isNull() && doc["ota_update_on_sync"].as<bool>();
+    bool vB_rebootOnSync    = !doc["reboot_on_sync"].isNull() && doc["reboot_on_sync"].as<bool>();
+    bool vB_otaOnSync       = !doc["ota_update_on_sync"].isNull() && doc["ota_update_on_sync"].as<bool>();
+    bool vB_fetchHtmlOnSync = !doc["fetch_html_on_sync"].isNull() && doc["fetch_html_on_sync"].as<bool>();
+    bool vB_fetchHtmlGithubOnSync = !doc["fetch_html_github"].isNull() && doc["fetch_html_github"].as<bool>();
 
     fV_salvarMainConfig();
     fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Config geral aplicada e salva.");
@@ -479,6 +482,13 @@ void fV_cloudSyncTask(void) {
     fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Sync completo.");
 
     // ── Executa flags de ação (após sync completo) ────────────────────
+    if (vB_fetchHtmlOnSync) {
+        vS_fetchCloudFilesUrl  = vSt_mainConfig.vS_cloudUrl;
+        vB_fetchHtmlGithub     = vB_fetchHtmlGithubOnSync;
+        vB_pendingFetchCloudFiles = true;
+        fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Flag fetch_html_on_sync ativo — agendando fetch HTML (%s)...",
+            vB_fetchHtmlGithub ? "GitHub" : "servidor");
+    }
     if (vB_otaOnSync) {
         fV_printSerialDebug(LOG_NETWORK, "[CLOUD] Flag ota_update_on_sync ativo — iniciando OTA via GitHub...");
         fV_cloudOtaFromGitHub();
@@ -509,7 +519,8 @@ void fV_fetchCloudFilesTask(void) {
 
     bool fetchHttps = vSt_mainConfig.vB_cloudUseHttps;
     String fetchSchema = fetchHttps ? "https://" : "http://";
-    String listUrl = fetchSchema + vS_fetchCloudFilesUrl + ":" + String(vSt_mainConfig.vU16_cloudPort) + "/api/get_web_files.php";
+    String endpoint = vB_fetchHtmlGithub ? "/api/get_web_files.php?source=github" : "/api/get_web_files.php";
+    String listUrl = fetchSchema + vS_fetchCloudFilesUrl + ":" + String(vSt_mainConfig.vU16_cloudPort) + endpoint;
     fV_printSerialDebug(LOG_NETWORK, "[FETCH] Buscando lista: %s", listUrl.c_str());
 
     WiFiClientSecure fetchSecClient;
@@ -558,7 +569,7 @@ void fV_fetchCloudFilesTask(void) {
 
     for (JsonVariant fv : files) {
         String filename = fv.as<String>();
-        String fileUrl  = fetchSchema + vS_fetchCloudFilesUrl + ":" + String(vSt_mainConfig.vU16_cloudPort) + "/api/get_web_files.php?file=" + filename;
+        String fileUrl  = fetchSchema + vS_fetchCloudFilesUrl + ":" + String(vSt_mainConfig.vU16_cloudPort) + "/api/get_web_files.php?file=" + filename + (vB_fetchHtmlGithub ? "&source=github" : "");
         vS_fetchStatus  = "Baixando " + filename + " (" + String(downloaded + errors + 1) + "/" + String(total) + ")";
         fV_printSerialDebug(LOG_NETWORK, "[FETCH] %s", vS_fetchStatus.c_str());
 
