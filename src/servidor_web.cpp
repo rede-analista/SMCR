@@ -1890,25 +1890,24 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
     }
     system_obj["active_pins"] = activePinsCount;
     
-    // 4. Dados de Pinos para Dashboard (apenas se habilitado nas configurações)
+    // 4. Dados de Pinos (campos básicos sempre presentes; histórico condicionado a statusPinosEnabled)
     JsonArray pins_array = vL_jsonDoc["pins"].to<JsonArray>();
-    if (vSt_mainConfig.vB_statusPinosEnabled) {
-        for (uint8_t i = 0; i < vU8_activePinsCount; i++) {
-            if (vA_pinConfigs[i].tipo != 0) {  // Apenas pinos utilizados
-                JsonObject pin_obj = pins_array.add<JsonObject>();
-                pin_obj["gpio"] = vA_pinConfigs[i].pino;
-                pin_obj["description"] = vA_pinConfigs[i].nome;
-                pin_obj["tipo"] = vA_pinConfigs[i].tipo;
-                pin_obj["modo"] = vA_pinConfigs[i].modo;
-                pin_obj["status_atual"] = vA_pinConfigs[i].status_atual;
-                pin_obj["nivel_acionamento_min"] = vA_pinConfigs[i].nivel_acionamento_min;
-                pin_obj["nivel_acionamento_max"] = vA_pinConfigs[i].nivel_acionamento_max;
-                
-                // Adiciona histórico para pinos analógicos locais (192) ou remotos (65533) - se habilitado
+    for (uint8_t i = 0; i < vU8_activePinsCount; i++) {
+        if (vA_pinConfigs[i].tipo != 0) {
+            JsonObject pin_obj = pins_array.add<JsonObject>();
+            pin_obj["gpio"] = vA_pinConfigs[i].pino;
+            pin_obj["description"] = vA_pinConfigs[i].nome;
+            pin_obj["tipo"] = vA_pinConfigs[i].tipo;
+            pin_obj["modo"] = vA_pinConfigs[i].modo;
+            pin_obj["status_atual"] = vA_pinConfigs[i].status_atual;
+            pin_obj["nivel_acionamento_min"] = vA_pinConfigs[i].nivel_acionamento_min;
+            pin_obj["nivel_acionamento_max"] = vA_pinConfigs[i].nivel_acionamento_max;
+            pin_obj["exibir_display"] = vA_pinConfigs[i].vB_exibirDisplay;
+
+            if (vSt_mainConfig.vB_statusPinosEnabled) {
+                // Histórico para pinos analógicos
                 if ((vA_pinConfigs[i].tipo == 192 || vA_pinConfigs[i].tipo == 65533) && vSt_mainConfig.vB_showAnalogHistory) {
                     JsonArray history_array = pin_obj["historico"].to<JsonArray>();
-                    
-                    // Monta o histórico na ordem correta (mais antigo para mais novo)
                     uint8_t count = vA_pinConfigs[i].historico_count;
                     if (count > 0) {
                         uint8_t startIndex = (vA_pinConfigs[i].historico_index + 8 - count) % 8;
@@ -1918,12 +1917,9 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
                         }
                     }
                 }
-                
-                // Adiciona histórico para pinos digitais locais (1) ou remotos (65534) - se habilitado
+                // Histórico para pinos digitais
                 if ((vA_pinConfigs[i].tipo == 1 || vA_pinConfigs[i].tipo == 65534) && vSt_mainConfig.vB_showDigitalHistory) {
                     JsonArray history_array = pin_obj["historico"].to<JsonArray>();
-                    
-                    // Monta o histórico na ordem correta (mais antigo para mais novo)
                     uint8_t count = vA_pinConfigs[i].historico_count;
                     if (count > 0) {
                         uint8_t startIndex = (vA_pinConfigs[i].historico_index + 8 - count) % 8;
@@ -1940,6 +1936,7 @@ void fV_handleStatusJson(AsyncWebServerRequest *request) {
     // Adiciona cores do sistema para o dashboard
     system_obj["cor_com_alerta"] = vSt_mainConfig.vS_corStatusComAlerta;
     system_obj["cor_sem_alerta"] = vSt_mainConfig.vS_corStatusSemAlerta;
+    system_obj["tempo_refresh"]  = vSt_mainConfig.vU16_tempoRefresh;
 
     // 3. Sincronizacao (Agrupados em "sync")
     JsonObject sync_obj = vL_jsonDoc["sync"].to<JsonObject>();
