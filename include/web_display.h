@@ -14,16 +14,24 @@ const char web_display_html[] PROGMEM = R"rawliteral(
     <title>SMCR - Display</title>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background: #f0f0f0; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background: #f0f0f0; color: #222; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 16px 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .header { display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #007bff; }
-        h1 { margin: 0; color: #333; font-size: 20px; font-weight: bold; text-align: center; }
+        h1 { margin: 0; font-size: 20px; font-weight: bold; text-align: center; }
         .btn-back { position: absolute; left: 0; text-decoration: none; color: #555; font-size: 22px; line-height: 1; padding: 4px 6px; border-radius: 6px; }
         .btn-back:hover { background: #e9ecef; }
+        .btn-dark { position: absolute; right: 0; background: none; border: none; cursor: pointer; font-size: 20px; line-height: 1; padding: 4px 6px; border-radius: 6px; color: #555; }
+        .btn-dark:hover { background: #e9ecef; }
         .pin-item { padding: 10px 14px; margin: 5px 0; border-radius: 6px; display: flex; align-items: center; gap: 12px; border: 1px solid #e9ecef; }
         .pin-indicator { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-        .pin-description { font-size: 14px; color: #222; }
+        .pin-description { font-size: 14px; }
         .footer { text-align: center; font-size: 11px; color: #aaa; margin-top: 14px; }
+        body.dark { background: #1a1a1a; color: #e0e0e0; }
+        body.dark .container { background: #242424; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        body.dark .pin-item { border-color: #383838; }
+        body.dark .btn-back, body.dark .btn-dark { color: #aaa; }
+        body.dark .btn-back:hover, body.dark .btn-dark:hover { background: #333; }
+        body.dark .footer { color: #666; }
     </style>
 </head>
 <body>
@@ -31,6 +39,7 @@ const char web_display_html[] PROGMEM = R"rawliteral(
         <div class="header">
             <a href="/" class="btn-back" title="Voltar">&#8962;</a>
             <h1 id="title-hostname">-</h1>
+            <button class="btn-dark" id="btn-dark" title="Modo escuro">🌙</button>
         </div>
         <div id="pins-list"><p style="text-align:center;color:#666;">Carregando...</p></div>
         <div class="footer">Atualiza a cada <span id="refresh-seconds">15</span>s</div>
@@ -38,6 +47,14 @@ const char web_display_html[] PROGMEM = R"rawliteral(
     <script>
         let refreshTimer = null, currentInterval = 15000;
         const PIN_TYPE_ANALOG = 192, PIN_TYPE_PWM = 193, PIN_TYPE_REMOTE_ANALOG = 65533;
+        const btnDark = document.getElementById('btn-dark');
+        if (localStorage.getItem('display-dark') === '1') document.body.classList.add('dark');
+        btnDark.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+        btnDark.addEventListener('click', function() {
+            const dark = document.body.classList.toggle('dark');
+            localStorage.setItem('display-dark', dark ? '1' : '0');
+            this.textContent = dark ? '☀️' : '🌙';
+        });
         function isAlerta(pin) {
             const tipo = pin.tipo || 0, val = pin.status_atual !== undefined ? pin.status_atual : 0;
             if (tipo === PIN_TYPE_ANALOG || tipo === PIN_TYPE_PWM || tipo === PIN_TYPE_REMOTE_ANALOG)
@@ -55,7 +72,7 @@ const char web_display_html[] PROGMEM = R"rawliteral(
                 const novoInterval = tempoRefresh * 1000;
                 if (novoInterval !== currentInterval) { currentInterval = novoInterval; if (refreshTimer) clearInterval(refreshTimer); refreshTimer = setInterval(updateDisplay, currentInterval); }
                 const list = document.getElementById('pins-list');
-                if (!pins.length) { list.innerHTML = '<p style="text-align:center;color:#666;">Nenhum pino configurado para exibição no Display</p>'; return; }
+                if (!pins.length) { list.innerHTML = '<p style="text-align:center;color:#888;">Nenhum pino configurado para exibição no Display</p>'; return; }
                 list.innerHTML = '';
                 pins.forEach(pin => {
                     const cor = isAlerta(pin) ? corAlerta : corOk, desc = pin.description || 'Pino';

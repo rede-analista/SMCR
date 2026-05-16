@@ -11,6 +11,7 @@
             margin: 0;
             padding: 16px;
             background: #f0f0f0;
+            color: #222;
         }
         .container {
             max-width: 600px;
@@ -31,7 +32,6 @@
         }
         h1 {
             margin: 0;
-            color: #333;
             font-size: 20px;
             font-weight: bold;
             text-align: center;
@@ -47,6 +47,19 @@
             border-radius: 6px;
         }
         .btn-back:hover { background: #e9ecef; }
+        .btn-dark {
+            position: absolute;
+            right: 0;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            line-height: 1;
+            padding: 4px 6px;
+            border-radius: 6px;
+            color: #555;
+        }
+        .btn-dark:hover { background: #e9ecef; }
         .pin-item {
             padding: 10px 14px;
             margin: 5px 0;
@@ -62,10 +75,7 @@
             border-radius: 50%;
             flex-shrink: 0;
         }
-        .pin-description {
-            font-size: 14px;
-            color: #222;
-        }
+        .pin-description { font-size: 14px; }
         .footer {
             text-align: center;
             font-size: 11px;
@@ -78,6 +88,17 @@
             padding: 20px 0;
             font-size: 14px;
         }
+
+        /* Dark mode */
+        body.dark { background: #1a1a1a; color: #e0e0e0; }
+        body.dark .container { background: #242424; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        body.dark .pin-item { border-color: #383838; }
+        body.dark .btn-back,
+        body.dark .btn-dark { color: #aaa; }
+        body.dark .btn-back:hover,
+        body.dark .btn-dark:hover { background: #333; }
+        body.dark .footer { color: #666; }
+        body.dark #empty-msg { color: #888; }
     </style>
 </head>
 <body>
@@ -85,6 +106,7 @@
         <div class="header">
             <a href="/" class="btn-back" title="Voltar">&#8962;</a>
             <h1 id="title-hostname">-</h1>
+            <button class="btn-dark" id="btn-dark" title="Alternar modo escuro">🌙</button>
         </div>
         <div id="pins-list"><p id="empty-msg">Carregando...</p></div>
         <div class="footer">Atualiza a cada <span id="refresh-seconds">15</span>s</div>
@@ -97,6 +119,15 @@
         const PIN_TYPE_ANALOG        = 192;
         const PIN_TYPE_PWM           = 193;
         const PIN_TYPE_REMOTE_ANALOG = 65533;
+
+        // Dark mode
+        if (localStorage.getItem('display-dark') === '1') document.body.classList.add('dark');
+        document.getElementById('btn-dark').textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+        document.getElementById('btn-dark').addEventListener('click', function() {
+            const dark = document.body.classList.toggle('dark');
+            localStorage.setItem('display-dark', dark ? '1' : '0');
+            this.textContent = dark ? '☀️' : '🌙';
+        });
 
         function isAlerta(pin) {
             const tipo = pin.tipo || 0;
@@ -112,11 +143,11 @@
                 .then(r => r.json())
                 .then(data => {
                     const sys = data.system || {};
-                    const hostname    = sys.hostname || '-';
-                    const corAlerta   = sys.cor_com_alerta  || '#dc3545';
-                    const corOk       = sys.cor_sem_alerta  || '#28a745';
+                    const hostname     = sys.hostname || '-';
+                    const corAlerta    = sys.cor_com_alerta || '#dc3545';
+                    const corOk        = sys.cor_sem_alerta || '#28a745';
                     const tempoRefresh = sys.tempo_refresh  || 15;
-                    const pins        = (data.pins || []).filter(p => p.exibir_display === true);
+                    const pins         = (data.pins || []).filter(p => p.exibir_display === true);
 
                     document.getElementById('title-hostname').textContent = hostname;
                     document.title = hostname;
@@ -137,10 +168,8 @@
 
                     list.innerHTML = '';
                     pins.forEach(pin => {
-                        const alerta = isAlerta(pin);
-                        const cor    = alerta ? corAlerta : corOk;
-                        const desc   = pin.description || 'Pino';
-
+                        const cor  = isAlerta(pin) ? corAlerta : corOk;
+                        const desc = pin.description || 'Pino';
                         const item = document.createElement('div');
                         item.className = 'pin-item';
                         item.innerHTML =
