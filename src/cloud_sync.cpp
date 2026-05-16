@@ -406,10 +406,12 @@ void fV_cloudSyncTask(void) {
         cfg.modo                  = p["modo"] | 0;
         cfg.xor_logic             = p["xor_logic"] | 0;
         cfg.tempo_retencao        = p["tempo_retencao"] | 0;
+        cfg.tempo_min_pulso_ms    = p["tempo_min_pulso_ms"] | 0;
         cfg.nivel_acionamento_min = p["nivel_acionamento_min"] | 0;
         cfg.nivel_acionamento_max = p["nivel_acionamento_max"] | 1;
         cfg.classe_mqtt           = p["classe_mqtt"] | String("");
         cfg.icone_mqtt            = p["icone_mqtt"] | String("");
+        cfg.vB_exibirDisplay      = p["exibir_display"] | false;
         cfg.status_atual          = 0;
         cfg.ignore_contador       = 0;
         cfg.ultimo_acionamento_ms = 0;
@@ -706,10 +708,12 @@ void fV_cloudAutoRegisterTask(void) {
         p["modo"]                  = vA_pinConfigs[i].modo;
         p["xor_logic"]             = vA_pinConfigs[i].xor_logic;
         p["tempo_retencao"]        = vA_pinConfigs[i].tempo_retencao;
+        p["tempo_min_pulso_ms"]    = vA_pinConfigs[i].tempo_min_pulso_ms;
         p["nivel_acionamento_min"] = vA_pinConfigs[i].nivel_acionamento_min;
         p["nivel_acionamento_max"] = vA_pinConfigs[i].nivel_acionamento_max;
         p["classe_mqtt"]           = vA_pinConfigs[i].classe_mqtt;
         p["icone_mqtt"]            = vA_pinConfigs[i].icone_mqtt;
+        p["exibir_display"]        = vA_pinConfigs[i].vB_exibirDisplay;
     }
 
     // Ações configuradas
