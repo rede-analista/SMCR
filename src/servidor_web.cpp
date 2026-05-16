@@ -2976,6 +2976,7 @@ void fV_handlePinAdd(AsyncWebServerRequest *request) {
     newPin.nivel_acionamento_max = request->hasArg("nivel_acionamento_max") ? request->arg("nivel_acionamento_max").toInt() : 0;
         newPin.classe_mqtt = request->hasArg("classe_mqtt") ? request->arg("classe_mqtt") : "";
         newPin.icone_mqtt = request->hasArg("icone_mqtt") ? request->arg("icone_mqtt") : "";
+    newPin.vB_exibirDisplay = request->hasArg("exibir_display") && request->arg("exibir_display") == "1";
     
     // Tenta adicionar o pino
     int result = -1;
@@ -3026,6 +3027,7 @@ void fV_handlePinsListApi(AsyncWebServerRequest *request) {
             pinObj["nivel_acionamento_max"] = vA_pinConfigs[i].nivel_acionamento_max;
                         pinObj["classe_mqtt"] = vA_pinConfigs[i].classe_mqtt;
                         pinObj["icone_mqtt"] = vA_pinConfigs[i].icone_mqtt;
+            pinObj["exibir_display"] = vA_pinConfigs[i].vB_exibirDisplay;
             pinObj["status_atual"] = vA_pinConfigs[i].status_atual;
         }
     }
@@ -3141,6 +3143,7 @@ void fV_handlePinUpdateApi(AsyncWebServerRequest *request) {
     updatedPin.nivel_acionamento_max = doc["nivel_acionamento_max"] | 0;
     updatedPin.classe_mqtt = doc["classe_mqtt"] | "";
     updatedPin.icone_mqtt = doc["icone_mqtt"] | "";
+    updatedPin.vB_exibirDisplay = doc["exibir_display"] | false;
 
     uint16_t newPinNumber = updatedPin.pino;
     bool renamed = (newPinNumber != pinNumber);

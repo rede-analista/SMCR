@@ -45,7 +45,7 @@ const char web_display_html[] PROGMEM = R"rawliteral(
         }
         function updateDisplay() {
             fetch('/status/json').then(r => r.json()).then(data => {
-                const sys = data.system || {}, pins = data.pins || [];
+                const sys = data.system || {}, pins = (data.pins || []).filter(p => p.exibir_display === true);
                 const hostname = sys.hostname || '-', corAlerta = sys.cor_com_alerta || '#dc3545';
                 const corOk = sys.cor_sem_alerta || '#28a745', tempoRefresh = sys.tempo_refresh || 15;
                 document.getElementById('title-hostname').textContent = hostname;
@@ -54,7 +54,7 @@ const char web_display_html[] PROGMEM = R"rawliteral(
                 const novoInterval = tempoRefresh * 1000;
                 if (novoInterval !== currentInterval) { currentInterval = novoInterval; if (refreshTimer) clearInterval(refreshTimer); refreshTimer = setInterval(updateDisplay, currentInterval); }
                 const list = document.getElementById('pins-list');
-                if (!pins.length) { list.innerHTML = '<p style="text-align:center;color:#666;">Nenhum pino cadastrado</p>'; return; }
+                if (!pins.length) { list.innerHTML = '<p style="text-align:center;color:#666;">Nenhum pino configurado para exibição no Display</p>'; return; }
                 list.innerHTML = '';
                 pins.forEach(pin => {
                     const cor = isAlerta(pin) ? corAlerta : corOk, desc = pin.description || 'Pino';

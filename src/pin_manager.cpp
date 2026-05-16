@@ -216,6 +216,7 @@ void fV_loadPinConfigs(void) {
         vA_pinConfigs[index].nivel_acionamento_max = pin["nivel_acionamento_max"] | 0;
             vA_pinConfigs[index].classe_mqtt = pin["classe_mqtt"] | "";
             vA_pinConfigs[index].icone_mqtt = pin["icone_mqtt"] | "";
+        vA_pinConfigs[index].vB_exibirDisplay = pin["exibir_display"] | false;
         vA_pinConfigs[index].status_atual = 0;
         vA_pinConfigs[index].ignore_contador = 0;
         vA_pinConfigs[index].ultimo_acionamento_ms = 0;  // Inicializa timestamp de retenção
@@ -265,9 +266,10 @@ bool fB_savePinConfigs(void) {
             pin["nivel_acionamento_max"] = vA_pinConfigs[i].nivel_acionamento_max;
                     pin["classe_mqtt"] = vA_pinConfigs[i].classe_mqtt;
                     pin["icone_mqtt"] = vA_pinConfigs[i].icone_mqtt;
+            pin["exibir_display"] = vA_pinConfigs[i].vB_exibirDisplay;
         }
     }
-    
+
     // Converte para string JSON
     String jsonOutput;
     serializeJson(doc, jsonOutput);
@@ -479,6 +481,7 @@ bool fB_removePinConfig(uint16_t pinNumber) {
     vA_pinConfigs[vU8_activePinsCount].tempo_min_pulso_ms = 0;
     vA_pinConfigs[vU8_activePinsCount].nivel_acionamento_min = 0;
     vA_pinConfigs[vU8_activePinsCount].nivel_acionamento_max = 0;
+    vA_pinConfigs[vU8_activePinsCount].vB_exibirDisplay = false;
     vA_pinConfigs[vU8_activePinsCount].status_atual = 0;
     vA_pinConfigs[vU8_activePinsCount].ignore_contador = 0;
     vA_pinConfigs[vU8_activePinsCount].ultimo_acionamento_ms = 0;  // Limpa timestamp

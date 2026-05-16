@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.48"
+#define FIRMWARE_VERSION "2.3.49"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -165,6 +165,8 @@ struct PinConfig_t {
     // MQTT Discovery
     String classe_mqtt;          // Classe do dispositivo no MQTT/Home Assistant (ex: switch, light, sensor)
     String icone_mqtt;           // Ícone MDI para o dispositivo (ex: mdi:light-switch, mdi:led-on)
+    // Display
+    bool vB_exibirDisplay;       // Exibe o pino na página /display
 };
 
 // --- Estrutura para Configuração de Ações ---

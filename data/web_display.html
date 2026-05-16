@@ -114,7 +114,7 @@
                     const corAlerta   = sys.cor_com_alerta  || '#dc3545';
                     const corOk       = sys.cor_sem_alerta  || '#28a745';
                     const tempoRefresh = sys.tempo_refresh  || 15;
-                    const pins        = data.pins || [];
+                    const pins        = (data.pins || []).filter(p => p.exibir_display === true);
 
                     document.getElementById('title-hostname').textContent = hostname;
                     document.title = 'SMCR - Display [' + hostname + ']';
@@ -129,7 +129,7 @@
 
                     const list = document.getElementById('pins-list');
                     if (pins.length === 0) {
-                        list.innerHTML = '<p id="empty-msg">Nenhum pino cadastrado</p>';
+                        list.innerHTML = '<p id="empty-msg">Nenhum pino configurado para exibição no Display</p>';
                         return;
                     }
 
