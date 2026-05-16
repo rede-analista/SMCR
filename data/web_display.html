@@ -23,7 +23,8 @@
         .header {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: center;
+            position: relative;
             margin-bottom: 16px;
             padding-bottom: 10px;
             border-bottom: 2px solid #007bff;
@@ -31,18 +32,19 @@
         h1 {
             margin: 0;
             color: #333;
-            font-size: 18px;
+            font-size: 20px;
             font-weight: bold;
+            text-align: center;
         }
         .btn-back {
+            position: absolute;
+            left: 0;
             text-decoration: none;
-            color: #333;
-            padding: 7px 14px;
+            color: #555;
+            font-size: 22px;
+            line-height: 1;
+            padding: 4px 6px;
             border-radius: 6px;
-            border: 1px solid #dee2e6;
-            background: #fff;
-            font-size: 13px;
-            white-space: nowrap;
         }
         .btn-back:hover { background: #e9ecef; }
         .pin-item {
@@ -81,8 +83,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Display &mdash; [<span id="title-hostname">-</span>]</h1>
-            <a href="/" class="btn-back">&#8592; Voltar</a>
+            <a href="/" class="btn-back" title="Voltar">&#8962;</a>
+            <h1 id="title-hostname">-</h1>
         </div>
         <div id="pins-list"><p id="empty-msg">Carregando...</p></div>
         <div class="footer">Atualiza a cada <span id="refresh-seconds">15</span>s</div>
@@ -117,7 +119,7 @@
                     const pins        = (data.pins || []).filter(p => p.exibir_display === true);
 
                     document.getElementById('title-hostname').textContent = hostname;
-                    document.title = 'SMCR - Display [' + hostname + ']';
+                    document.title = hostname;
                     document.getElementById('refresh-seconds').textContent = tempoRefresh;
 
                     const novoInterval = tempoRefresh * 1000;

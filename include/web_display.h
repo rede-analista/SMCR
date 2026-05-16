@@ -16,9 +16,10 @@ const char web_display_html[] PROGMEM = R"rawliteral(
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background: #f0f0f0; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 16px 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #007bff; }
-        h1 { margin: 0; color: #333; font-size: 18px; font-weight: bold; }
-        .btn-back { text-decoration: none; color: #333; padding: 7px 14px; border-radius: 6px; border: 1px solid #dee2e6; background: #fff; font-size: 13px; }
+        .header { display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #007bff; }
+        h1 { margin: 0; color: #333; font-size: 20px; font-weight: bold; text-align: center; }
+        .btn-back { position: absolute; left: 0; text-decoration: none; color: #555; font-size: 22px; line-height: 1; padding: 4px 6px; border-radius: 6px; }
+        .btn-back:hover { background: #e9ecef; }
         .pin-item { padding: 10px 14px; margin: 5px 0; border-radius: 6px; display: flex; align-items: center; gap: 12px; border: 1px solid #e9ecef; }
         .pin-indicator { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
         .pin-description { font-size: 14px; color: #222; }
@@ -28,8 +29,8 @@ const char web_display_html[] PROGMEM = R"rawliteral(
 <body>
     <div class="container">
         <div class="header">
-            <h1>Display &mdash; [<span id="title-hostname">-</span>]</h1>
-            <a href="/" class="btn-back">&#8592; Voltar</a>
+            <a href="/" class="btn-back" title="Voltar">&#8962;</a>
+            <h1 id="title-hostname">-</h1>
         </div>
         <div id="pins-list"><p style="text-align:center;color:#666;">Carregando...</p></div>
         <div class="footer">Atualiza a cada <span id="refresh-seconds">15</span>s</div>
@@ -49,7 +50,7 @@ const char web_display_html[] PROGMEM = R"rawliteral(
                 const hostname = sys.hostname || '-', corAlerta = sys.cor_com_alerta || '#dc3545';
                 const corOk = sys.cor_sem_alerta || '#28a745', tempoRefresh = sys.tempo_refresh || 15;
                 document.getElementById('title-hostname').textContent = hostname;
-                document.title = 'SMCR - Display [' + hostname + ']';
+                document.title = hostname;
                 document.getElementById('refresh-seconds').textContent = tempoRefresh;
                 const novoInterval = tempoRefresh * 1000;
                 if (novoInterval !== currentInterval) { currentInterval = novoInterval; if (refreshTimer) clearInterval(refreshTimer); refreshTimer = setInterval(updateDisplay, currentInterval); }
