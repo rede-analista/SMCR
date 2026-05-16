@@ -14,6 +14,7 @@
 #include "web_littlefs.h"
 #include "web_serial.h"
 #include "web_historico.h"
+#include "web_display.h"
 #include <LittleFS.h>
 #include <Preferences.h>
 // Inclusões para navegação completa no NVS
@@ -113,6 +114,11 @@ void fV_setupWebServer() {
              fV_printSerialDebug(LOG_WEB, "[PERFORMANCE] FIM carregamento / (dashboard) - %s (millis: %lu, duracao: %lu ms)", endTimeStr.c_str(), endTime, endTime - startTime);
          }
      });
+
+    // Rota: página Display (lista de pinos com indicador de alerta, sem valores)
+    SERVIDOR_WEB_ASYNC->on("/display", HTTP_GET, [](AsyncWebServerRequest *request) {
+        servePageWithFallback(request, "/web_display.html", web_display_html);
+    });
 
     // CORREÇÃO: Rota para salvar a configuracao inicial usa HTTP_POST e chama o handler
     SERVIDOR_WEB_ASYNC->on("/save_config", HTTP_POST, fV_handleSaveConfig);
