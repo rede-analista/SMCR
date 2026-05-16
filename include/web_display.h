@@ -23,7 +23,7 @@ const char web_display_html[] PROGMEM = R"rawliteral(
         .btn-dark { position: absolute; right: 0; background: none; border: none; cursor: pointer; font-size: 20px; line-height: 1; padding: 4px 6px; border-radius: 6px; color: #555; }
         .btn-dark:hover { background: #e9ecef; }
         .pin-item { padding: 10px 14px; margin: 5px 0; border-radius: 6px; display: flex; align-items: center; gap: 12px; border: 1px solid #e9ecef; }
-        .pin-indicator { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+        .pin-indicator { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; }
         .pin-description { font-size: 14px; }
         .footer { text-align: center; font-size: 11px; color: #aaa; margin-top: 14px; }
         body.dark { background: #1a1a1a; color: #e0e0e0; }
