@@ -97,7 +97,7 @@ void fV_cloudOtaFromGitHub(void) {
         esp_task_wdt_delete(NULL);
     }
     if (vO_pinActionTaskHandle) vTaskSuspend(vO_pinActionTaskHandle);
-    delay(200);
+    delay(3000); // aguarda TIME_WAIT do TCP anterior expirar no lwIP
 
     fV_printSerialDebug(LOG_NETWORK, "[OTA] Iniciando update via proxy cloud...");
 
@@ -114,7 +114,7 @@ void fV_cloudOtaFromGitHub(void) {
     if (vSt_mainConfig.vB_cloudUseHttps) secClient.setInsecure();
 
     HTTPClient http;
-    http.setTimeout(270000); // 270s — aguarda PHP baixar firmware do GitHub (Apache Timeout=300)
+    http.setTimeout(60000); // 60s — cabe em uint16_t sem overflow; PHP responde em streaming
     http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
     const char* hdrs[] = {"X-Firmware-Version"};
