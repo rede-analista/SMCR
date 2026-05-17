@@ -114,7 +114,7 @@ void fV_cloudOtaFromGitHub(void) {
     if (vSt_mainConfig.vB_cloudUseHttps) secClient.setInsecure();
 
     HTTPClient http;
-    http.setTimeout(60000);
+    http.setTimeout(270000); // 270s — aguarda PHP baixar firmware do GitHub (Apache Timeout=300)
     http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
     const char* hdrs[] = {"X-Firmware-Version"};
