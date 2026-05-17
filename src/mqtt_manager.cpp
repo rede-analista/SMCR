@@ -29,8 +29,9 @@ unsigned long vUL_lastDiscoveryPublish = 0; // controle de ritmo entre publicaç
 // ID único do módulo (baseado no MAC)
 String vS_mqttUniqueId = "";
 
-// Forward declaration
+// Forward declarations
 void fV_publishMqttDiscoveryStep(void);
+void fV_publishAllPinsPriority(void);
 
 /**
  * Gera um ID único baseado no MAC do ESP32 para uso no MQTT
@@ -258,7 +259,7 @@ void fV_setupMqtt(void) {
             vB_discoveryPublished = true;
         }
         
-        // Publicar status inicial de todos os pinos e inter-módulos
+        // Publicar status inicial de todos os pinos, prioridades e inter-módulos
         fV_publishAllPinsStatus();
         fV_publishAllInterModStatus();
         
@@ -541,12 +542,26 @@ void fV_publishMqttDiscoveryStep(void) {
 
         bool success = vO_mqttClient.publish(configTopic.c_str(), payload.c_str(), true);
         if (success) {
-            fV_printSerialDebug(LOG_MQTT, "[MQTT] Discovery publicado para pino %d (tipo=%d, modo=%d, component=%s)", 
+            fV_printSerialDebug(LOG_MQTT, "[MQTT] Discovery publicado para pino %d (tipo=%d, modo=%d, component=%s)",
                 pin->pino, pin->tipo, pin->modo, component.c_str());
             fV_printSerialDebug(LOG_MQTT, "[MQTT] Topico: %s", configTopic.c_str());
             fV_printSerialDebug(LOG_MQTT, "[MQTT] Payload: %s", payload.c_str());
         } else {
             fV_printSerialDebug(LOG_MQTT, "[MQTT] ERRO ao publicar discovery para pino %d", pin->pino);
+        }
+
+        // Sensor de prioridade para pinos de saída digital/PWM
+        if (isOutput || isPWM) {
+            String prioObjId = objectId + "_prio";
+            String prioTopic = vSt_mainConfig.vS_mqttTopicBase + "/" + uniqueId + "/pin/" + String(pin->pino) + "/priority";
+            String prioCfgTopic = "homeassistant/sensor/" + prioObjId + "/config";
+            String prioPayload = "{\"name\":\"" + pinName + " Prioridade\","
+                + "\"unique_id\":\"" + prioObjId + "\","
+                + "\"state_topic\":\"" + prioTopic + "\","
+                + "\"icon\":\"mdi:alert-circle-outline\","
+                + "\"device\":{\"identifiers\":[\"" + uniqueId + "\"],\"name\":\"" + deviceName + "\"}"
+                + "}";
+            vO_mqttClient.publish(prioCfgTopic.c_str(), prioPayload.c_str(), true);
         }
 
         publishedThisCycle++;
@@ -630,8 +645,9 @@ void fV_publishInterModStatus(uint8_t index) {
     if (!vO_mqttClient.connected() || index >= vU8_activeInterModCount) return;
     InterModConfig_t* m = &vA_interModConfigs[index];
     String base = vSt_mainConfig.vS_mqttTopicBase + "/" + fS_getMqttUniqueId() + "/intermod/" + m->id;
-    vO_mqttClient.publish((base + "/online").c_str(), m->online ? "1" : "0", true);
+    vO_mqttClient.publish((base + "/status").c_str(), m->online ? "online" : "offline", true);
     vO_mqttClient.publish((base + "/ativo").c_str(),  m->ativo  ? "1" : "0", true);
+    fV_publishAllPinsPriority();
 }
 
 void fV_publishAllInterModStatus(void) {
@@ -646,16 +662,42 @@ void fV_publishAllPinsStatus(void) {
     if (!vO_mqttClient.connected()) {
         return;
     }
-    
+
     // Early return se não há pinos configurados
     if (vU8_activePinsCount == 0) {
         return;
     }
-    
+
     fV_printSerialDebug(LOG_MQTT, "[MQTT] Publicando status de todos os pinos");
-    
+
     for (uint8_t i = 0; i < vU8_activePinsCount; i++) {
         fV_publishPinStatus(i);
         delay(10); // Pequeno delay entre publicações
+    }
+    fV_publishAllPinsPriority();
+}
+
+// Retorna prioridade atual de um GPIO: 1=offline(P1), 2=ação(P2), 3=healthcheck(P3), 0=normal
+static uint8_t fU8_getPinPriority(uint16_t gpio) {
+    if (fB_isPinBlockedByOffline(gpio)) return 1;
+    if (fB_isPinUsedByActiveAction(gpio)) return 2;
+    if (fB_isPinInHealthcheckPins(gpio)) return 3;
+    return 0;
+}
+
+void fV_publishPinPriority(uint8_t pinIndex) {
+    if (!vO_mqttClient.connected() || pinIndex >= vU8_activePinsCount) return;
+    PinConfig_t* pin = &vA_pinConfigs[pinIndex];
+    if (pin->tipo == 0) return;
+    String topic = vSt_mainConfig.vS_mqttTopicBase + "/" + fS_getMqttUniqueId()
+                   + "/pin/" + String(pin->pino) + "/priority";
+    uint8_t prio = fU8_getPinPriority(pin->pino);
+    vO_mqttClient.publish(topic.c_str(), String(prio).c_str(), true);
+}
+
+void fV_publishAllPinsPriority(void) {
+    if (!vO_mqttClient.connected() || vU8_activePinsCount == 0) return;
+    for (uint8_t i = 0; i < vU8_activePinsCount; i++) {
+        fV_publishPinPriority(i);
     }
 }

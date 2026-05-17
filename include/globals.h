@@ -12,7 +12,7 @@ Inclusão de bibliotecas
 #include <freertos/task.h>
 
 // Versão do firmware atual
-#define FIRMWARE_VERSION "2.3.55"
+#define FIRMWARE_VERSION "2.3.56"
 
 
 // Objeto Preferences global, para ser acessado em qualquer lugar
@@ -438,7 +438,9 @@ void fV_mqttLoop(void);               // Loop MQTT (reconexão automática não 
 void fV_publishMqttDiscovery(void);   // Publica configurações de auto-discovery do Home Assistant
 void fV_publishPinStatus(uint8_t pinIndex);   // Publica status de um pino específico
 void fV_publishAllPinsStatus(void);           // Publica status de todos os pinos
-void fV_publishInterModStatus(uint8_t index); // Publica status de um inter-módulo (online + ativo)
+void fV_publishPinPriority(uint8_t pinIndex); // Publica prioridade de um pino (0=normal,1=offline,2=ação,3=healthcheck)
+void fV_publishAllPinsPriority(void);         // Publica prioridade de todos os pinos
+void fV_publishInterModStatus(uint8_t index); // Publica status de um inter-módulo (online/offline + ativo)
 void fV_publishAllInterModStatus(void);        // Publica status de todos os inter-módulos
 String fS_getMqttStatus(void);        // Retorna status da conexão MQTT
 String fS_getMqttUniqueId(void);      // Retorna ID único do módulo para MQTT
@@ -458,7 +460,8 @@ void fV_interModDiscoveryTask(void);           // Task de descoberta automática
 void fV_interModAlertFlashTask(void);          // Task de piscar LEDs de alerta quando módulo offline
 bool fB_checkModuleHealth(uint8_t moduleIndex); // Verifica saúde de um módulo específico
 String fS_getInterModStatus(void);             // Retorna resumo de status dos módulos
-bool fB_isPinBlockedByOffline(uint16_t gpio);  // Retorna true se algum módulo offline usa este GPIO para alerta offline
+bool fB_isPinBlockedByOffline(uint16_t gpio);      // Retorna true se algum módulo offline usa este GPIO para alerta offline
+bool fB_isPinInHealthcheckPins(uint16_t gpio);    // Retorna true se algum módulo usa este GPIO para alerta de healthcheck
 
 extern TaskHandle_t vO_pinActionTaskHandle;
 

@@ -760,6 +760,17 @@ bool fB_isPinBlockedByOffline(uint16_t gpio) {
     return false;
 }
 
+bool fB_isPinInHealthcheckPins(uint16_t gpio) {
+    if (millis() >= vU32_healthCheckFlashUntil) return false;
+    for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
+        InterModConfig_t* m = &vA_interModConfigs[i];
+        if (m->ativo && m->healthcheck_alert_enabled && fB_isPinInString(m->pins_healthcheck, gpio)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /**
  * @brief Verifica se qualquer GPIO da string tem conflito de prioridade para o healthcheck
  * Conflito: pino bloqueado por alerta offline (P1) ou com ação ativa (P2)
@@ -793,6 +804,12 @@ void fV_interModAlertFlashTask(void) {
 
     unsigned long now = millis();
     bool inHealthCheckFlash = (now < vU32_healthCheckFlashUntil);
+
+    static bool vB_prevHcActive = false;
+    if (inHealthCheckFlash != vB_prevHcActive) {
+        vB_prevHcActive = inHealthCheckFlash;
+        fV_publishAllPinsPriority();
+    }
 
     for (uint8_t i = 0; i < vU8_activeInterModCount; i++) {
         InterModConfig_t* m = &vA_interModConfigs[i];
