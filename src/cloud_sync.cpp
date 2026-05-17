@@ -142,9 +142,10 @@ void fV_cloudOtaFromGitHub(void) {
     int contentLen   = http.getSize();
     fV_printSerialDebug(LOG_NETWORK, "[OTA] Firmware %s | %d bytes. Gravando...", fwVersion.c_str(), contentLen);
 
+    Update.abort(); // limpa estado sujo de tentativa anterior
     if (!Update.begin(contentLen > 0 ? (size_t)contentLen : UPDATE_SIZE_UNKNOWN)) {
         http.end();
-        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao iniciar Update (sem espaco?)");
+        fV_printSerialDebug(LOG_NETWORK, "[OTA] Falha ao iniciar Update: erro %d (%s)", Update.getError(), Update.errorString());
         if (vO_pinActionTaskHandle) vTaskResume(vO_pinActionTaskHandle);
         return;
     }
