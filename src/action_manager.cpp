@@ -530,10 +530,14 @@ bool fB_isPinUsedByActiveAction(uint16_t gpio) {
         ActionConfig_t* a = &vA_actionConfigs[i];
         if (a->acao == ACTION_TYPE_NONE || a->pino_destino != gpio) continue;
         if (a->estado_acao) return true;
-        // LIGA zera estado_acao imediatamente; considera ativa enquanto a origem estiver ligada
+        // LIGA zera estado_acao imediatamente; considera ativa enquanto a origem remota estiver ligada
+        // Só aplica para pinos remotos (tipo=65534): status_atual=1 significa relê ON de forma persistente
+        // Pinos locais (botões, digitais) têm status_atual transitório — não indica ação em efeito
         if (a->acao == ACTION_TYPE_LIGA) {
             uint8_t originIdx = fU8_findPinIndex(a->pino_origem);
-            if (originIdx < vU8_activePinsCount && vA_pinConfigs[originIdx].status_atual == 1) return true;
+            if (originIdx < vU8_activePinsCount &&
+                vA_pinConfigs[originIdx].tipo == 65534 &&
+                vA_pinConfigs[originIdx].status_atual == 1) return true;
         }
     }
     return false;
