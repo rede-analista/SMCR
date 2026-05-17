@@ -604,6 +604,7 @@ void fV_writeActionPin(uint8_t pinIndex, uint8_t pinGpio, bool ligar) {
         // Publica no MQTT se habilitado
         if (vSt_mainConfig.vB_mqttEnabled) {
             fV_publishPinStatus(pinIndex);
+            fV_publishPinPriority(pinIndex);
         }
     }
     
