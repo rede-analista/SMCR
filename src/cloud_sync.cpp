@@ -166,8 +166,8 @@ void fV_cloudOtaFromGitHub(void) {
             if (expected > 0 && written >= expected) break;
         } else if (!http.connected()) {
             break;
-        } else if (millis() - lastAct > 30000) {
-            fV_printSerialDebug(LOG_NETWORK, "[OTA] Timeout de inatividade (30s)");
+        } else if (millis() - lastAct > 60000) {
+            fV_printSerialDebug(LOG_NETWORK, "[OTA] Timeout de inatividade (60s)");
             break;
         }
         yield();
