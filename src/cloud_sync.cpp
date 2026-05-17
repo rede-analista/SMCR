@@ -153,7 +153,7 @@ void fV_cloudOtaFromGitHub(void) {
     WiFiClient* stream     = http.getStreamPtr();
     size_t written         = 0;
     size_t expected        = (contentLen > 0) ? (size_t)contentLen : 0;
-    uint8_t buf[512];
+    uint8_t buf[4096];
     unsigned long lastAct  = millis();
 
     while (true) {
@@ -167,8 +167,8 @@ void fV_cloudOtaFromGitHub(void) {
             if (expected > 0 && written >= expected) break;
         } else if (!http.connected()) {
             break;
-        } else if (millis() - lastAct > 60000) {
-            fV_printSerialDebug(LOG_NETWORK, "[OTA] Timeout de inatividade (60s)");
+        } else if (millis() - lastAct > 120000) {
+            fV_printSerialDebug(LOG_NETWORK, "[OTA] Timeout de inatividade (120s)");
             break;
         }
         yield();
