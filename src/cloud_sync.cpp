@@ -108,6 +108,7 @@ void fV_cloudOtaFromGitHub(void) {
     }
 
     String url = fS_cloudBaseUrl() + "/api/get_firmware.php?token=" + vSt_mainConfig.vS_cloudApiToken;
+    fV_printSerialDebug(LOG_NETWORK, "[OTA] URL: %s", url.c_str());
 
     WiFiClientSecure secClient;
     if (vSt_mainConfig.vB_cloudUseHttps) secClient.setInsecure();
