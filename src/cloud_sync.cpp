@@ -153,7 +153,7 @@ void fV_cloudOtaFromGitHub(void) {
     WiFiClient* stream     = http.getStreamPtr();
     size_t written         = 0;
     size_t expected        = (contentLen > 0) ? (size_t)contentLen : 0;
-    uint8_t buf[4096];
+    static uint8_t buf[4096]; // static: BSS, não consome stack (TLS já usa ~4KB)
     unsigned long lastAct  = millis();
 
     while (true) {
