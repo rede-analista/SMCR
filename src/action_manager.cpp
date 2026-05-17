@@ -522,15 +522,18 @@ bool fB_updateActionConfig(uint16_t pinOrigem, uint8_t numeroAcao, const ActionC
 }
 
 //========================================
-// Verifica se alguma ação ATIVA (estado_acao=true) usa este GPIO como destino
+// Verifica se alguma ação ATIVA usa este GPIO como destino
 // Usado pelo sistema de prioridades: ação tem precedência sobre healthcheck
 //========================================
 bool fB_isPinUsedByActiveAction(uint16_t gpio) {
     for (uint8_t i = 0; i < vU8_activeActionsCount; i++) {
-        if (vA_actionConfigs[i].acao != ACTION_TYPE_NONE &&
-            vA_actionConfigs[i].estado_acao &&
-            vA_actionConfigs[i].pino_destino == gpio) {
-            return true;
+        ActionConfig_t* a = &vA_actionConfigs[i];
+        if (a->acao == ACTION_TYPE_NONE || a->pino_destino != gpio) continue;
+        if (a->estado_acao) return true;
+        // LIGA zera estado_acao imediatamente; considera ativa enquanto a origem estiver ligada
+        if (a->acao == ACTION_TYPE_LIGA) {
+            uint8_t originIdx = fU8_findPinIndex(a->pino_origem);
+            if (originIdx < vU8_activePinsCount && vA_pinConfigs[originIdx].status_atual == 1) return true;
         }
     }
     return false;
