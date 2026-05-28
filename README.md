@@ -144,7 +144,6 @@ Após configurar o WiFi, o módulo reinicia e se conecta à sua rede. Acesse pel
 - Flash com ~97% de uso — evitar adicionar strings longas ou novas features sem remover código existente
 - Sem validação de entradas — configurações incorretas de pinagem podem causar travamentos ou danos ao ESP32
 - Sem HTTPS — não recomendado em redes públicas ou desprotegidas
-- Comunicação inter-módulo depende de broker MQTT disponível
 
 ---
 
